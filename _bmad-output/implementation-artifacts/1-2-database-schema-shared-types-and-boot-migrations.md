@@ -1,6 +1,6 @@
 # Story 1.2: Database Schema, Shared Types & Boot Migrations
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -18,39 +18,58 @@ so that every subsequent story has a stable, typed data contract to build agains
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement `src/db/schema.ts` — full Drizzle table definition (AC: 1)
-  - [ ] Replace stub with complete `jobs` table using `sqliteTable` from `drizzle-orm/sqlite-core`
-  - [ ] Define all 17 columns (id + 11 Sheets-owned + 5 user-owned) with explicit `snake_case` DB column names
-  - [ ] Add `uniqueIndex('company_job_title_idx')` on `(company, job_title)`
-  - [ ] Use `integer('applied', { mode: 'boolean' })` for boolean mapping; all nullable fields without `.notNull()`
-  - [ ] Annotate Sheets-owned vs user-owned with inline comments (core invariant reference for Story 2.1)
-- [ ] Task 2: Implement `src/db/client.ts` — Drizzle client singleton (AC: 3)
-  - [ ] Replace stub with `Database` from `bun:sqlite` (built-in — do NOT install better-sqlite3)
-  - [ ] Create `drizzle(sqlite, { schema })` singleton; export as `db`
-  - [ ] Read DB path from `process.env.DB_PATH ?? './data/jobs.db'`
-- [ ] Task 3: Implement `src/shared/schemas.ts` — Zod schemas + inferred types (AC: 2)
-  - [ ] Replace stub with full Zod schemas: `jobSchema`, `ingestPayloadSchema`, `syncResultSchema`
-  - [ ] Export inferred TypeScript types: `Job`, `IngestPayload`, `SyncResult`
-  - [ ] `recommendation` field: `z.enum(['apply', 'investigate', 'skip']).nullable()`
-  - [ ] `applied` field: `z.boolean()`; all date fields: `z.string().nullable()` (ISO 8601)
-- [ ] Task 4: Generate initial migration (AC: 1, 3)
-  - [ ] Run `bun run db:generate` — Drizzle Kit generates SQL in `src/db/migrations/`
-  - [ ] Verify generated SQL has all columns and `CREATE UNIQUE INDEX company_job_title_idx`
-  - [ ] Commit the generated migration file (it is source-controlled; `data/` is gitignored, migrations are not)
-- [ ] Task 5: Implement `src/db/migrate.ts` — boot migration runner (AC: 3)
-  - [ ] Replace stub with `migrate()` from `drizzle-orm/bun-sqlite/migrator`
-  - [ ] Export `runMigrations()` function (synchronous — bun:sqlite migrate is sync, no await)
-  - [ ] Use `import.meta.main` guard for standalone execution (Bun pattern — NOT Node's `require.main`)
-  - [ ] Log `[db] Migrations complete` on success
-- [ ] Task 6: Wire migrations into `src/index.ts` (AC: 3)
-  - [ ] Replace `// TODO Story 1.2: boot migrations here` with import + call to `runMigrations()`
-  - [ ] Keep `// TODO Story 1.3` and `// TODO Epic 2+` comments intact — other stories depend on them
-- [ ] Task 7: Verify all AC pass
-  - [ ] `tsc --noEmit` passes with no TypeScript errors
-  - [ ] `bun run db:generate` produces correct migration SQL
-  - [ ] `bun start` creates `data/jobs.db` and logs migration success
-  - [ ] Second `bun start` completes without error (idempotent)
-  - [ ] `import { Job } from '@shared/schemas'` compiles from both `src/server/` and `src/client/` paths
+- [x] Task 1: Implement `src/db/schema.ts` — full Drizzle table definition (AC: 1)
+  - [x] Replace stub with complete `jobs` table using `sqliteTable` from `drizzle-orm/sqlite-core`
+  - [x] Define all 17 columns (id + 11 Sheets-owned + 5 user-owned) with explicit `snake_case` DB column names
+  - [x] Add `uniqueIndex('company_job_title_idx')` on `(company, job_title)`
+  - [x] Use `integer('applied', { mode: 'boolean' })` for boolean mapping; all nullable fields without `.notNull()`
+  - [x] Annotate Sheets-owned vs user-owned with inline comments (core invariant reference for Story 2.1)
+- [x] Task 2: Implement `src/db/client.ts` — Drizzle client singleton (AC: 3)
+  - [x] Replace stub with `Database` from `bun:sqlite` (built-in — do NOT install better-sqlite3)
+  - [x] Create `drizzle(sqlite, { schema })` singleton; export as `db`
+  - [x] Read DB path from `process.env.DB_PATH ?? './data/jobs.db'`
+- [x] Task 3: Implement `src/shared/schemas.ts` — Zod schemas + inferred types (AC: 2)
+  - [x] Replace stub with full Zod schemas: `jobSchema`, `ingestPayloadSchema`, `syncResultSchema`
+  - [x] Export inferred TypeScript types: `Job`, `IngestPayload`, `SyncResult`
+  - [x] `recommendation` field: `z.enum(['apply', 'investigate', 'skip']).nullable()`
+  - [x] `applied` field: `z.boolean()`; all date fields: `z.string().nullable()` (ISO 8601)
+- [x] Task 4: Generate initial migration (AC: 1, 3)
+  - [x] Run `bun run db:generate` — Drizzle Kit generates SQL in `src/db/migrations/`
+  - [x] Verify generated SQL has all columns and `CREATE UNIQUE INDEX company_job_title_idx`
+  - [x] Commit the generated migration file (it is source-controlled; `data/` is gitignored, migrations are not)
+- [x] Task 5: Implement `src/db/migrate.ts` — boot migration runner (AC: 3)
+  - [x] Replace stub with `migrate()` from `drizzle-orm/bun-sqlite/migrator`
+  - [x] Export `runMigrations()` function (synchronous — bun:sqlite migrate is sync, no await)
+  - [x] Use `import.meta.main` guard for standalone execution (Bun pattern — NOT Node's `require.main`)
+  - [x] Log `[db] Migrations complete` on success
+- [x] Task 6: Wire migrations into `src/index.ts` (AC: 3)
+  - [x] Replace `// TODO Story 1.2: boot migrations here` with import + call to `runMigrations()`
+  - [x] Keep `// TODO Story 1.3` and `// TODO Epic 2+` comments intact — other stories depend on them
+- [x] Task 7: Verify all AC pass
+  - [x] `tsc --noEmit` passes with no TypeScript errors
+  - [x] `bun run db:generate` produces correct migration SQL
+  - [x] `bun start` creates `data/jobs.db` and logs migration success
+  - [x] Second `bun start` completes without error (idempotent)
+  - [x] `import { Job } from '@shared/schemas'` compiles from both `src/server/` and `src/client/` paths
+
+### Review Follow-ups (AI)
+
+- [x] [Review][Defer] CWD-relative `migrationsFolder` breaks when process not started from project root [src/db/migrate.ts:5] — deferred, by spec design; use `import.meta.dir` in a future refactor
+- [x] [Review][Defer] `runMigrations()` has no error handling — migration failure crashes process with raw stack trace [src/db/migrate.ts] — deferred, by spec design
+- [x] [Review][Defer] `DB_PATH` env var not validated — arbitrary path accepted, Story 1.3 scope [src/db/client.ts:5] — deferred, pre-existing
+- [x] [Review][Defer] `recommendation` column is unconstrained `text` in DB; only Zod enforces the enum [src/db/schema.ts:10] — deferred, architectural (SQLite has no native enum type)
+- [x] [Review][Defer] `company`/`jobTitle` accept empty strings — `z.string()` allows `""` per spec [src/shared/schemas.ts:6-7] — deferred, by spec design; add `.min(1)` in future if ingest issues arise
+- [x] [Review][Defer] `company`/`jobTitle` uniqueness key has no case normalization — SQLite text comparisons are case-sensitive [src/db/schema.ts] — deferred, architectural decision
+- [x] [Review][Defer] `db` singleton never closed on process shutdown — WAL may not flush on unclean exit [src/db/client.ts] — deferred, architectural
+- [x] [Review][Defer] Date fields stored as raw `text` with no format constraint — Zod uses `z.string().nullable()` per spec [src/db/schema.ts] — deferred, by spec design
+- [x] [Review][Defer] `fitScore` has no DB-level CHECK constraint — only Zod enforces `[0, 100]` [src/db/schema.ts] — deferred, architectural (Drizzle/SQLite pattern)
+
+## Senior Developer Review (AI)
+
+**Review Date:** 2026-03-28
+**Outcome:** Approve — 0 patch findings. Implementation matches spec exactly.
+**Dismissed (5):** False positive duplicate SQL column (prompt artifact), false positive migration path (diff display artifact), intended TODO removal, cosmetic missing newline, no actionable DB_PATH security issue beyond Story 1.3 scope.
+**Deferred (9):** See Review Follow-ups above — all are pre-existing architectural decisions or explicitly deferred to Story 1.3.
 
 ## Dev Notes
 
@@ -314,10 +333,32 @@ No new directories needed — all created via `.gitkeep` in Story 1.1.
 
 ### Agent Model Used
 
-_to be filled by dev agent_
+claude-sonnet-4-6
 
 ### Debug Log References
 
+_None — clean implementation, no debugging required._
+
 ### Completion Notes List
 
+- Replaced all 4 stub files with full implementations as specified in Dev Notes
+- `src/db/schema.ts`: Full Drizzle `jobs` table with 17 columns, explicit snake_case column names, and `company_job_title_idx` unique index. Ownership comments preserved.
+- `src/db/client.ts`: Drizzle singleton using `bun:sqlite` (built-in), reads DB path from `DB_PATH` env var with `./data/jobs.db` fallback.
+- `src/shared/schemas.ts`: Full Zod schemas (`jobInputSchema`, `jobSchema`, `ingestPayloadSchema`, `syncResultSchema`) plus inferred TypeScript types (`Job`, `JobInput`, `IngestPayload`, `SyncResult`).
+- `src/db/migrate.ts`: Synchronous migration runner using `drizzle-orm/bun-sqlite/migrator`, with `import.meta.main` guard for standalone execution.
+- `src/index.ts`: Replaced TODO comment with `runMigrations()` call before route registration; `// TODO Story 1.3` and `// TODO Epic 2+` comments preserved.
+- Migration generated: `src/db/migrations/0000_dashing_mister_fear.sql` — SQL matches spec (all 17 columns + unique index).
+- All ACs verified: `tsc --noEmit` passes, `bun start` creates `data/jobs.db` and logs `[db] Migrations complete`, second run is idempotent.
+
 ### File List
+
+- `src/db/schema.ts` (modified)
+- `src/db/client.ts` (modified)
+- `src/db/migrate.ts` (modified)
+- `src/shared/schemas.ts` (modified)
+- `src/index.ts` (modified)
+- `src/db/migrations/0000_dashing_mister_fear.sql` (new)
+
+### Change Log
+
+- 2026-03-28: Implemented Story 1.2 — database schema, Drizzle client, Zod shared types, boot migration runner, and wired migrations into server entry point.

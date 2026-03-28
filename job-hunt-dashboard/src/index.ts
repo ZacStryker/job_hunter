@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import { join } from 'node:path'
+import { runMigrations } from './db/migrate'
 
 const app = new Hono()
 
-// TODO Story 1.2: boot migrations here
+runMigrations()
 // TODO Story 1.3: env validation here
 // TODO Epic 2+: mount API routes here
 

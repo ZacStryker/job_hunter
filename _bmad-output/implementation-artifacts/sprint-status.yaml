@@ -45,7 +45,7 @@ development_status:
   # Epic 1: Working Application Foundation
   epic-1: in-progress
   1-1-project-scaffold-and-dev-prod-scripts: done
-  1-2-database-schema-shared-types-and-boot-migrations: ready-for-dev
+  1-2-database-schema-shared-types-and-boot-migrations: done
   1-3-app-shell-environment-config-and-react-entry: backlog
   epic-1-retrospective: optional
 
