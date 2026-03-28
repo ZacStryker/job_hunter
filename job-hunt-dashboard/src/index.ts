@@ -6,7 +6,22 @@ import { runMigrations } from './db/migrate'
 const app = new Hono()
 
 runMigrations()
-// TODO Story 1.3: env validation here
+const REQUIRED_ENV_VARS = [
+  'PORT',
+  'DB_PATH',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'GOOGLE_REFRESH_TOKEN',
+  'GOOGLE_SPREADSHEET_ID',
+] as const
+
+const missingVars = REQUIRED_ENV_VARS.filter((key) => !process.env[key])
+if (missingVars.length > 0) {
+  console.error(
+    `[env] Missing required environment variables:\n${missingVars.map((k) => `  - ${k}`).join('\n')}`
+  )
+  process.exit(1)
+}
 // TODO Epic 2+: mount API routes here
 
 // Resolve dist/ relative to this file, not CWD — safe for any working directory
