@@ -1,0 +1,93 @@
+# generated: 2026-03-27
+# last_updated: 2026-03-27
+# project: bmad
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-03-27
+last_updated: 2026-03-28  # updated by dev agent
+project: bmad
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 1: Working Application Foundation
+  epic-1: in-progress
+  1-1-project-scaffold-and-dev-prod-scripts: done
+  1-2-database-schema-shared-types-and-boot-migrations: backlog
+  1-3-app-shell-environment-config-and-react-entry: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: Data Ingestion & Sheets Sync
+  epic-2: backlog
+  2-1-api-ingest-endpoint-with-transactional-upsert: backlog
+  2-2-google-sheets-oauth-client-and-column-mapping: backlog
+  2-3-api-sync-endpoint-and-sync-button-ui: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: Pipeline View — Job Triage at a Glance
+  epic-3: backlog
+  3-1-jobs-api-and-tanstack-query-hook: backlog
+  3-2-pipeline-table-with-fit-score-badge-and-action-chip: backlog
+  3-3-column-visibility-toggle-and-localstorage-persistence: backlog
+  3-4-view-switching-loading-and-empty-states: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: Job Detail & Decision — The Triage Moment
+  epic-4: backlog
+  4-1-job-detail-drawer-shell-and-row-click: backlog
+  4-2-ai-analysis-display-in-drawer: backlog
+  4-3-applied-toggle-and-status-override-with-persistence: backlog
+  4-4-status-timeline: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: Tracker View — Monitoring Applied Applications
+  epic-5: backlog
+  5-1-tracker-table-with-applied-jobs: backlog
+  5-2-visual-row-aging: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6 (Post-MVP): Email Status Detection
+  epic-6: backlog
+  6-1-imap-polling-service: backlog
+  6-2-fuzzy-email-to-job-matching-and-status-update: backlog
+  6-3-email-events-visible-in-drawer: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7 (Post-MVP): Cover Letter Generation Pipeline
+  epic-7: backlog
+  7-1-cover-letter-generation-trigger: backlog
+  7-2-n8n-webhook-callback-and-cover-letter-storage: backlog
+  7-3-cover-letter-display-and-table-row-indicator: backlog
+  epic-7-retrospective: optional
