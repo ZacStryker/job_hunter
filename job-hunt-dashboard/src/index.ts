@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import { join } from 'node:path'
 import { runMigrations } from './db/migrate'
+import ingestRoute from './server/routes/api-ingest'
+import { errorHandler } from './server/middleware/error-handler'
 
 const app = new Hono()
 
@@ -22,7 +24,8 @@ if (missingVars.length > 0) {
   )
   process.exit(1)
 }
-// TODO Epic 2+: mount API routes here
+app.route('/api/ingest', ingestRoute)
+app.onError(errorHandler)
 
 // Resolve dist/ relative to this file, not CWD — safe for any working directory
 const distDir = join(import.meta.dir, '..', 'dist')
