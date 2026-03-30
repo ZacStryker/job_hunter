@@ -3,6 +3,7 @@ import { serveStatic } from 'hono/bun'
 import { join } from 'node:path'
 import { runMigrations } from './db/migrate'
 import ingestRoute from './server/routes/api-ingest'
+import syncRoute from './server/routes/api-sync'
 import { errorHandler } from './server/middleware/error-handler'
 
 const app = new Hono()
@@ -25,6 +26,7 @@ if (missingVars.length > 0) {
   process.exit(1)
 }
 app.route('/api/ingest', ingestRoute)
+app.route('/api/sync', syncRoute)
 app.onError(errorHandler)
 
 // Resolve dist/ relative to this file, not CWD — safe for any working directory

@@ -30,6 +30,15 @@
 - No payload size limit on `ingestPayloadSchema` — no `.max()` on the array. A very large batch could hold the SQLite write lock for an extended period. Non-issue for expected Sheets data volumes (~200 rows).
 - `dateScraped` (and other date fields) accept any string format; no ISO-8601 validation. Pre-existing from Story 1.2 review.
 
+## Deferred from: code review of 2-3-api-sync-endpoint-and-sync-button-ui (2026-03-30)
+
+- TOCTOU: `ingestJobs` pre-query snapshot runs outside the transaction — concurrent requests could cause count inaccuracy. Same pattern as Story 2.1 finding; single-user localhost tool so non-issue in practice.
+- `body.error` undefined guard in `useSyncMutation.ts` — if server returns non-standard error shape, UI renders "undefined. No data was modified." Architecture guarantees `{ error: string }` shape; revisit if error contract loosens.
+- `role="alert"` may not announce dynamically-inserted content in all screen reader/browser combinations — revisit if accessibility requirements harden for this tool.
+- `\x00` null-byte separator collision: if company/jobTitle contains a null byte, distinct rows could hash to same key. DB unique index still enforces correctness; only counts would be wrong. Exotic input, not expected from Sheets data.
+- Empty `rows[]` still runs full table scan pre-query in `ingestJobs`; add an early-return guard. Negligible at expected data volumes (~200 rows).
+- `api-sync.test.ts` `afterEach` resets `mockIngestJobs` to real implementation backed by shared `:memory:` DB; DB state is not cleared between test files. Pre-existing test architecture pattern.
+
 ## Deferred from: code review of 2-2-google-sheets-oauth-client-and-column-mapping (2026-03-29)
 
 - `parseInt` float truncation: `parseInt('82.5')` silently returns 82; spec mandates using `parseInt` so this is by design. If spreadsheet sources emit floats, add a `Number()` + `isFinite()` guard in a future pass.

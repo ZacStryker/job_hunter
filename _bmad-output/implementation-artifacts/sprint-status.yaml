@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-03-29 # updated by code-review agent
+last_updated: 2026-03-30 # updated by create-story agent
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -53,12 +53,12 @@ development_status:
   epic-2: in-progress
   2-1-api-ingest-endpoint-with-transactional-upsert: done
   2-2-google-sheets-oauth-client-and-column-mapping: done
-  2-3-api-sync-endpoint-and-sync-button-ui: backlog
+  2-3-api-sync-endpoint-and-sync-button-ui: done
   epic-2-retrospective: optional
 
   # Epic 3: Pipeline View — Job Triage at a Glance
-  epic-3: backlog
-  3-1-jobs-api-and-tanstack-query-hook: backlog
+  epic-3: in-progress
+  3-1-jobs-api-and-tanstack-query-hook: ready-for-dev
   3-2-pipeline-table-with-fit-score-badge-and-action-chip: backlog
   3-3-column-visibility-toggle-and-localstorage-persistence: backlog
   3-4-view-switching-loading-and-empty-states: backlog
