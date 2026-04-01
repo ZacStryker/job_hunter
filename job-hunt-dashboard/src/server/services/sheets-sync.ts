@@ -37,14 +37,14 @@ function mapRow(headers: string[], row: string[]): JobInput | null {
   }
 
   const company = get('company')
-  const jobTitle = get('job_title')
+  const jobTitle = get('title')
   if (!company || !jobTitle) return null
 
-  const fitScoreRaw = get('fit_score')
+  const fitScoreRaw = get('score')
   const fitScoreParsed = fitScoreRaw !== null ? parseInt(fitScoreRaw, 10) : null
   const fitScore = fitScoreParsed !== null && !isNaN(fitScoreParsed) ? fitScoreParsed : null
 
-  const rec = get('recommendation')
+  const rec = get('recommended_action')
   const recommendation =
     rec === 'apply' || rec === 'investigate' || rec === 'skip' ? rec : null
 
@@ -57,8 +57,8 @@ function mapRow(headers: string[], row: string[]): JobInput | null {
     requirementsMet: get('requirements_met'),
     requirementsMissed: get('requirements_missed'),
     redFlags: get('red_flags'),
-    jobDescription: get('job_description'),
-    sourceUrl: get('source_url'),
+    jobDescription: get('analysis'),
+    sourceUrl: get('url'),
     dateScraped: get('date_scraped'),
   }
 }

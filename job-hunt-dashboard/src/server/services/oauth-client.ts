@@ -11,6 +11,8 @@ export async function getAccessToken(): Promise<string> {
   })
 
   if (!res.ok) {
+    const errBody = await res.json().catch(() => res.text())
+    console.error('[oauth] Google token error:', JSON.stringify(errBody))
     throw new Error('OAuth token expired or invalid')
   }
 

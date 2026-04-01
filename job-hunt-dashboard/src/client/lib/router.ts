@@ -2,6 +2,8 @@ import { createRootRoute, createRoute, createRouter } from '@tanstack/react-rout
 import { Layout } from '../components/shared/Layout'
 import { PipelineRoute } from '../routes/index'
 import { TrackerRoute } from '../routes/tracker'
+import { queryClient } from './query-client'
+import { fetchJobs } from '../hooks/useJobsQuery'
 
 const rootRoute = createRootRoute({
   component: Layout,
@@ -11,6 +13,7 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: PipelineRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
 })
 
 const trackerRoute = createRoute({
@@ -23,7 +26,6 @@ const routeTree = rootRoute.addChildren([indexRoute, trackerRoute])
 
 export const router = createRouter({ routeTree })
 
-// Required for TypeScript inference throughout the app
 declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router

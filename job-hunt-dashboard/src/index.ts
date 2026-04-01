@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { runMigrations } from './db/migrate'
 import ingestRoute from './server/routes/api-ingest'
 import syncRoute from './server/routes/api-sync'
+import jobsRoute from './server/routes/api-jobs'
 import { errorHandler } from './server/middleware/error-handler'
 
 const app = new Hono()
@@ -27,6 +28,7 @@ if (missingVars.length > 0) {
 }
 app.route('/api/ingest', ingestRoute)
 app.route('/api/sync', syncRoute)
+app.route('/api/jobs', jobsRoute)
 app.onError(errorHandler)
 
 // Resolve dist/ relative to this file, not CWD — safe for any working directory

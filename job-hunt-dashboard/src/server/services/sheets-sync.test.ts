@@ -15,15 +15,15 @@ const { fetchJobsFromSheets } = await import('./sheets-sync')
 
 const HEADERS = [
   'company',
-  'job_title',
-  'fit_score',
-  'recommendation',
+  'title',
+  'score',
+  'recommended_action',
   'role_fit',
   'requirements_met',
   'requirements_missed',
   'red_flags',
-  'job_description',
-  'source_url',
+  'analysis',
+  'url',
   'date_scraped',
 ]
 
@@ -79,11 +79,11 @@ test('empty spreadsheet (0 data rows) → returns []', async () => {
   expect(jobs).toEqual([])
 })
 
-test('rows missing company or job_title → filtered out of result', async () => {
+test('rows missing company or title → filtered out of result', async () => {
   const values = [
     HEADERS,
     ['', 'Backend Engineer', '82', 'apply', '', '', '', '', '', '', ''],   // missing company
-    ['Acme Corp', '', '82', 'apply', '', '', '', '', '', '', ''],           // missing job_title
+    ['Acme Corp', '', '82', 'apply', '', '', '', '', '', '', ''],           // missing title
     ['Good Corp', 'Eng', '75', 'skip', '', '', '', '', '', '', ''],         // valid
   ]
 
@@ -96,7 +96,7 @@ test('rows missing company or job_title → filtered out of result', async () =>
   expect(jobs[0].company).toBe('Good Corp')
 })
 
-test('fit_score string "85" → parsed to integer 85', async () => {
+test('score string "85" → parsed to integer 85', async () => {
   const values = [
     HEADERS,
     ['TechCo', 'SWE', '85', 'apply', '', '', '', '', '', '', ''],
