@@ -49,3 +49,18 @@
 - `global.fetch` overwritten in `beforeEach` but never restored in `afterEach` in both test files. Low severity for co-located suites; add `afterAll(() => { global.fetch = originalFetch })` if test isolation issues arise.
 - Duplicate spreadsheet column names: `headers.indexOf()` silently uses the first match, ignoring subsequent columns with the same name. Non-issue for expected well-formed spreadsheets.
 - `headers.indexOf(col)` linear scan for each of ~11 fields per data row (O(n×m)); replace with a header-index map built once per `fetchJobsFromSheets()` call if large-sheet performance becomes an issue.
+
+## Deferred from: code review of 3-2-pipeline-table-with-fit-score-badge-and-action-chip (2026-04-01)
+
+- `cursor-pointer` on table rows without keyboard handler, `role`, or `tabIndex` — Story 4.1 scope per spec dev notes; wire `onClick` and ARIA attributes when the row-click drawer is implemented.
+- `CHIP_STYLES[recommendation]` returns `undefined` for unexpected values — TypeScript prevents this at compile time; root cause is lack of runtime API response validation (pre-existing). Add a fallback (`?? ''`) when adding Zod parsing to the jobs API response.
+- `PipelineTable` renders a header-only table if passed an empty `jobs` array — current route guards against this; add a no-results row when the component is reused in filtered/search contexts (future story).
+- Loading/error state collapsing in `PipelineRoute` — loading case is intentional (router loader ensures cache per story 3.1); error case falls back to empty-state placeholder with no message. Address with proper error boundary when story 3.4 adds skeleton/error states.
+
+## Deferred from: code review of 3-1-jobs-api-and-tanstack-query-hook (2026-04-01)
+
+- Router loader (`src/client/lib/router.ts`) has no `errorComponent` — silent failure on load error — story 3-4 scope
+- No `LIMIT` clause on `GET /api/jobs` (`src/server/routes/api-jobs.ts`) — full table scan — MVP design decision, revisit at scale
+- No timeout / AbortController on `fetchJobs` (`src/client/hooks/useJobsQuery.ts`) — design decision
+- `staleTime: 0` causes redundant re-fetch on every navigation to `/` — future optimization
+- `api-sync.test.ts` error-handling tests (propagates OAuth error, propagates DB write error) failing on HEAD — Hono sub-apps tested in isolation don't inherit parent app's `onError` — pre-existing issue from story 2-3, not introduced by story 3-1
