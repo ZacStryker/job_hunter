@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
+  getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
+import type { SortingState, VisibilityState, Updater } from '@tanstack/react-table'
 import {
   TableBody,
   TableCell,
@@ -14,6 +17,21 @@ import {
 import type { Job } from '@shared/schemas'
 import { ScoreBadge } from './ScoreBadge'
 import { ActionChip } from './ActionChip'
+import { ColumnVisibilityToggle } from './ColumnVisibilityToggle'
+
+const VISIBILITY_KEY = 'job-hunt-column-visibility'
+
+function loadVisibility(): VisibilityState {
+  try {
+    const stored = localStorage.getItem(VISIBILITY_KEY)
+    if (!stored) return {}
+    const parsed: unknown = JSON.parse(stored)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
+    return parsed as VisibilityState
+  } catch {
+    return {}
+  }
+}
 
 const columnHelper = createColumnHelper<Job>()
 
@@ -34,6 +52,42 @@ const columns = [
     header: 'Action',
     cell: (info) => <ActionChip recommendation={info.getValue()} />,
   }),
+  columnHelper.accessor('requirementsMet', {
+    id: 'reqs_met',
+    header: 'Reqs Met',
+    cell: (info) => {
+      const v = info.getValue()
+      return v ? (
+        <span className="max-w-[200px] truncate block text-zinc-300">{v}</span>
+      ) : (
+        <span className="text-zinc-500">—</span>
+      )
+    },
+  }),
+  columnHelper.accessor('requirementsMissed', {
+    id: 'reqs_missed',
+    header: 'Reqs Missed',
+    cell: (info) => {
+      const v = info.getValue()
+      return v ? (
+        <span className="max-w-[200px] truncate block text-zinc-300">{v}</span>
+      ) : (
+        <span className="text-zinc-500">—</span>
+      )
+    },
+  }),
+  columnHelper.accessor('roleFit', {
+    id: 'notes',
+    header: 'Notes',
+    cell: (info) => {
+      const v = info.getValue()
+      return v ? (
+        <span className="max-w-[200px] truncate block text-zinc-300">{v}</span>
+      ) : (
+        <span className="text-zinc-500">—</span>
+      )
+    },
+  }),
 ]
 
 interface PipelineTableProps {
@@ -41,27 +95,55 @@ interface PipelineTableProps {
 }
 
 export function PipelineTable({ jobs }: PipelineTableProps) {
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(loadVisibility)
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'fitScore', desc: true }])
+
+  function handleVisibilityChange(updater: Updater<VisibilityState>) {
+    setColumnVisibility((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      try {
+        localStorage.setItem(VISIBILITY_KEY, JSON.stringify(next))
+      } catch {
+        // ignore storage errors (quota exceeded, private mode)
+      }
+      return next
+    })
+  }
+
   const table = useReactTable({
     data: jobs,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    enableMultiSort: false,
+    state: { columnVisibility, sorting },
+    onColumnVisibilityChange: handleVisibilityChange,
+    onSortingChange: setSorting,
   })
 
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
-      <div className="overflow-auto max-h-[calc(100vh-88px)]">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col max-h-[calc(100vh-88px)]">
+      <div className="flex items-center justify-end px-3 py-2 border-b border-zinc-800 shrink-0">
+        <ColumnVisibilityToggle table={table} />
+      </div>
+      <div className="overflow-auto flex-1">
         <table className="w-full caption-bottom text-sm">
           <TableHeader className="sticky top-0 backdrop-blur-sm bg-zinc-900/80 border-b border-zinc-800">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="border-0 hover:bg-transparent">
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    className="px-3 h-9 text-xs font-medium uppercase text-zinc-400"
-                  >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
+                {headerGroup.headers.map((header) => {
+                  const sorted = header.column.getIsSorted()
+                  return (
+                    <TableHead
+                      key={header.id}
+                      className="px-3 h-9 text-xs font-medium uppercase text-zinc-400 cursor-pointer select-none"
+                      onClick={header.column.getToggleSortingHandler()}
+                    >
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                    </TableHead>
+                  )
+                })}
               </TableRow>
             ))}
           </TableHeader>
