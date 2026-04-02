@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-04-02 # story 3-4 done
+last_updated: 2026-04-02 # story 4-2 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -62,12 +62,12 @@ development_status:
   3-2-pipeline-table-with-fit-score-badge-and-action-chip: done
   3-3-column-visibility-toggle-and-localstorage-persistence: done
   3-4-view-switching-loading-and-empty-states: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   # Epic 4: Job Detail & Decision — The Triage Moment
-  epic-4: backlog
-  4-1-job-detail-drawer-shell-and-row-click: backlog
-  4-2-ai-analysis-display-in-drawer: backlog
+  epic-4: in-progress
+  4-1-job-detail-drawer-shell-and-row-click: done
+  4-2-ai-analysis-display-in-drawer: done
   4-3-applied-toggle-and-status-override-with-persistence: backlog
   4-4-status-timeline: backlog
   epic-4-retrospective: optional

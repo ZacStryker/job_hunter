@@ -1,8 +1,10 @@
+import { useState, useEffect } from 'react'
 import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
 import { useJobsQuery } from '../hooks/useJobsQuery'
 import { useSyncMutation } from '../hooks/useSyncMutation'
 import { PipelineTable } from '../components/pipeline/PipelineTable'
+import { JobDrawer } from '../components/detail/JobDrawer'
 
 function SkeletonCard() {
   return (
@@ -72,6 +74,13 @@ function EmptyState({ syncMutation }: { syncMutation: ReturnType<typeof useSyncM
 export function PipelineRoute() {
   const { data: jobs, isPending } = useJobsQuery()
   const syncMutation = useSyncMutation()
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (selectedJobId !== null && jobs && !jobs.find((j) => j.id === selectedJobId)) {
+      setSelectedJobId(null)
+    }
+  }, [jobs, selectedJobId])
 
   if (isPending) {
     return <SkeletonCard />
@@ -79,9 +88,20 @@ export function PipelineRoute() {
 
   if (jobs && jobs.length > 0) {
     return (
-      <div className="p-4">
-        <PipelineTable jobs={jobs} />
-      </div>
+      <>
+        <div className="p-4">
+          <PipelineTable
+            jobs={jobs}
+            onRowClick={(job) => setSelectedJobId(job.id === selectedJobId ? null : job.id)}
+            selectedJobId={selectedJobId}
+          />
+        </div>
+        <JobDrawer
+          job={jobs.find((j) => j.id === selectedJobId) ?? null}
+          open={selectedJobId !== null}
+          onClose={() => setSelectedJobId(null)}
+        />
+      </>
     )
   }
 

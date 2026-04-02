@@ -92,9 +92,11 @@ const columns = [
 
 interface PipelineTableProps {
   jobs: Job[]
+  onRowClick: (job: Job) => void
+  selectedJobId: number | null
 }
 
-export function PipelineTable({ jobs }: PipelineTableProps) {
+export function PipelineTable({ jobs, onRowClick, selectedJobId }: PipelineTableProps) {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(loadVisibility)
   const [sorting, setSorting] = useState<SortingState>([{ id: 'fitScore', desc: true }])
 
@@ -151,7 +153,12 @@ export function PipelineTable({ jobs }: PipelineTableProps) {
             {table.getRowModel().rows.map((row) => (
               <TableRow
                 key={row.id}
-                className="border-zinc-800 hover:bg-zinc-800/50 cursor-pointer"
+                onClick={() => onRowClick(row.original)}
+                className={`border-zinc-800 cursor-pointer ${
+                  row.original.id === selectedJobId
+                    ? 'bg-zinc-800'
+                    : 'hover:bg-zinc-800/50'
+                }`}
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="py-1.5 px-3 text-sm text-zinc-200">

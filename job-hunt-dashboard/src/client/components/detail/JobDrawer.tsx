@@ -1,0 +1,89 @@
+import { useState, useEffect } from 'react'
+import { ExternalLink } from 'lucide-react'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
+import { Separator } from '../ui/separator'
+import type { Job } from '@shared/schemas'
+import { ScoreBadge } from '../pipeline/ScoreBadge'
+import { ActionChip } from '../pipeline/ActionChip'
+import { AssessmentSection } from './AssessmentSection'
+
+interface JobDrawerProps {
+  job: Job | null
+  open: boolean
+  onClose: () => void
+}
+
+export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
+  const [showFullDescription, setShowFullDescription] = useState(false)
+
+  useEffect(() => {
+    setShowFullDescription(false)
+  }, [job?.id])
+
+  return (
+    <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
+      <SheetContent
+        side="right"
+        className="w-[480px] max-w-none flex flex-col p-0 bg-zinc-900 border-zinc-800"
+      >
+        <SheetDescription className="sr-only">AI analysis and job details</SheetDescription>
+        <div className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 p-4 shrink-0">
+          <SheetHeader className="space-y-1">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">{job?.company}</p>
+            <SheetTitle className="text-lg font-semibold text-zinc-100 leading-snug">
+              {job?.jobTitle}
+            </SheetTitle>
+            <div className="flex items-center gap-2 pt-1">
+              {job?.fitScore !== null && job?.fitScore !== undefined && (
+                <ScoreBadge score={job.fitScore} />
+              )}
+              {job?.recommendation && (
+                <ActionChip recommendation={job.recommendation} />
+              )}
+            </div>
+          </SheetHeader>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <AssessmentSection label="Role Fit" content={job?.roleFit ?? null} />
+          <AssessmentSection label="Requirements Met" content={job?.requirementsMet ?? null} />
+          <AssessmentSection label="Requirements Missed" content={job?.requirementsMissed ?? null} />
+          <AssessmentSection label="Red Flags" content={job?.redFlags ?? null} />
+          <Separator className="bg-zinc-800" />
+          {job?.jobDescription && (
+            <div className="space-y-2">
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">Job Description</p>
+              <p className="text-sm text-zinc-200 leading-relaxed">
+                {showFullDescription
+                  ? job.jobDescription
+                  : job.jobDescription.slice(0, 300)}
+                {!showFullDescription && job.jobDescription.length > 300 && '…'}
+              </p>
+              {job.jobDescription.length > 300 && (
+                <button
+                  className="text-xs text-zinc-400 hover:text-zinc-200"
+                  onClick={() => setShowFullDescription(!showFullDescription)}
+                >
+                  {showFullDescription ? 'Show less' : 'Show more'}
+                </button>
+              )}
+            </div>
+          )}
+          {job?.sourceUrl && (
+            <a
+              href={job.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-200"
+            >
+              <ExternalLink size={14} />
+              Source
+            </a>
+          )}
+          {(job?.jobDescription || job?.sourceUrl) && <Separator className="bg-zinc-800" />}
+          {/* Story 4.3: Applied toggle, status override */}
+          {/* Story 4.4: StatusTimeline */}
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}

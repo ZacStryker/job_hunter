@@ -76,6 +76,17 @@
 - SkeletonCard column headers hardcoded — `['Company', 'Job Title', 'Score', 'Action', 'Reqs Met', 'Reqs Missed', 'Notes']` duplicates `PipelineTable` column definitions with no shared source of truth; will silently drift if columns change. Low risk while column set is stable.
 - `bg-muted` CSS variable in `skeleton.tsx` (shadcn-generated) — verify `--muted` is defined in the project's global stylesheet and resolves to a visible color in the dark zinc theme; if not, the skeleton renders transparent with no pulse animation.
 
+## Deferred from: code review of 4-1-job-detail-drawer-shell-and-row-click (2026-04-02)
+
+- AC5 timing: `setSelectedJobId(null)` fires immediately in `onOpenChange`, clearing `bg-zinc-800` row highlight while the 300ms Sheet close animation is still playing. Minor visual edge case; fix requires delaying state reset or using animation completion callback.
+- Template-literal className for conditional row styling in PipelineTable — `className={...}` uses string interpolation instead of `cn()` utility; no behavioral impact. Consistent with shadcn convention to address in a future cleanup pass.
+- `w-[480px] max-w-none` on SheetContent overflows viewports narrower than 480px — spec-specified width; mobile responsiveness explicitly out of scope for this story.
+- `onRowClick` and `selectedJobId` props are required on PipelineTable — standalone use (tests, Storybook) must provide stubs. Spec decision; existing tests were updated.
+
+## Deferred from: code review of 4-2-ai-analysis-display-in-drawer (2026-04-02)
+
+_(No deferred findings — all dismissed findings were false positives or covered by spec intent.)_
+
 ## Deferred from: code review of 3-1-jobs-api-and-tanstack-query-hook (2026-04-01)
 
 - Router loader (`src/client/lib/router.ts`) has no `errorComponent` — silent failure on load error — story 3-4 scope
