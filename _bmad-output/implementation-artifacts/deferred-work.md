@@ -57,6 +57,25 @@
 - `PipelineTable` renders a header-only table if passed an empty `jobs` array — current route guards against this; add a no-results row when the component is reused in filtered/search contexts (future story).
 - Loading/error state collapsing in `PipelineRoute` — loading case is intentional (router loader ensures cache per story 3.1); error case falls back to empty-state placeholder with no message. Address with proper error boundary when story 3.4 adds skeleton/error states.
 
+## Deferred from: code review of 3-3-column-visibility-toggle-and-localstorage-persistence (2026-04-02)
+
+- `loadVisibility` has no guard for non-browser environments (SSR, edge runtimes) — SPA pattern, non-issue in current stack; add `if (typeof localStorage === 'undefined') return {}` guard if env ever changes [PipelineTable.tsx:24]
+- Stale/orphaned column IDs in persisted VisibilityState survive schema changes silently — frozen IDs make this unlikely; add key validation/filtering if column IDs change in a future story [PipelineTable.tsx:27]
+- All column headers sortable including Action chip — no `enableSorting: false` on non-semantic columns; add per-column `enableSorting` when sorting UX is refined [PipelineTable.tsx:133]
+- No `aria-sort` attribute on sortable column headers — add `aria-sort` when accessibility pass is done for the pipeline table [PipelineTable.tsx:130-137]
+- Truncated cell values (`max-w-[200px] truncate`) lack `title` attribute — full content inaccessible on hover; add `title={v}` in next accessibility pass [PipelineTable.tsx:55-87]
+- `OPTIONAL_COLUMNS` manifest in ColumnVisibilityToggle duplicates column IDs from PipelineTable — minor tech debt; consider exporting column IDs from a shared constant if columns expand [ColumnVisibilityToggle.tsx:11]
+- Empty string cell values treated identically to null (em-dash) — `v ?` check fails for `''`; add `v != null && v !== ''` guard if Sheets data produces empty-string vs null distinction matters [PipelineTable.tsx:55-87]
+
+## Deferred from: code review of 3-4-view-switching-loading-and-empty-states (2026-04-02)
+
+- Query fetch error silently maps to EmptyState — `isError` not destructured in `PipelineRoute`; a failed jobs fetch shows "No jobs yet" with no error message. Explicitly out of scope per story spec. Address with proper error boundary in a future story.
+- No loading indicator during post-sync refetch — after sync success and `invalidateQueries`, `isPending` stays false while jobs refetches; no skeleton is shown during the background fetch. Out of scope per story AC.
+- Sync mutation instances not shared across navigation — each mount of `PipelineRoute` creates a new `useSyncMutation()` instance; if the component remounts mid-request the new instance has fresh `isPending: false`, re-enabling the button while a request is still in-flight. Single-user localhost tool; address with a shared mutation key or global state if concurrency becomes an issue.
+- `data === undefined` falls through to EmptyState — conflates error, uninitialized, and legitimately-empty states. Explicitly out of scope per story spec; address alongside error boundary work.
+- SkeletonCard column headers hardcoded — `['Company', 'Job Title', 'Score', 'Action', 'Reqs Met', 'Reqs Missed', 'Notes']` duplicates `PipelineTable` column definitions with no shared source of truth; will silently drift if columns change. Low risk while column set is stable.
+- `bg-muted` CSS variable in `skeleton.tsx` (shadcn-generated) — verify `--muted` is defined in the project's global stylesheet and resolves to a visible color in the dark zinc theme; if not, the skeleton renders transparent with no pulse animation.
+
 ## Deferred from: code review of 3-1-jobs-api-and-tanstack-query-hook (2026-04-01)
 
 - Router loader (`src/client/lib/router.ts`) has no `errorComponent` — silent failure on load error — story 3-4 scope

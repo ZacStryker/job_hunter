@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-04-01
+last_updated: 2026-04-02 # story 3-4 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -60,8 +60,8 @@ development_status:
   epic-3: in-progress
   3-1-jobs-api-and-tanstack-query-hook: done
   3-2-pipeline-table-with-fit-score-badge-and-action-chip: done
-  3-3-column-visibility-toggle-and-localstorage-persistence: backlog
-  3-4-view-switching-loading-and-empty-states: backlog
+  3-3-column-visibility-toggle-and-localstorage-persistence: done
+  3-4-view-switching-loading-and-empty-states: done
   epic-3-retrospective: optional
 
   # Epic 4: Job Detail & Decision — The Triage Moment
