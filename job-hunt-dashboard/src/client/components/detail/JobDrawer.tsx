@@ -6,6 +6,10 @@ import type { Job } from '@shared/schemas'
 import { ScoreBadge } from '../pipeline/ScoreBadge'
 import { ActionChip } from '../pipeline/ActionChip'
 import { AssessmentSection } from './AssessmentSection'
+import { AppliedToggle } from './AppliedToggle'
+import { StatusOverride } from './StatusOverride'
+import { useJobEvents } from '../../hooks/useJobEvents'
+import { StatusTimeline } from './StatusTimeline'
 
 interface JobDrawerProps {
   job: Job | null
@@ -15,6 +19,7 @@ interface JobDrawerProps {
 
 export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   const [showFullDescription, setShowFullDescription] = useState(false)
+  const { data: events = [] } = useJobEvents(job?.id)
 
   useEffect(() => {
     setShowFullDescription(false)
@@ -80,8 +85,9 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
             </a>
           )}
           {(job?.jobDescription || job?.sourceUrl) && <Separator className="bg-zinc-800" />}
-          {/* Story 4.3: Applied toggle, status override */}
-          {/* Story 4.4: StatusTimeline */}
+          {job && <AppliedToggle job={job} />}
+          {job && <StatusOverride job={job} />}
+          {job && <StatusTimeline events={events} />}
         </div>
       </SheetContent>
     </Sheet>

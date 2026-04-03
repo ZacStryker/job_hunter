@@ -23,3 +23,10 @@ export const jobs = sqliteTable('jobs', {
 }, (table) => [
   uniqueIndex('company_job_title_idx').on(table.company, table.jobTitle),
 ])
+
+export const statusEvents = sqliteTable('status_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  jobId: integer('job_id').notNull().references(() => jobs.id),
+  status: text('status').notNull(),
+  timestamp: text('timestamp').notNull(), // Full ISO 8601 datetime string
+})

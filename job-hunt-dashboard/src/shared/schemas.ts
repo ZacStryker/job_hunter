@@ -35,7 +35,15 @@ export const syncResultSchema = z.object({
   updated: z.number().int(),
 })
 
+export const statusEventSchema = z.object({
+  id: z.number().int(),
+  jobId: z.number().int(),
+  status: z.string(),
+  timestamp: z.string(), // ISO 8601 full datetime
+})
+
 export type Job = z.infer<typeof jobSchema>
 export type JobInput = z.infer<typeof jobInputSchema>
 export type IngestPayload = z.infer<typeof ingestPayloadSchema>
 export type SyncResult = z.infer<typeof syncResultSchema>
+export type StatusEvent = z.infer<typeof statusEventSchema>

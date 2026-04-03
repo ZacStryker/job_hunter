@@ -87,6 +87,18 @@
 
 _(No deferred findings — all dismissed findings were false positives or covered by spec intent.)_
 
+## Deferred from: code review of 4-3-applied-toggle-and-status-override-with-persistence (2026-04-03)
+
+- UTC date stored for `dateApplied` may mismatch user's local date — `new Date().toISOString().split('T')[0]` yields UTC date; users west of UTC near midnight get tomorrow's date. Requires product decision on timezone strategy.
+- No try/catch around DB update/re-select in PATCH handler — a DB error (lock, disk full) throws an unstructured 500. Pre-existing pattern across all DB calls; address in a future hardening pass.
+- Invalid `dateApplied` format causes `Intl.DateTimeFormat` to throw a RangeError — guard belongs at ingest time (Story 1.2 deferred item); consider adding `.regex(/^\d{4}-\d{2}-\d{2}$/)` to `dateApplied` in the ingest schema.
+- `dateApplied` format inconsistency if Epic 2 ingest stored full ISO timestamps — server PATCH generates YYYY-MM-DD, but existing values may be full ISO strings; the `T00:00:00` suffix appended in `AppliedToggle` would create an invalid date. Verify via data audit.
+
+## Deferred from: code review of 4-4-status-timeline (2026-04-03)
+
+- FK `ON DELETE NO ACTION` on `status_events.job_id` — orphans event rows if a job row is ever deleted. No job deletion feature exists in current scope; add `ON DELETE CASCADE` in a future migration if job pruning is introduced [`schema.ts`, `0001_goofy_pestilence.sql`]
+- Very large numeric IDs (20+ digits) pass the `/^\d+$/` regex guard but exceed `Number.MAX_SAFE_INTEGER`, producing an imprecise float for the DB query. Results in a 404 in practice but the validation contract is silently broken. Pre-existing pattern across all `/:id` handlers; add a `Number.isSafeInteger(rawId)` check in a future hardening pass [`api-jobs.ts`]
+
 ## Deferred from: code review of 3-1-jobs-api-and-tanstack-query-hook (2026-04-01)
 
 - Router loader (`src/client/lib/router.ts`) has no `errorComponent` — silent failure on load error — story 3-4 scope
