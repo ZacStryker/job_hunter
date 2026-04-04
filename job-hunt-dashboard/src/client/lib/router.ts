@@ -20,6 +20,7 @@ const trackerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/tracker',
   component: TrackerRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
 })
 
 const routeTree = rootRoute.addChildren([indexRoute, trackerRoute])

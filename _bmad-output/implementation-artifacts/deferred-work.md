@@ -99,6 +99,18 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - FK `ON DELETE NO ACTION` on `status_events.job_id` — orphans event rows if a job row is ever deleted. No job deletion feature exists in current scope; add `ON DELETE CASCADE` in a future migration if job pruning is introduced [`schema.ts`, `0001_goofy_pestilence.sql`]
 - Very large numeric IDs (20+ digits) pass the `/^\d+$/` regex guard but exceed `Number.MAX_SAFE_INTEGER`, producing an imprecise float for the DB query. Results in a 404 in practice but the validation contract is silently broken. Pre-existing pattern across all `/:id` handlers; add a `Number.isSafeInteger(rawId)` check in a future hardening pass [`api-jobs.ts`]
 
+## Deferred from: code review of 5-1-tracker-table-with-applied-jobs (2026-04-04)
+
+- `open=true` + `job=null` if selected job is deleted mid-session: `selectedJobId !== null` but `jobs.find()` returns null, leaving JobDrawer open with no data. Design decision — story notes document this pattern as acceptable (same as PipelineRoute; job deletion not a user action in Tracker view) [`tracker.tsx:19`]
+- Raw enum values (e.g. `phone_screen`) rendered in Status column without display mapping. Pre-existing concern across all status-displaying views; not in scope for this story [`TrackerTable.tsx:63`]
+
+## Deferred from: code review of 5-2-visual-row-aging (2026-04-04)
+
+- Tooltip `animate-in`/`animate-out` classes on shadcn `TooltipContent` do not respect `prefers-reduced-motion` — tooltip entrance/exit animation plays regardless of motion preference. `tooltip.tsx` is shadcn-generated and must not be hand-edited per story spec. Address in a future accessibility hardening pass with a custom wrapper or global CSS override.
+- `aria-describedby` injected by Radix `TooltipTrigger asChild` onto `<tr>` (ARIA role `row`) — the `row` role doesn't officially accept `aria-describedby`; some assistive technologies may not surface the tooltip relationship. This is the specified approach from the story; address in a future accessibility audit [`AgingRow.tsx:29`].
+- `computeDaysAgo` midnight boundary: if the user's wall-clock time is within hours of local midnight of `dateApplied`, the day count can be off by one in rare cases. Established local-time pattern (`T00:00:00`) from Story 5.1; accepted trade-off.
+- Tooltip portal in scrollable container: if the Tracker table's scroll container gains `overflow: hidden`, the Radix tooltip portal (appends to `document.body`) may be clipped or mispositioned. Radix handles this via its portal mechanism; low risk at current layout [`AgingRow.tsx:28`].
+
 ## Deferred from: code review of 3-1-jobs-api-and-tanstack-query-hook (2026-04-01)
 
 - Router loader (`src/client/lib/router.ts`) has no `errorComponent` — silent failure on load error — story 3-4 scope
