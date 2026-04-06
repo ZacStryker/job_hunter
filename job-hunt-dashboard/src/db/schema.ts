@@ -24,6 +24,13 @@ export const jobs = sqliteTable('jobs', {
   uniqueIndex('company_job_title_idx').on(table.company, table.jobTitle),
 ])
 
+export const coverLetters = sqliteTable('cover_letters', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  jobId: integer('job_id').notNull().references(() => jobs.id),
+  content: text('content').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
 export const statusEvents = sqliteTable('status_events', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   jobId: integer('job_id').notNull().references(() => jobs.id),

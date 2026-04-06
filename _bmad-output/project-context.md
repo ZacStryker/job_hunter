@@ -36,6 +36,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - All cross-boundary types must be imported from `src/shared/schemas.ts` — never redefined inline or imported from anywhere else
 - Zod schemas: named `camelCaseSchema` suffix (e.g., `jobSchema`, `ingestPayloadSchema`); types inferred via `z.infer<typeof ...>`
 - Dates: ISO 8601 strings everywhere — never Unix timestamps, never `Date` objects in API responses or DB storage
+- **Date-only strings (e.g., `dateApplied`):** always append `T00:00:00Z` (UTC) when converting to a `Date` for arithmetic — NEVER use `T00:00:00` without the `Z` suffix; the missing `Z` creates local-timezone-dependent date shifts that corrupt date comparison logic (this bug has appeared in 4 stories: 4.3, 5.1, 5.2, 6.2)
 - Booleans in API JSON: `true`/`false`; Drizzle handles SQLite 0/1 mapping automatically
 - Nulls: explicit `null` for missing optional fields in API responses — never `undefined`
 - Collections: always arrays — never objects keyed by ID in API responses
@@ -146,9 +147,10 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Expired token must produce a clear error — no silent failure or retry loop
 - `sheets-sync.ts` is the only file that knows Sheets column names — no Sheets types leak beyond it
 
-**Post-MVP Boundaries (do not implement in MVP)**
-- `status_events` table: schema placeholder exists but `StatusTimeline` component is non-functional at MVP
-- IMAP polling, n8n webhook, cover letter storage: deferred — do not add stubs or partial implementations
+**Post-MVP Features (now implemented — do not treat as deferred)**
+- `status_events` table: live with `source` column (`'manual'` | `'email'`); `StatusTimeline` renders events with email indicator
+- IMAP polling: live in `src/server/services/imap-poller.ts`; optional env vars `IMAP_HOST`/`IMAP_USER`/`IMAP_PASS`
+- n8n webhook, cover letter storage: Epic 7 — not yet implemented
 
 ---
 

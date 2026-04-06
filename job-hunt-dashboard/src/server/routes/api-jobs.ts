@@ -1,8 +1,10 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, and } from 'drizzle-orm'
 import { db } from '../../db/client'
-import { jobs, statusEvents } from '../../db/schema'
+import { jobs, statusEvents, coverLetters } from '../../db/schema'
+import { callN8nWebhook } from '../services/cover-letter-service'
+import type { Job } from '../../shared/schemas'
 
 const app = new Hono()
 
@@ -102,6 +104,57 @@ app.patch('/:id', async (c) => {
 
   const updatedJob = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
   return c.json({ job: updatedJob })
+})
+
+app.post('/:id/generate-cover-letter', async (c) => {
+  const idParam = c.req.param('id')
+  if (!/^\d+$/.test(idParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  if (rawId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const job = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
+  }
+  if (!job.jobDescription) {
+    return c.json({ error: 'Job has no job description' }, 400)
+  }
+
+  let coverLetterText: string
+  try {
+    coverLetterText = await callN8nWebhook(job as Job)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (message === 'N8N_WEBHOOK_URL not configured') {
+      return c.json({ error: 'Cover letter generation is not configured' }, 503)
+    }
+    return c.json({ error: 'Cover letter generation failed' }, 502)
+  }
+
+  const now = new Date().toISOString()
+
+  try {
+    db.transaction((tx) => {
+      tx.insert(coverLetters).values({
+        jobId: rawId,
+        content: coverLetterText,
+        createdAt: now,
+      }).run()
+      tx.update(jobs).set({ coverLetterSentAt: now }).where(eq(jobs.id, rawId)).run()
+    })
+  } catch {
+    return c.json({ error: 'Failed to store cover letter' }, 500)
+  }
+
+  const inserted = db.select().from(coverLetters)
+    .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.createdAt, now)))
+    .get()
+
+  return c.json({ coverLetter: inserted })
 })
 
 export default app

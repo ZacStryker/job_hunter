@@ -43,6 +43,14 @@ export const statusEventSchema = z.object({
   source: z.enum(['manual', 'email']),
 })
 
+export const coverLetterSchema = z.object({
+  id: z.number().int(),
+  jobId: z.number().int(),
+  content: z.string().min(1),
+  createdAt: z.string(),
+})
+export type CoverLetter = z.infer<typeof coverLetterSchema>
+
 export type Job = z.infer<typeof jobSchema>
 export type JobInput = z.infer<typeof jobInputSchema>
 export type IngestPayload = z.infer<typeof ingestPayloadSchema>

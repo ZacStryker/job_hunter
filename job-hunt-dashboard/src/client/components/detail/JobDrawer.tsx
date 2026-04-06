@@ -9,6 +9,8 @@ import { AssessmentSection } from './AssessmentSection'
 import { StatusDropdown } from './StatusDropdown'
 import { useJobEvents } from '../../hooks/useJobEvents'
 import { StatusTimeline } from './StatusTimeline'
+import { useGenerateCoverLetter } from '../../hooks/useGenerateCoverLetter'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 
 interface JobDrawerProps {
   job: Job | null
@@ -19,6 +21,7 @@ interface JobDrawerProps {
 export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   const [showFullDescription, setShowFullDescription] = useState(false)
   const { data: events = [] } = useJobEvents(job?.id)
+  const { mutate: generateCoverLetter, isPending, isError, error } = useGenerateCoverLetter(job?.id ?? 0)
 
   useEffect(() => {
     setShowFullDescription(false)
@@ -86,6 +89,45 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
           {(job?.jobDescription || job?.sourceUrl) && <Separator className="bg-zinc-800" />}
           {job && <StatusDropdown job={job} />}
           {job && <StatusTimeline events={events} />}
+          {job && (
+            <>
+              <Separator className="bg-zinc-800" />
+              <div className="space-y-2">
+                <p className="text-xs text-zinc-500 uppercase tracking-wide">Cover Letter</p>
+                {job.jobDescription ? (
+                  <>
+                    <button
+                      onClick={() => generateCoverLetter()}
+                      disabled={isPending}
+                      className="text-sm text-zinc-400 hover:text-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isPending ? 'Generating…' : job.coverLetterSentAt ? 'Regenerate Cover Letter' : 'Generate Cover Letter'}
+                    </button>
+                    {isError && (
+                      <p className="text-xs text-red-400">{error?.message ?? 'Generation failed'}</p>
+                    )}
+                  </>
+                ) : (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          disabled
+                          className="text-sm text-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Generate Cover Letter
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>No job description available</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {/* Story 7.2: cover letter content display goes here */}
+              </div>
+            </>
+          )}
         </div>
       </SheetContent>
     </Sheet>

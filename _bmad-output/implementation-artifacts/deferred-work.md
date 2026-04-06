@@ -140,6 +140,13 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - `new Date(event.timestamp)` on a malformed or unparseable timestamp string produces `"Invalid Date"` rendered inline — no guard in `StatusTimeline` or Zod `.datetime()` validation at API boundary. Add a timestamp format guard or Zod `.datetime()` refinement to `statusEventSchema` in a future hardening pass [`StatusTimeline.tsx`].
 - `STATUS_LABELS` in `StatusTimeline` has no formatting for statuses outside its map — the `?? event.status` fallback renders raw DB strings verbatim (e.g., `'offer_accepted'` in snake_case). More likely to surface now that the email pipeline is active. Add display-name mapping for all known statuses or a generic humanizer [`StatusTimeline.tsx`].
 
+## Deferred from: code review of 7-1-cover-letter-generation-trigger (2026-04-06)
+
+- No auth on `POST /:id/generate-cover-letter` — pre-existing pattern across all API routes; any unauthenticated network caller can trigger n8n webhook calls and write to `cover_letters`. Address when adding auth layer to the app.
+- `onSuccess` in `useGenerateCoverLetter` only invalidates `['jobs']` — Story 7.2 will likely add a `['coverLetters', jobId]` query; proactively invalidate it in `onSuccess` when that query is introduced [`useGenerateCoverLetter.ts`].
+- No server-side rate-limiting / idempotency guard on cover letter generation — `isPending` prevents double-submit from the same session, but concurrent requests from separate tabs or clients will each trigger a new n8n call and insert a new row. Address with a per-job mutex or cooldown if misuse becomes a concern.
+- `N8N_WEBHOOK_URL` not logged on successful calls or on failures for observability — the spec notes "URL is safe to log"; add structured server-side logging when a logging layer is introduced [`cover-letter-service.ts`].
+
 ## Deferred from: code review of 3-1-jobs-api-and-tanstack-query-hook (2026-04-01)
 
 - Router loader (`src/client/lib/router.ts`) has no `errorComponent` — silent failure on load error — story 3-4 scope
