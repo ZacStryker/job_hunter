@@ -6,8 +6,7 @@ import type { Job } from '@shared/schemas'
 import { ScoreBadge } from '../pipeline/ScoreBadge'
 import { ActionChip } from '../pipeline/ActionChip'
 import { AssessmentSection } from './AssessmentSection'
-import { AppliedToggle } from './AppliedToggle'
-import { StatusOverride } from './StatusOverride'
+import { StatusDropdown } from './StatusDropdown'
 import { useJobEvents } from '../../hooks/useJobEvents'
 import { StatusTimeline } from './StatusTimeline'
 
@@ -85,8 +84,7 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
             </a>
           )}
           {(job?.jobDescription || job?.sourceUrl) && <Separator className="bg-zinc-800" />}
-          {job && <AppliedToggle job={job} />}
-          {job && <StatusOverride job={job} />}
+          {job && <StatusDropdown job={job} />}
           {job && <StatusTimeline events={events} />}
         </div>
       </SheetContent>

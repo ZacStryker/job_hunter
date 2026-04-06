@@ -6,6 +6,7 @@ import ingestRoute from './server/routes/api-ingest'
 import syncRoute from './server/routes/api-sync'
 import jobsRoute from './server/routes/api-jobs'
 import { errorHandler } from './server/middleware/error-handler'
+import { startImapPoller } from './server/services/imap-poller'
 
 const app = new Hono()
 
@@ -26,6 +27,9 @@ if (missingVars.length > 0) {
   )
   process.exit(1)
 }
+
+startImapPoller()
+
 app.route('/api/ingest', ingestRoute)
 app.route('/api/sync', syncRoute)
 app.route('/api/jobs', jobsRoute)

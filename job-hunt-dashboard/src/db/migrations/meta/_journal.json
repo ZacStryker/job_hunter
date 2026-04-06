@@ -15,6 +15,13 @@
       "when": 1775237821773,
       "tag": "0001_goofy_pestilence",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1775391709301,
+      "tag": "0002_unknown_slipstream",
+      "breakpoints": true
     }
   ]
 }

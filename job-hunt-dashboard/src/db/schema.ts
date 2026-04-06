@@ -29,4 +29,5 @@ export const statusEvents = sqliteTable('status_events', {
   jobId: integer('job_id').notNull().references(() => jobs.id),
   status: text('status').notNull(),
   timestamp: text('timestamp').notNull(), // Full ISO 8601 datetime string
+  source: text('source').notNull().default('manual'),
 })

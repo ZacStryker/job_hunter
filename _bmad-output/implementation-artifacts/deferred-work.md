@@ -111,6 +111,35 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - `computeDaysAgo` midnight boundary: if the user's wall-clock time is within hours of local midnight of `dateApplied`, the day count can be off by one in rare cases. Established local-time pattern (`T00:00:00`) from Story 5.1; accepted trade-off.
 - Tooltip portal in scrollable container: if the Tracker table's scroll container gains `overflow: hidden`, the Radix tooltip portal (appends to `document.body`) may be clipped or mispositioned. Radix handles this via its portal mechanism; low risk at current layout [`AgingRow.tsx:28`].
 
+## Deferred from: code review of 6-1-imap-polling-service (2026-04-05)
+
+- `setInterval` async callback — unhandled rejection risk if future code throws outside `pollOnce`'s try/catch; currently safe because `pollOnce` never re-throws, but Story 6.2 adding logic inside the try block increases the exposure surface [`imap-poller.ts:22-24`]
+- `setInterval` handle not stored — no graceful shutdown on SIGTERM, no cleanup mechanism for tests that successfully start the poller; must be addressed if process lifecycle management is added [`imap-poller.ts:22`]
+- `startImapPoller` not idempotent — called multiple times (e.g., hot-reload) registers overlapping polling intervals with no way to cancel previous ones; non-issue for current single-startup pattern [`imap-poller.ts:11`]
+- `ImapCredentials` interface not exported — Story 6.2 callers will need to type their arguments against this interface; export it when extending `pollOnce` [`imap-poller.ts:5`]
+
+## Deferred from: code review of 6-2-fuzzy-email-to-job-matching-and-status-update.md (2026-04-05)
+
+- No initial poll on startup — `startImapPoller` calls `setInterval` but never calls `pollOnce` immediately; first execution is delayed by the full interval (default 5 minutes). Design preference; address if fast-startup detection is needed.
+- Concurrent poll overlap — `setInterval` fires on a fixed clock regardless of whether the previous async `pollOnce` invocation has completed; a slow IMAP fetch can cause overlapping poll runs and duplicate DB writes. Personal dashboard single-user tool; add a concurrency guard (e.g., an `isPolling` flag) if poll duration approaches the interval.
+- `IMAP_POLL_INTERVAL_MS=0` produces a busy-loop — `parseInt('0')` is not `NaN`, so no minimum-value clamp is applied; `setInterval(fn, 0)` fires as fast as the event loop allows. Unrealistic misconfiguration; add `Math.max(30000, POLL_INTERVAL_MS)` if misconfiguration becomes a concern.
+- Unsanitized `err.message` logging — `console.error('[imap] Poll error:', err.message)` passes the library error message raw; some IMAP servers/libraries embed credentials or auth tokens in auth-failure messages, potentially violating the security invariant. Library behavior outside direct control; consider logging only a fixed prefix if IMAP auth error shapes are audited.
+
+## Deferred from: code review of 4-5-unified-status-dropdown-with-applied (2026-04-05)
+
+- Port 993 hardcoded in `pollOnce` — no `IMAP_PORT` env var for non-standard or test IMAP servers; code change required for local mock IMAP testing [`imap-poller.ts:118`]
+- `uidsResult === false` guard is dead code — `imapflow`'s `client.search()` returns `number[]`, never `false`; the guard is a no-op and could mislead future readers about the API contract [`imap-poller.ts:134`]
+- UTC midnight anchor for `dateApplied` (`job.dateApplied + 'T00:00:00Z'`) may misalign with email `Date:` header timestamps near timezone boundaries, potentially consuming part of the ±3-day window for users in UTC+12 or UTC-12 [`imap-poller.ts:66`]
+- `normalizeText` expands abbreviations (`sr`→`senior`, `eng`→`engineer`) across the full combined email body, not just the job title tokens; boilerplate phrases containing those words in unrelated context inflate false-positive title-match scores [`imap-poller.ts:30`]
+
+## Deferred from: code review of 6-3-email-events-visible-in-drawer (2026-04-05)
+
+- No `aria-label` on `<Mail>` icon in `StatusTimeline` — screen readers get no indication that an event was email-sourced. Add `aria-label="Via email"` (or equivalent) in a future accessibility hardening pass. Consistent with Epic 5 deferred a11y items (A1, A2) [`StatusTimeline.tsx`].
+- `status_events.source` column has no SQLite CHECK constraint — values beyond `'manual'`/`'email'` can be written via direct DB access; Zod enum in `statusEventSchema` only enforces at schema layer, not at the `GET /api/jobs/:id/events` return path (raw Drizzle rows are returned without parsing). Add `CHECK(source IN ('manual','email'))` in a future migration [`schema.ts`, `0002_unknown_slipstream.sql`].
+- `useJobEvents` swallows non-ok API responses silently — returns `[]` on any `!res.ok`, causing `StatusTimeline` to render "No status history yet." even when events exist but the fetch failed (network blip, 500). No error state is surfaced to the user. Add an error state when reworking hook error handling [`useJobEvents.ts`].
+- `new Date(event.timestamp)` on a malformed or unparseable timestamp string produces `"Invalid Date"` rendered inline — no guard in `StatusTimeline` or Zod `.datetime()` validation at API boundary. Add a timestamp format guard or Zod `.datetime()` refinement to `statusEventSchema` in a future hardening pass [`StatusTimeline.tsx`].
+- `STATUS_LABELS` in `StatusTimeline` has no formatting for statuses outside its map — the `?? event.status` fallback renders raw DB strings verbatim (e.g., `'offer_accepted'` in snake_case). More likely to surface now that the email pipeline is active. Add display-name mapping for all known statuses or a generic humanizer [`StatusTimeline.tsx`].
+
 ## Deferred from: code review of 3-1-jobs-api-and-tanstack-query-hook (2026-04-01)
 
 - Router loader (`src/client/lib/router.ts`) has no `errorComponent` — silent failure on load error — story 3-4 scope

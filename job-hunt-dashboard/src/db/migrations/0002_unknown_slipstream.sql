@@ -1,0 +1,1 @@
+ALTER TABLE `status_events` ADD `source` text DEFAULT 'manual' NOT NULL;

@@ -35,7 +35,8 @@ const CREATE_STATUS_EVENTS_TABLE = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id INTEGER NOT NULL,
     status TEXT NOT NULL,
-    timestamp TEXT NOT NULL
+    timestamp TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'manual'
   )
 `
 

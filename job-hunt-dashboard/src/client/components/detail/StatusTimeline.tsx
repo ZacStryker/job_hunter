@@ -1,3 +1,4 @@
+import { Mail } from 'lucide-react'
 import type { StatusEvent } from '@shared/schemas'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -27,8 +28,11 @@ export function StatusTimeline({ events }: StatusTimelineProps) {
           <div key={event.id} className="flex items-start gap-2">
             <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-zinc-400 shrink-0" />
             <div>
-              <p className="text-sm text-zinc-200">
+              <p className="text-sm text-zinc-200 flex items-center gap-1.5">
                 {STATUS_LABELS[event.status] ?? event.status}
+                {event.source === 'email' && (
+                  <Mail size={12} className="text-zinc-500 shrink-0" />
+                )}
               </p>
               <p className="text-xs text-zinc-500">
                 {new Intl.DateTimeFormat('en-US', {

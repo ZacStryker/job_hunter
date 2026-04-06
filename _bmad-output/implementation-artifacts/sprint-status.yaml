@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-04-05 # epic-6 story 6-1 created
+last_updated: 2026-04-05 # story 6-3 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -70,6 +70,7 @@ development_status:
   4-2-ai-analysis-display-in-drawer: done
   4-3-applied-toggle-and-status-override-with-persistence: done
   4-4-status-timeline: done
+  4-5-unified-status-dropdown-with-applied: done
   epic-4-retrospective: optional
 
   # Epic 5: Tracker View — Monitoring Applied Applications
@@ -80,9 +81,9 @@ development_status:
 
   # Epic 6 (Post-MVP): Email Status Detection
   epic-6: in-progress
-  6-1-imap-polling-service: ready-for-dev
-  6-2-fuzzy-email-to-job-matching-and-status-update: backlog
-  6-3-email-events-visible-in-drawer: backlog
+  6-1-imap-polling-service: done
+  6-2-fuzzy-email-to-job-matching-and-status-update: done
+  6-3-email-events-visible-in-drawer: done
   epic-6-retrospective: optional
 
   # Epic 7 (Post-MVP): Cover Letter Generation Pipeline

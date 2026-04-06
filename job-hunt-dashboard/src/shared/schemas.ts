@@ -40,6 +40,7 @@ export const statusEventSchema = z.object({
   jobId: z.number().int(),
   status: z.string(),
   timestamp: z.string(), // ISO 8601 full datetime
+  source: z.enum(['manual', 'email']),
 })
 
 export type Job = z.infer<typeof jobSchema>
