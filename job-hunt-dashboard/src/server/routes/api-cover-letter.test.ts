@@ -130,3 +130,55 @@ describe('POST /:id/generate-cover-letter', () => {
     expect(data).not.toHaveProperty('message')
   })
 })
+
+describe('GET /:id/cover-letter', () => {
+  test('returns 200 with most recent cover letter', async () => {
+    prodSqlite.run(
+      `INSERT INTO jobs (company, job_title, job_description) VALUES ('Acme', 'Engineer', 'Build stuff')`
+    )
+    const row = prodSqlite.query('SELECT id FROM jobs LIMIT 1').get() as { id: number }
+    prodSqlite.run(
+      `INSERT INTO cover_letters (job_id, content, created_at) VALUES (?, ?, ?)`,
+      [row.id, 'First letter', '2026-04-01T10:00:00.000Z']
+    )
+    prodSqlite.run(
+      `INSERT INTO cover_letters (job_id, content, created_at) VALUES (?, ?, ?)`,
+      [row.id, 'Second letter', '2026-04-02T10:00:00.000Z']
+    )
+    const res = await jobsApp.request(`/${row.id}/cover-letter`, { method: 'GET' })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { coverLetter: { content: string } }
+    expect(data.coverLetter.content).toBe('Second letter')
+  })
+
+  test('returns 404 when no cover letter exists', async () => {
+    prodSqlite.run(
+      `INSERT INTO jobs (company, job_title) VALUES ('Acme', 'Engineer')`
+    )
+    const row = prodSqlite.query('SELECT id FROM jobs LIMIT 1').get() as { id: number }
+    const res = await jobsApp.request(`/${row.id}/cover-letter`, { method: 'GET' })
+    expect(res.status).toBe(404)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    expect(data.error).toBe('No cover letter found')
+    expect(data).not.toHaveProperty('message')
+  })
+
+  test('returns 400 for non-numeric id', async () => {
+    const res = await jobsApp.request('/abc/cover-letter', { method: 'GET' })
+    expect(res.status).toBe(400)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    expect(data.error).toBe('Invalid job id')
+    expect(data).not.toHaveProperty('message')
+  })
+
+  test('returns 400 for id=0', async () => {
+    const res = await jobsApp.request('/0/cover-letter', { method: 'GET' })
+    expect(res.status).toBe(400)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    expect(data.error).toBe('Invalid job id')
+    expect(data).not.toHaveProperty('message')
+  })
+})

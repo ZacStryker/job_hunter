@@ -157,4 +157,26 @@ app.post('/:id/generate-cover-letter', async (c) => {
   return c.json({ coverLetter: inserted })
 })
 
+app.get('/:id/cover-letter', async (c) => {
+  const idParam = c.req.param('id')
+  if (!/^\d+$/.test(idParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  if (rawId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const letter = db.select().from(coverLetters)
+    .where(eq(coverLetters.jobId, rawId))
+    .orderBy(desc(coverLetters.createdAt))
+    .get()
+
+  if (!letter) {
+    return c.json({ error: 'No cover letter found' }, 404)
+  }
+
+  return c.json({ coverLetter: letter })
+})
+
 export default app

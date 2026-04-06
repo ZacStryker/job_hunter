@@ -147,6 +147,11 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - No server-side rate-limiting / idempotency guard on cover letter generation — `isPending` prevents double-submit from the same session, but concurrent requests from separate tabs or clients will each trigger a new n8n call and insert a new row. Address with a per-job mutex or cooldown if misuse becomes a concern.
 - `N8N_WEBHOOK_URL` not logged on successful calls or on failures for observability — the spec notes "URL is safe to log"; add structured server-side logging when a logging layer is introduced [`cover-letter-service.ts`].
 
+## Deferred from: code review of 7-2-n8n-webhook-callback-and-cover-letter-storage (2026-04-06)
+
+- `orderBy(desc(coverLetters.createdAt))` sorts lexicographically on a TEXT column (`api-jobs.ts`). ISO-UTC strings sort correctly and the generate endpoint consistently writes `new Date().toISOString()`, but format inconsistency would silently return the wrong "most recent" letter. Pre-existing schema constraint from Story 7.1; not actionable without a schema migration.
+- `new Date(coverLetter.createdAt).toLocaleDateString()` renders "Invalid Date" if `createdAt` is a malformed string (`JobDrawer.tsx`). `createdAt` is stored as raw TEXT with no Zod `.datetime()` refinement in `coverLetterSchema`. Consistent with the pre-existing unvalidated date field pattern across the codebase (logged in Story 1.2 deferred); address in a future schema-hardening pass.
+
 ## Deferred from: code review of 3-1-jobs-api-and-tanstack-query-hook (2026-04-01)
 
 - Router loader (`src/client/lib/router.ts`) has no `errorComponent` — silent failure on load error — story 3-4 scope

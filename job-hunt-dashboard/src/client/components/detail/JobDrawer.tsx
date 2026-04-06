@@ -10,6 +10,7 @@ import { StatusDropdown } from './StatusDropdown'
 import { useJobEvents } from '../../hooks/useJobEvents'
 import { StatusTimeline } from './StatusTimeline'
 import { useGenerateCoverLetter } from '../../hooks/useGenerateCoverLetter'
+import { useCoverLetterQuery } from '../../hooks/useCoverLetterQuery'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 
 interface JobDrawerProps {
@@ -22,6 +23,10 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   const [showFullDescription, setShowFullDescription] = useState(false)
   const { data: events = [] } = useJobEvents(job?.id)
   const { mutate: generateCoverLetter, isPending, isError, error } = useGenerateCoverLetter(job?.id ?? 0)
+  const { data: coverLetter } = useCoverLetterQuery(
+    job?.id ?? 0,
+    !!job?.coverLetterSentAt
+  )
 
   useEffect(() => {
     setShowFullDescription(false)
@@ -124,7 +129,22 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                     </Tooltip>
                   </TooltipProvider>
                 )}
-                {/* Story 7.2: cover letter content display goes here */}
+                {coverLetter && (
+                  <div className="space-y-1 pt-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-zinc-600">Generated {new Date(coverLetter.createdAt).toLocaleDateString()}</p>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(coverLetter.content)}
+                        className="text-xs text-zinc-500 hover:text-zinc-300"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <pre className="text-xs text-zinc-300 whitespace-pre-wrap max-h-64 overflow-y-auto font-sans leading-relaxed">
+                      {coverLetter.content}
+                    </pre>
+                  </div>
+                )}
               </div>
             </>
           )}
