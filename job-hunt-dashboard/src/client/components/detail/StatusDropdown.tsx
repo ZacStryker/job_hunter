@@ -9,10 +9,10 @@ import {
 import type { Job } from '@shared/schemas'
 import { useJobMutation } from '../../hooks/useJobMutation'
 
-const NO_STATUS = '__none__'
+export const NO_STATUS = '__none__'
 export const APPLIED = 'Applied'
 
-const STATUS_OPTIONS = [
+export const STATUS_OPTIONS = [
   { value: NO_STATUS, label: 'No Status' },
   { value: APPLIED, label: 'Applied' },
   { value: 'phone_screen', label: 'Phone Screen' },

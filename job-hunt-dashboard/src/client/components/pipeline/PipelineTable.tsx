@@ -18,6 +18,7 @@ import type { Job } from '@shared/schemas'
 import { ScoreBadge } from './ScoreBadge'
 import { ActionChip } from './ActionChip'
 import { ColumnVisibilityToggle } from './ColumnVisibilityToggle'
+import { STATUS_OPTIONS, NO_STATUS, APPLIED } from '../detail/StatusDropdown'
 
 const VISIBILITY_KEY = 'job-hunt-column-visibility'
 
@@ -76,18 +77,19 @@ const columns = [
       )
     },
   }),
-  columnHelper.accessor('status', {
-    id: 'status',
-    header: 'Status',
-    cell: (info) => {
-      const v = info.getValue()
-      return v ? (
-        <span className="text-zinc-300">{v}</span>
-      ) : (
-        <span className="text-zinc-500">—</span>
-      )
-    },
-  }),
+  columnHelper.accessor(
+    (row) => row.statusOverride ?? (row.applied ? APPLIED : NO_STATUS),
+    {
+      id: 'status',
+      header: 'Status',
+      cell: ({ getValue }) => {
+        const value = getValue()
+        if (value === NO_STATUS) return <span className="text-zinc-500">—</span>
+        const label = STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value
+        return <span className="text-zinc-300">{label}</span>
+      },
+    }
+  ),
 ]
 
 interface PipelineTableProps {
