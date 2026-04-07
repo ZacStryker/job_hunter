@@ -13,30 +13,31 @@ beforeEach(() => {
 
 const { fetchJobsFromSheets } = await import('./sheets-sync')
 
-const HEADERS = [
-  'company',
-  'title',
-  'score',
-  'recommended_action',
-  'role_fit',
-  'requirements_met',
-  'requirements_missed',
-  'red_flags',
-  'analysis',
-  'url',
-  'date_scraped',
-]
+const MAIN_HEADERS = ['job_id', 'company', 'title', 'score', 'recommended_action', 'url']
+const DETAIL_HEADERS = ['job_id', 'date_scraped', 'description', 'role_fit', 'requirements_met', 'requirements_missed', 'red_flags']
+
+function mockSheets(mainValues: string[][], detailValues: string[][]) {
+  mockFetch.mockImplementation((url: string) => {
+    const body = (url as string).includes('JobDetails')
+      ? { values: detailValues }
+      : { values: mainValues }
+    return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }))
+  })
+}
 
 test('valid spreadsheet response → returns correctly mapped JobInput[]', async () => {
-  const values = [
-    HEADERS,
-    ['Acme Corp', 'Backend Engineer', '82', 'apply', 'Strong fit', 'TypeScript', 'None', '', 'Job desc', 'https://example.com', '2026-03-01'],
-    ['Beta Inc', 'Frontend Dev', '70', 'investigate', 'Good', 'React', 'Go', 'Culture risk', 'Desc', 'https://beta.com', '2026-03-02'],
+  const mainValues = [
+    MAIN_HEADERS,
+    ['J1', 'Acme Corp', 'Backend Engineer', '82', 'apply', 'https://example.com'],
+    ['J2', 'Beta Inc', 'Frontend Dev', '70', 'investigate', 'https://beta.com'],
+  ]
+  const detailValues = [
+    DETAIL_HEADERS,
+    ['J1', '2026-03-01', 'Job desc', 'Strong fit', 'TypeScript', 'None', ''],
+    ['J2', '2026-03-02', 'Desc', 'Good', 'React', 'Go', 'Culture risk'],
   ]
 
-  mockFetch.mockImplementation(() =>
-    Promise.resolve(new Response(JSON.stringify({ values }), { status: 200 }))
-  )
+  mockSheets(mainValues, detailValues)
 
   const jobs = await fetchJobsFromSheets()
   expect(jobs).toHaveLength(2)
@@ -69,27 +70,20 @@ test('Sheets API returns non-2xx → throws with descriptive message including s
 })
 
 test('empty spreadsheet (0 data rows) → returns []', async () => {
-  const values = [HEADERS] // only headers, no data rows
-
-  mockFetch.mockImplementation(() =>
-    Promise.resolve(new Response(JSON.stringify({ values }), { status: 200 }))
-  )
+  mockSheets([MAIN_HEADERS], [DETAIL_HEADERS])
 
   const jobs = await fetchJobsFromSheets()
   expect(jobs).toEqual([])
 })
 
 test('rows missing company or title → filtered out of result', async () => {
-  const values = [
-    HEADERS,
-    ['', 'Backend Engineer', '82', 'apply', '', '', '', '', '', '', ''],   // missing company
-    ['Acme Corp', '', '82', 'apply', '', '', '', '', '', '', ''],           // missing title
-    ['Good Corp', 'Eng', '75', 'skip', '', '', '', '', '', '', ''],         // valid
+  const mainValues = [
+    MAIN_HEADERS,
+    ['J1', '', 'Backend Engineer', '82', 'apply', ''],    // missing company
+    ['J2', 'Acme Corp', '', '82', 'apply', ''],           // missing title
+    ['J3', 'Good Corp', 'Eng', '75', 'skip', ''],         // valid
   ]
-
-  mockFetch.mockImplementation(() =>
-    Promise.resolve(new Response(JSON.stringify({ values }), { status: 200 }))
-  )
+  mockSheets(mainValues, [DETAIL_HEADERS])
 
   const jobs = await fetchJobsFromSheets()
   expect(jobs).toHaveLength(1)
@@ -97,16 +91,26 @@ test('rows missing company or title → filtered out of result', async () => {
 })
 
 test('score string "85" → parsed to integer 85', async () => {
-  const values = [
-    HEADERS,
-    ['TechCo', 'SWE', '85', 'apply', '', '', '', '', '', '', ''],
+  const mainValues = [
+    MAIN_HEADERS,
+    ['J1', 'TechCo', 'SWE', '85', 'apply', ''],
   ]
-
-  mockFetch.mockImplementation(() =>
-    Promise.resolve(new Response(JSON.stringify({ values }), { status: 200 }))
-  )
+  mockSheets(mainValues, [DETAIL_HEADERS])
 
   const jobs = await fetchJobsFromSheets()
   expect(jobs[0].fitScore).toBe(85)
   expect(typeof jobs[0].fitScore).toBe('number')
+})
+
+test('job with no matching detail row → detail fields are null', async () => {
+  const mainValues = [
+    MAIN_HEADERS,
+    ['J1', 'TechCo', 'SWE', '85', 'apply', 'https://example.com'],
+  ]
+  mockSheets(mainValues, [DETAIL_HEADERS])
+
+  const jobs = await fetchJobsFromSheets()
+  expect(jobs[0].roleFit).toBeNull()
+  expect(jobs[0].dateScraped).toBeNull()
+  expect(jobs[0].jobDescription).toBeNull()
 })
