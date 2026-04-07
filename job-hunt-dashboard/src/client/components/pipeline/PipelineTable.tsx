@@ -17,7 +17,6 @@ import {
 import type { Job } from '@shared/schemas'
 import { ScoreBadge } from './ScoreBadge'
 import { ActionChip } from './ActionChip'
-import { CoverLetterChip } from './CoverLetterChip'
 import { ColumnVisibilityToggle } from './ColumnVisibilityToggle'
 
 const VISIBILITY_KEY = 'job-hunt-column-visibility'
@@ -52,35 +51,6 @@ const columns = [
   columnHelper.accessor('recommendation', {
     header: 'Action',
     cell: (info) => <ActionChip recommendation={info.getValue()} />,
-  }),
-  columnHelper.accessor('coverLetterSentAt', {
-    id: 'cover_letter',
-    header: 'CL',
-    cell: (info) => <CoverLetterChip sentAt={info.getValue()} />,
-  }),
-  columnHelper.accessor('requirementsMet', {
-    id: 'reqs_met',
-    header: 'Reqs Met',
-    cell: (info) => {
-      const v = info.getValue()
-      return v ? (
-        <span className="max-w-[200px] truncate block text-zinc-300">{v}</span>
-      ) : (
-        <span className="text-zinc-500">—</span>
-      )
-    },
-  }),
-  columnHelper.accessor('requirementsMissed', {
-    id: 'reqs_missed',
-    header: 'Reqs Missed',
-    cell: (info) => {
-      const v = info.getValue()
-      return v ? (
-        <span className="max-w-[200px] truncate block text-zinc-300">{v}</span>
-      ) : (
-        <span className="text-zinc-500">—</span>
-      )
-    },
   }),
   columnHelper.accessor('roleFit', {
     id: 'notes',
