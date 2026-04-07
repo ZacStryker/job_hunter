@@ -4,6 +4,7 @@ import type { Job } from '@shared/schemas'
 type JobPatch = {
   applied?: boolean
   statusOverride?: string | null
+  archived?: boolean
 }
 
 type MutationInput = { id: number; patch: JobPatch }

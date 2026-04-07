@@ -2,6 +2,7 @@ import { createRootRoute, createRoute, createRouter } from '@tanstack/react-rout
 import { Layout } from '../components/shared/Layout'
 import { PipelineRoute } from '../routes/index'
 import { TrackerRoute } from '../routes/tracker'
+import { ArchivedRoute } from '../routes/archived'
 import { queryClient } from './query-client'
 import { fetchJobs } from '../hooks/useJobsQuery'
 
@@ -23,7 +24,14 @@ const trackerRoute = createRoute({
   loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, trackerRoute])
+const archivedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/archived',
+  component: ArchivedRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
+})
+
+const routeTree = rootRoute.addChildren([indexRoute, trackerRoute, archivedRoute])
 
 export const router = createRouter({ routeTree })
 

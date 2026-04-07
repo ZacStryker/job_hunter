@@ -20,6 +20,8 @@ export const jobs = sqliteTable('jobs', {
   statusOverride: text('status_override'),
   coverLetterSentAt: text('cover_letter_sent_at'),
   dateApplied: text('date_applied'),
+  // User-owned (NEVER overwritten on sync — protected by ON CONFLICT clause in Story 2.1)
+  archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
 }, (table) => [
   uniqueIndex('company_job_title_idx').on(table.company, table.jobTitle),
 ])

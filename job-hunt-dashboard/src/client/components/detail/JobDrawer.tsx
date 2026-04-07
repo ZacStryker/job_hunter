@@ -12,6 +12,7 @@ import { StatusTimeline } from './StatusTimeline'
 import { useGenerateCoverLetter } from '../../hooks/useGenerateCoverLetter'
 import { useCoverLetterQuery } from '../../hooks/useCoverLetterQuery'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
+import { useJobMutation } from '../../hooks/useJobMutation'
 
 interface JobDrawerProps {
   job: Job | null
@@ -23,6 +24,7 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   const [showFullDescription, setShowFullDescription] = useState(false)
   const { data: events = [] } = useJobEvents(job?.id)
   const { mutate: generateCoverLetter, isPending, isError, error } = useGenerateCoverLetter(job?.id ?? 0)
+  const { mutate: patchJob, isPending: isArchiving } = useJobMutation(job?.id ?? 0)
   const { data: coverLetter } = useCoverLetterQuery(
     job?.id ?? 0,
     !!job?.coverLetterSentAt
@@ -145,6 +147,20 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                     </pre>
                   </div>
                 )}
+              </div>
+            </>
+          )}
+          {job && (
+            <>
+              <Separator className="bg-zinc-800" />
+              <div>
+                <button
+                  onClick={() => patchJob({ id: job.id, patch: { archived: !job.archived } })}
+                  disabled={isArchiving}
+                  className="text-sm text-zinc-400 hover:text-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isArchiving ? (job.archived ? 'Unarchiving…' : 'Archiving…') : (job.archived ? 'Unarchive' : 'Archive')}
+                </button>
               </div>
             </>
           )}

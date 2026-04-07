@@ -76,28 +76,30 @@ export function PipelineRoute() {
   const syncMutation = useSyncMutation()
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
 
+  const activeJobs = (jobs ?? []).filter(j => !j.archived)
+
   useEffect(() => {
-    if (selectedJobId !== null && jobs && !jobs.find((j) => j.id === selectedJobId)) {
+    if (selectedJobId !== null && !activeJobs.find((j) => j.id === selectedJobId)) {
       setSelectedJobId(null)
     }
-  }, [jobs, selectedJobId])
+  }, [activeJobs, selectedJobId])
 
   if (isPending) {
     return <SkeletonCard />
   }
 
-  if (jobs && jobs.length > 0) {
+  if (jobs !== undefined && activeJobs.length > 0) {
     return (
       <>
         <div className="p-4">
           <PipelineTable
-            jobs={jobs}
+            jobs={activeJobs}
             onRowClick={(job) => setSelectedJobId(job.id === selectedJobId ? null : job.id)}
             selectedJobId={selectedJobId}
           />
         </div>
         <JobDrawer
-          job={jobs.find((j) => j.id === selectedJobId) ?? null}
+          job={activeJobs.find((j) => j.id === selectedJobId) ?? null}
           open={selectedJobId !== null}
           onClose={() => setSelectedJobId(null)}
         />

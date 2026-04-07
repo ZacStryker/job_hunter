@@ -47,3 +47,6 @@
     - [Story 7.1: Cover Letter Generation Trigger](./epic-7-post-mvp-cover-letter-generation-pipeline.md#story-71-cover-letter-generation-trigger)
     - [Story 7.2: n8n Webhook Callback & Cover Letter Storage](./epic-7-post-mvp-cover-letter-generation-pipeline.md#story-72-n8n-webhook-callback-cover-letter-storage)
     - [Story 7.3: Cover Letter Display & Table Row Indicator](./epic-7-post-mvp-cover-letter-generation-pipeline.md#story-73-cover-letter-display-table-row-indicator)
+  - [Epic 8 (Post-MVP): Field Visibility & Archive](./epic-8-field-visibility-and-archive.md)
+    - [Story 8.1: Pipeline Table — Date Scraped & Status Columns](./epic-8-field-visibility-and-archive.md#story-81-pipeline-table--date-scraped--status-columns)
+    - [Story 8.2: Archive Jobs](./epic-8-field-visibility-and-archive.md#story-82-archive-jobs)

@@ -67,6 +67,7 @@ const CREATE_JOBS_TABLE = `
     status_override TEXT,
     cover_letter_sent_at TEXT,
     date_applied TEXT,
+    archived INTEGER NOT NULL DEFAULT 0,
     UNIQUE(company, job_title)
   )
 `

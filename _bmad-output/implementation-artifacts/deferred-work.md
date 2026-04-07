@@ -152,6 +152,25 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - `orderBy(desc(coverLetters.createdAt))` sorts lexicographically on a TEXT column (`api-jobs.ts`). ISO-UTC strings sort correctly and the generate endpoint consistently writes `new Date().toISOString()`, but format inconsistency would silently return the wrong "most recent" letter. Pre-existing schema constraint from Story 7.1; not actionable without a schema migration.
 - `new Date(coverLetter.createdAt).toLocaleDateString()` renders "Invalid Date" if `createdAt` is a malformed string (`JobDrawer.tsx`). `createdAt` is stored as raw TEXT with no Zod `.datetime()` refinement in `coverLetterSchema`. Consistent with the pre-existing unvalidated date field pattern across the codebase (logged in Story 1.2 deferred); address in a future schema-hardening pass.
 
+## Deferred from: code review of 7-3-cover-letter-display-and-table-row-indicator (2026-04-07)
+
+- No `aria-label` or `title` on `CoverLetterChip` — the "CL Sent" chip uses a two-letter abbreviation with no accessible label. Screen readers and unfamiliar users get no disclosure that "CL" means "Cover Letter". Consistent with pre-existing a11y debt on ActionChip and other pipeline cell components; address in a future accessibility hardening pass [`CoverLetterChip.tsx`].
+
+## Deferred from: code review of 8-1-pipeline-table-date-scraped-and-status-columns (2026-04-07)
+
+- `dateScraped` column uses `v.slice(0, 10)` on a `z.string().nullable()` field with no ISO 8601 format enforcement — malformed strings silently display garbage date portions. Spec-mandated approach; pre-existing schema looseness logged from Story 1.2 and 2.1 reviews. Add Zod `.datetime()` or `.regex()` refinement to `dateScraped` in a future schema-hardening pass [`PipelineTable.tsx:94`]
+- New columns (`cover_letter`, `date_scraped`, `status`) default hidden for users with existing localStorage VisibilityState — keys missing from stored state cause columns to be hidden until manually re-enabled. Consistent pre-existing behavior for all prior column additions. Add a migration or default-visibility fallback if UX issues arise [`PipelineTable.tsx`, `ColumnVisibilityToggle.tsx`]
+- `status` column renders raw DB strings verbatim without display-name mapping — values like `phone_screen` shown as-is. Pre-existing concern noted in Story 5.1 review; add a display-name map or humanizer when a status formatting pass is done [`PipelineTable.tsx:109`]
+- Whitespace-only `coverLetterSentAt` value would pass `if (!sentAt)` truthy check and display "CL Sent" badge for semantically-empty data — very unlikely from actual data source; pre-existing pattern [`CoverLetterChip.tsx:6`]
+
+## Deferred from: code review of 8-2-archive-jobs (2026-04-07)
+
+- `useEffect` uses inline-computed filtered array (`activeJobs`/`archivedJobs`) as a dependency, causing the effect to run on every render cycle. Not a correctness bug but a code quality concern; useMemo would be cleaner. [archived.tsx, tracker.tsx, index.tsx]
+- No success feedback when a job disappears after archive/unarchive — job silently vanishes with no toast or notification. UX enhancement; address when adding a notification layer. [JobDrawer.tsx]
+- `ArchivedRoute` shows "No archived jobs." during initial data load — `useJobsQuery` defaults to `[]`, so the empty state briefly renders on cold cache. Route loader mitigates in practice; add a skeleton for consistency when doing a loading-state pass. [archived.tsx]
+- Ingest preservation test queries by company name only (`WHERE company = 'Acme'`); should use the composite unique key `(company, job_title)` for robustness. Per-test DB isolation makes this safe currently. [api-ingest.test.ts:333]
+- Mutation error is silently lost when the drawer auto-closes via optimistic update before the PATCH response arrives. Pre-existing limitation of the optimistic-update pattern across all mutations; address when adding a global error/notification layer. [useJobMutation.ts]
+
 ## Deferred from: code review of 3-1-jobs-api-and-tanstack-query-hook (2026-04-01)
 
 - Router loader (`src/client/lib/router.ts`) has no `errorComponent` — silent failure on load error — story 3-4 scope

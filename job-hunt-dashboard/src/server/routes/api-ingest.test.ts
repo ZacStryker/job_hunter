@@ -49,6 +49,7 @@ const CREATE_JOBS_TABLE = `
     status_override TEXT,
     cover_letter_sent_at TEXT,
     date_applied TEXT,
+    archived INTEGER NOT NULL DEFAULT 0,
     UNIQUE(company, job_title)
   )
 `
@@ -315,5 +316,20 @@ describe('POST /api/ingest HTTP contract (production handler)', () => {
 
     const after = prodSqlite.prepare('SELECT COUNT(*) as n FROM jobs').get() as { n: number }
     expect(after.n).toBe(before.n)
+  })
+
+  test('ingest does not overwrite archived field on upsert conflict', async () => {
+    prodSqlite.run(
+      `INSERT INTO jobs (company, job_title, applied, archived) VALUES ('Acme', 'Engineer', 0, 1)`
+    )
+    const payload: JobInput[] = [{ company: 'Acme', jobTitle: 'Engineer', fitScore: 80, recommendation: 'apply', roleFit: null, requirementsMet: null, requirementsMissed: null, redFlags: null, jobDescription: null, sourceUrl: null, dateScraped: null }]
+    const res = await ingestApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    expect(res.status).toBe(200)
+    const row = prodSqlite.query('SELECT archived FROM jobs WHERE company = ?').get('Acme') as { archived: number }
+    expect(row.archived).toBe(1)
   })
 })

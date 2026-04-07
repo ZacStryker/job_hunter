@@ -26,6 +26,7 @@ const CREATE_JOBS_TABLE = `
     status_override TEXT,
     cover_letter_sent_at TEXT,
     date_applied TEXT,
+    archived INTEGER NOT NULL DEFAULT 0,
     UNIQUE(company, job_title)
   )
 `
@@ -155,6 +156,32 @@ describe('PATCH /api/jobs/:id', () => {
     const data = await res.json() as { job: Record<string, unknown> }
     expect(data.job.company).toBe('Sheets')
     expect(data.job.fitScore).toBe(90)
+  })
+
+  test('PATCH { archived: true } returns 200 with job.archived === true', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Arch', 'Dev', 0)`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Arch') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archived: true }),
+    })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { job: Record<string, unknown> }
+    expect(data.job.archived).toBe(true)
+  })
+
+  test('PATCH { archived: false } returns 200 with job.archived === false', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, archived) VALUES ('Arch2', 'Dev', 0, 1)`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Arch2') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archived: false }),
+    })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { job: Record<string, unknown> }
+    expect(data.job.archived).toBe(false)
   })
 })
 

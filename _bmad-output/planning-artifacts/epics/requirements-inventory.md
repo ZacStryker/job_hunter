@@ -49,6 +49,13 @@
 - FR31: User can view the generated cover letter in the job detail view
 - FR33: User can see a visual cover letter status indicator on a job's table row
 
+**Post-MVP: Field Visibility & Archive**
+- FR34: User can view Date Scraped and Status as optional columns in the Pipeline table (togglable via column visibility dropdown)
+- FR35: Job detail drawer displays the job description when one is available — collapsible at ~300 chars with "Show more" (null-safe) *(fulfilled by Epic 4 implementation)*
+- FR36: User can archive a job record from the job detail drawer
+- FR37: Archived jobs are excluded from Pipeline and Tracker views by default
+- FR38: User can view archived jobs via a dedicated Archived view tab
+
 ## NonFunctional Requirements
 
 **Reliability**
@@ -147,3 +154,8 @@ From Architecture — critical implementation constraints:
 | FR31 | Epic 7 | Cover letter in drawer |
 | FR32 | Epic 6 | Email events in drawer |
 | FR33 | Epic 7 | CL status indicator on table row |
+| FR34 | Epic 8 | Date Scraped + Status optional columns in Pipeline table |
+| FR35 | Epic 8 | Job description in drawer — fulfilled by Epic 4 implementation |
+| FR36 | Epic 8 | Archive action in job drawer |
+| FR37 | Epic 8 | Archived jobs excluded from Pipeline/Tracker by default |
+| FR38 | Epic 8 | Archived view tab to see archived jobs |

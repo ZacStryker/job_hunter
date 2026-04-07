@@ -24,6 +24,7 @@ export const jobSchema = jobInputSchema.extend({
   statusOverride: z.string().nullable(),
   coverLetterSentAt: z.string().nullable(),
   dateApplied: z.string().nullable(),
+  archived: z.boolean(),
 })
 
 // POST /api/ingest body — array of Sheets-sourced records

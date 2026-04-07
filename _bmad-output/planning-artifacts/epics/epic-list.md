@@ -36,4 +36,8 @@ System polls IMAP inbox, matches emails to job records, and auto-updates applica
 User can trigger cover letter generation for any job — delivered via email, tracked in the drawer, with status indicator visible in the table row.
 **FRs covered:** FR28, FR29, FR30, FR31, FR33
 
+## Epic 8 (Post-MVP): Field Visibility & Archive
+User can see additional job data fields (date scraped, status) in the pipeline table and archive irrelevant jobs to keep active views focused.
+**FRs covered:** FR34, FR35 (fulfilled), FR36, FR37, FR38
+
 ---
