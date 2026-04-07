@@ -94,6 +94,30 @@ const columns = [
       )
     },
   }),
+  columnHelper.accessor('dateScraped', {
+    id: 'date_scraped',
+    header: 'Date Scraped',
+    cell: (info) => {
+      const v = info.getValue()
+      return v ? (
+        <span className="text-zinc-300">{v.slice(0, 10)}</span>
+      ) : (
+        <span className="text-zinc-500">—</span>
+      )
+    },
+  }),
+  columnHelper.accessor('status', {
+    id: 'status',
+    header: 'Status',
+    cell: (info) => {
+      const v = info.getValue()
+      return v ? (
+        <span className="text-zinc-300">{v}</span>
+      ) : (
+        <span className="text-zinc-500">—</span>
+      )
+    },
+  }),
 ]
 
 interface PipelineTableProps {

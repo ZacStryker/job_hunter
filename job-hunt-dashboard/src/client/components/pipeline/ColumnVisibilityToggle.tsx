@@ -13,6 +13,8 @@ const OPTIONAL_COLUMNS: Array<{ id: string; label: string }> = [
   { id: 'reqs_missed', label: 'Reqs Missed' },
   { id: 'notes', label: 'Notes' },
   { id: 'cover_letter', label: 'CL' },
+  { id: 'date_scraped', label: 'Date Scraped' },
+  { id: 'status', label: 'Status' },
 ]
 
 interface ColumnVisibilityToggleProps {
