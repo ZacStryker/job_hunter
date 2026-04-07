@@ -17,6 +17,7 @@ import {
 import type { Job } from '@shared/schemas'
 import { ScoreBadge } from './ScoreBadge'
 import { ActionChip } from './ActionChip'
+import { CoverLetterChip } from './CoverLetterChip'
 import { ColumnVisibilityToggle } from './ColumnVisibilityToggle'
 
 const VISIBILITY_KEY = 'job-hunt-column-visibility'
@@ -51,6 +52,11 @@ const columns = [
   columnHelper.accessor('recommendation', {
     header: 'Action',
     cell: (info) => <ActionChip recommendation={info.getValue()} />,
+  }),
+  columnHelper.accessor('coverLetterSentAt', {
+    id: 'cover_letter',
+    header: 'CL',
+    cell: (info) => <CoverLetterChip sentAt={info.getValue()} />,
   }),
   columnHelper.accessor('requirementsMet', {
     id: 'reqs_met',
