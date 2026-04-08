@@ -29,7 +29,8 @@ export async function callN8nWebhook(job: Job): Promise<string> {
     throw new Error(`n8n webhook returned ${response.status}`)
   }
 
-  const data = await response.json() as { cover_letter?: string }
+  const raw = await response.json()
+  const data = (Array.isArray(raw) ? raw[0] : raw) as { cover_letter?: string }
   const coverLetter = data.cover_letter
   if (!coverLetter) {
     throw new Error('n8n response missing cover_letter field')

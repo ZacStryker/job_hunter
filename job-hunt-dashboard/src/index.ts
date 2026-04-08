@@ -49,4 +49,5 @@ export default {
   port,
   hostname: '127.0.0.1',
   fetch: app.fetch,
+  idleTimeout: 120,
 }
