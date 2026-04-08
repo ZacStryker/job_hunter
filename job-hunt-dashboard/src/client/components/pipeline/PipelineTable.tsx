@@ -81,7 +81,7 @@ const columns = [
     cell: (info) => <ScoreBadge score={info.getValue()} />,
   }),
   columnHelper.accessor('recommendation', {
-    header: 'Action',
+    header: 'Recommendation',
     cell: (info) => <ActionChip recommendation={info.getValue()} />,
   }),
   columnHelper.accessor('roleFit', {
