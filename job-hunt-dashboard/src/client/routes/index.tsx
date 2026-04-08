@@ -3,6 +3,7 @@ import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
 import { useJobsQuery } from '../hooks/useJobsQuery'
 import { useSyncMutation } from '../hooks/useSyncMutation'
+import { useBulkArchiveMutation } from '../hooks/useBulkArchiveMutation'
 import { PipelineTable } from '../components/pipeline/PipelineTable'
 import { JobDrawer } from '../components/detail/JobDrawer'
 
@@ -74,6 +75,7 @@ function EmptyState({ syncMutation }: { syncMutation: ReturnType<typeof useSyncM
 export function PipelineRoute() {
   const { data: jobs, isPending } = useJobsQuery()
   const syncMutation = useSyncMutation()
+  const bulkArchiveMutation = useBulkArchiveMutation()
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
 
   const activeJobs = (jobs ?? []).filter(j => !j.archived)
@@ -96,6 +98,8 @@ export function PipelineRoute() {
             jobs={activeJobs}
             onRowClick={(job) => setSelectedJobId(job.id === selectedJobId ? null : job.id)}
             selectedJobId={selectedJobId}
+            onBulkArchive={bulkArchiveMutation.mutate}
+            isBulkArchiving={bulkArchiveMutation.isPending}
           />
         </div>
         <JobDrawer

@@ -366,3 +366,45 @@ describe('GET /api/jobs', () => {
     expect(data.jobs[0].latestStatus).toBe('interview')
   })
 })
+
+describe('POST /api/jobs/bulk-archive', () => {
+  test('archives multiple jobs and returns count', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Eng1', 0)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Eng2', 0)`)
+    const rows = prodSqlite.query('SELECT id FROM jobs').all() as { id: number }[]
+    const ids = rows.map((r) => r.id)
+    const res = await jobsApp.request('/bulk-archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { archived: number }
+    expect(data.archived).toBe(2)
+    const archived = prodSqlite.query('SELECT archived FROM jobs WHERE id = ?').get(ids[0]) as { archived: number }
+    expect(archived.archived).toBe(1)
+  })
+
+  test('returns 400 for empty ids array', async () => {
+    const res = await jobsApp.request('/bulk-archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [] }),
+    })
+    expect(res.status).toBe(400)
+    const data = await res.json() as { error: string }
+    expect(data).toHaveProperty('error')
+    expect(data).not.toHaveProperty('message')
+  })
+
+  test('returns archived: 0 for non-existent ids', async () => {
+    const res = await jobsApp.request('/bulk-archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [99999] }),
+    })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { archived: number }
+    expect(data.archived).toBe(0)
+  })
+})

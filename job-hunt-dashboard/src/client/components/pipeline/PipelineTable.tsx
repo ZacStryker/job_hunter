@@ -6,7 +6,8 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type { SortingState, VisibilityState, Updater } from '@tanstack/react-table'
+import type { SortingState, VisibilityState, Updater, RowSelectionState } from '@tanstack/react-table'
+import { Button } from '../ui/button'
 import {
   TableBody,
   TableCell,
@@ -36,7 +37,37 @@ function loadVisibility(): VisibilityState {
 
 const columnHelper = createColumnHelper<Job>()
 
+const selectionColumn = columnHelper.display({
+  id: 'select',
+  header: ({ table }) => (
+    <div onClick={(e) => e.stopPropagation()}>
+      <input
+        type="checkbox"
+        checked={table.getIsAllRowsSelected()}
+        ref={(el) => {
+          if (el) el.indeterminate = table.getIsSomeRowsSelected()
+        }}
+        onChange={table.getToggleAllRowsSelectedHandler()}
+        className="cursor-pointer accent-zinc-400"
+        aria-label="Select all"
+      />
+    </div>
+  ),
+  cell: ({ row }) => (
+    <div onClick={(e) => e.stopPropagation()}>
+      <input
+        type="checkbox"
+        checked={row.getIsSelected()}
+        onChange={row.getToggleSelectedHandler()}
+        className="cursor-pointer accent-zinc-400"
+        aria-label="Select row"
+      />
+    </div>
+  ),
+})
+
 const columns = [
+  selectionColumn,
   columnHelper.accessor('company', {
     header: 'Company',
     cell: (info) => info.getValue(),
@@ -96,11 +127,14 @@ interface PipelineTableProps {
   jobs: Job[]
   onRowClick: (job: Job) => void
   selectedJobId: number | null
+  onBulkArchive?: (ids: number[]) => void
+  isBulkArchiving?: boolean
 }
 
-export function PipelineTable({ jobs, onRowClick, selectedJobId }: PipelineTableProps) {
+export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, isBulkArchiving = false }: PipelineTableProps) {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(loadVisibility)
   const [sorting, setSorting] = useState<SortingState>([{ id: 'fitScore', desc: true }])
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   function handleVisibilityChange(updater: Updater<VisibilityState>) {
     setColumnVisibility((prev) => {
@@ -117,17 +151,35 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId }: PipelineTable
   const table = useReactTable({
     data: jobs,
     columns,
+    getRowId: (row) => String(row.id),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     enableMultiSort: false,
-    state: { columnVisibility, sorting },
+    enableRowSelection: true,
+    state: { columnVisibility, sorting, rowSelection },
     onColumnVisibilityChange: handleVisibilityChange,
     onSortingChange: setSorting,
+    onRowSelectionChange: setRowSelection,
   })
+
+  const selectedIds = table.getSelectedRowModel().rows.map((r) => r.original.id)
+  const selectedCount = selectedIds.length
+
+  function handleBulkArchive() {
+    onBulkArchive?.(selectedIds)
+    setRowSelection({})
+  }
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col max-h-[calc(100vh-88px)]">
-      <div className="flex items-center justify-end px-3 py-2 border-b border-zinc-800 shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 shrink-0">
+        <div>
+          {onBulkArchive && selectedCount > 0 && (
+            <Button size="sm" variant="outline" onClick={handleBulkArchive} disabled={isBulkArchiving}>
+              {isBulkArchiving ? 'Archiving…' : `Archive (${selectedCount})`}
+            </Button>
+          )}
+        </div>
         <ColumnVisibilityToggle table={table} />
       </div>
       <div className="overflow-auto flex-1">

@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { eq, desc, and } from 'drizzle-orm'
+import { eq, desc, and, inArray } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { jobs, statusEvents, coverLetters } from '../../db/schema'
 import { callN8nWebhook } from '../services/cover-letter-service'
@@ -63,6 +63,32 @@ app.get('/:id/events', (c) => {
     .all()
 
   return c.json({ events })
+})
+
+const bulkArchiveSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1, 'No ids provided'),
+})
+
+app.post('/bulk-archive', async (c) => {
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
+  const parsed = bulkArchiveSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body' }, 400)
+  }
+
+  const { ids } = parsed.data
+  const archived = db.transaction((tx) => {
+    const matching = tx.select({ id: jobs.id }).from(jobs).where(inArray(jobs.id, ids)).all()
+    tx.update(jobs).set({ archived: true }).where(inArray(jobs.id, ids)).run()
+    return matching.length
+  })
+
+  return c.json({ archived })
 })
 
 app.patch('/:id', async (c) => {

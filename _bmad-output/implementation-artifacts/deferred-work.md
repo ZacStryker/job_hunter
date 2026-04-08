@@ -178,3 +178,10 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - No timeout / AbortController on `fetchJobs` (`src/client/hooks/useJobsQuery.ts`) — design decision
 - `staleTime: 0` causes redundant re-fetch on every navigation to `/` — future optimization
 - `api-sync.test.ts` error-handling tests (propagates OAuth error, propagates DB write error) failing on HEAD — Hono sub-apps tested in isolation don't inherit parent app's `onError` — pre-existing issue from story 2-3, not introduced by story 3-1
+
+## Deferred from: code review of bulk-archive-jobs (2026-04-08)
+
+- Indeterminate checkbox state in PipelineTable header only fires on mount — when selection goes from none to partial, the `indeterminate` DOM property is not updated. Requires a sub-component with `useEffect` to fix correctly. Minor visual concern; actual selection behavior is unaffected. [PipelineTable.tsx, `selectionColumn` header]
+- `setRowSelection({})` clears selection synchronously before the async archive request completes — if mutation fails, the user cannot see which rows were originally selected for a retry. Consistent with existing single-job archive UX (drawer closes on click). Address when adding a notification layer for mutation errors.
+- `ids.includes(j.id)` in `useBulkArchiveMutation` optimistic update is O(n×m) — acceptable at job-hunt scale but would benefit from a `Set` lookup if list grows. [useBulkArchiveMutation.ts]
+- No per-request authorization on `POST /api/jobs/bulk-archive` — pre-existing pattern across all endpoints; single-user localhost tool. Address if multi-user deployment is ever considered.
