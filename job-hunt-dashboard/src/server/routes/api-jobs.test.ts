@@ -340,5 +340,29 @@ describe('GET /api/jobs', () => {
     expect(job.sourceUrl).toBeNull()
     expect(job.roleFit).toBeNull()
     expect(job.dateScraped).toBeNull()
+    expect(job.latestStatus).toBeNull()
+  })
+
+  test('latestStatus is null when job has no status events', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Eng', 0)`)
+    const res = await jobsApp.request('/', { method: 'GET' })
+    const data = await res.json() as { jobs: Record<string, unknown>[] }
+    expect(data.jobs[0].latestStatus).toBeNull()
+  })
+
+  test('latestStatus reflects the most recent status event', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Eng', 0)`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Acme') as { id: number }
+    prodSqlite.run(
+      `INSERT INTO status_events (job_id, status, timestamp) VALUES (?, 'phone_screen', '2026-04-06T10:00:00.000Z')`,
+      [row.id]
+    )
+    prodSqlite.run(
+      `INSERT INTO status_events (job_id, status, timestamp) VALUES (?, 'interview', '2026-04-07T10:00:00.000Z')`,
+      [row.id]
+    )
+    const res = await jobsApp.request('/', { method: 'GET' })
+    const data = await res.json() as { jobs: Record<string, unknown>[] }
+    expect(data.jobs[0].latestStatus).toBe('interview')
   })
 })

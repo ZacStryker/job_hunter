@@ -18,7 +18,26 @@ const jobPatchSchema = z.object({
 
 app.get('/', (c) => {
   const allJobs = db.select().from(jobs).all()
-  return c.json({ jobs: allJobs })
+  const allEvents = db.select({
+    jobId: statusEvents.jobId,
+    status: statusEvents.status,
+    timestamp: statusEvents.timestamp,
+  }).from(statusEvents).all()
+
+  const latestByJob = new Map<number, { status: string; timestamp: string }>()
+  for (const ev of allEvents) {
+    const existing = latestByJob.get(ev.jobId)
+    if (!existing || ev.timestamp > existing.timestamp) {
+      latestByJob.set(ev.jobId, { status: ev.status, timestamp: ev.timestamp })
+    }
+  }
+
+  const jobsWithLatestStatus = allJobs.map((job) => ({
+    ...job,
+    latestStatus: latestByJob.get(job.id)?.status ?? null,
+  }))
+
+  return c.json({ jobs: jobsWithLatestStatus })
 })
 
 app.get('/:id/events', (c) => {

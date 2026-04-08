@@ -7,8 +7,17 @@ import {
 } from '../ui/table'
 import { TooltipProvider } from '../ui/tooltip'
 import { AgingRow } from './AgingRow'
-import { APPLIED } from '../detail/StatusDropdown'
 import type { Job } from '@shared/schemas'
+
+const STATUS_LABELS: Record<string, string> = {
+  phone_screen: 'Phone Screen',
+  interview: 'Interview',
+  technical: 'Technical Round',
+  offer: 'Offer Received',
+  rejected: 'Rejected',
+  withdrawn: 'Withdrawn',
+  ghosted: 'Ghosted',
+}
 
 interface TrackerTableProps {
   jobs: Job[]
@@ -63,7 +72,7 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
                   <TableCell className="py-1.5 px-3 text-sm text-zinc-200">{job.company}</TableCell>
                   <TableCell className="py-1.5 px-3 text-sm text-zinc-200">{job.jobTitle}</TableCell>
                   <TableCell className="py-1.5 px-3 text-sm text-zinc-200">
-                    {job.statusOverride ?? job.status ?? (job.applied ? APPLIED : '—')}
+                    {job.latestStatus ? (STATUS_LABELS[job.latestStatus] ?? job.latestStatus) : '—'}
                   </TableCell>
                   <TableCell className="py-1.5 px-3 text-sm text-zinc-200">
                     {job.dateApplied ? formatDate(job.dateApplied) : '—'}
