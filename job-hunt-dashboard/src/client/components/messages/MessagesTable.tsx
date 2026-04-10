@@ -230,7 +230,7 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
                 mutate({ id: row.id, patch: { jobTitle: v === NONE_SENTINEL ? null : v } })
               }}
             >
-              <SelectTrigger className="h-7 w-[180px] bg-zinc-800 border-zinc-700 text-zinc-200 text-xs disabled:opacity-40 disabled:cursor-not-allowed">
+              <SelectTrigger className="h-7 w-[180px] bg-zinc-800 border-zinc-700 text-zinc-200 text-xs disabled:opacity-40 disabled:cursor-not-allowed [&>span]:text-left">
                 <SelectValue placeholder="—" />
               </SelectTrigger>
               <SelectContent className="max-h-60 overflow-y-auto">
