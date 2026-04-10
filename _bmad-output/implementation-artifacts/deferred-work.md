@@ -185,3 +185,17 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - `setRowSelection({})` clears selection synchronously before the async archive request completes — if mutation fails, the user cannot see which rows were originally selected for a retry. Consistent with existing single-job archive UX (drawer closes on click). Address when adding a notification layer for mutation errors.
 - `ids.includes(j.id)` in `useBulkArchiveMutation` optimistic update is O(n×m) — acceptable at job-hunt scale but would benefit from a `Set` lookup if list grows. [useBulkArchiveMutation.ts]
 - No per-request authorization on `POST /api/jobs/bulk-archive` — pre-existing pattern across all endpoints; single-user localhost tool. Address if multi-user deployment is ever considered.
+
+## Deferred from: code review of 9-1-messages-view (2026-04-09)
+
+- **Alert auto-dismiss race** [`Layout.tsx`] — Independent `useEffect` timers for 6 mutations (sync, discovery, analysis × success/error) are not coordinated; a success from one mutation can fire `setActiveAlert(null)` 4s later, prematurely dismissing an alert from a second mutation that succeeded shortly after. Low probability in practice.
+- **email-fetch-service full UID table scan** [`email-fetch-service.ts:9-11`] — All existing message UIDs are loaded into memory before the IMAP fetch loop. Unbounded allocation; acceptable at personal job-hunt scale but would need server-side filtering (WHERE uid IN ...) if the messages table grows large.
+- **MessagesTable columns array re-created each render** [`MessagesTable.tsx:44`] — The `columns` array is defined inside the component function without `useMemo`. TanStack Table re-initializes on every render. Wrap in `useMemo` if the table grows large or re-render frequency increases.
+- **MessagesTable distinctCompanies/filteredTitles recomputed per cell render** [`MessagesTable.tsx:42,126`] — Company list and job title list are re-derived from the `jobs` prop on every render pass. Memoize with `useMemo` at scale.
+- **useGenerateResume no success feedback** [`useGenerateResume.ts`] — Resume generation (out-of-spec addition from this story) gives no toast or UI state change on success — button returns to idle state silently. Add an `onSuccess` callback or toast notification.
+- **Company dropdown → jobTitle PATCH race** [`MessagesTable.tsx:101-103`] — Changing company fires a PATCH for `{ company, jobTitle: null }` while a prior jobTitle PATCH may still be in-flight. No request cancellation; the later response wins, but if network is slow the company-change patch could overwrite a concurrent jobTitle save. Add a mutation key or abort prior request.
+
+## Deferred from: Company typeahead implementation (2026-04-10)
+
+- **CompanyTypeahead missing stale company** [`MessagesTable.tsx`] — `distinctCompanies` is derived from `jobs` only. If a message has a company value that no longer has a corresponding job (deleted job, or externally set), that company does not appear in the typeahead options. The current value still displays correctly, but the user cannot re-select it — only clear it. Consider deriving options from `union(jobs.company, messages.company)`.
+- **`e.stopPropagation()` on company/type/jobTitle cell wrappers** [`MessagesTable.tsx`] — Pre-existing pattern from original Select cells. There is no row-level `onClick` handler, so these `stopPropagation` calls are no-ops. Remove in a future cleanup pass.
