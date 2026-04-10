@@ -36,6 +36,27 @@
       "when": 1775578964278,
       "tag": "0004_parched_sumo",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1744200000000,
+      "tag": "0005_new_job_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1775760713973,
+      "tag": "0006_rare_kid_colt",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1775826918248,
+      "tag": "0007_late_arachne",
+      "breakpoints": true
     }
   ]
 }

@@ -14,6 +14,13 @@ export const jobs = sqliteTable('jobs', {
   jobDescription: text('job_description'),
   sourceUrl: text('source_url'),
   dateScraped: text('date_scraped'),
+  source: text('source'),
+  location: text('location'),
+  salary: text('salary'),
+  benefits: text('benefits'),
+  contactName: text('contact_name'),
+  contactEmail: text('contact_email'),
+  contactPhone: text('contact_phone'),
   // User-owned (NEVER overwritten on sync — protected by ON CONFLICT clause in Story 2.1)
   applied: integer('applied', { mode: 'boolean' }).notNull().default(false),
   status: text('status'),
@@ -39,4 +46,17 @@ export const statusEvents = sqliteTable('status_events', {
   status: text('status').notNull(),
   timestamp: text('timestamp').notNull(), // Full ISO 8601 datetime string
   source: text('source').notNull().default('manual'),
+})
+
+export const messages = sqliteTable('messages', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  uid: text('uid').notNull().unique(), // IMAP UID — dedup key (folder:uid)
+  messageId: text('message_id').unique(), // RFC 2822 Message-ID — stable across folder moves
+  receivedAt: text('received_at').notNull(), // ISO 8601 datetime
+  fromAddress: text('from_address').notNull(), // "Name <email>" or "email"
+  subject: text('subject').notNull(),
+  // User-set fields (all nullable = not yet mapped)
+  type: text('type'),     // null | 'Submitted' | 'Rejected' | 'Screening' | 'Interview' | 'Offer' | 'Other'
+  company: text('company'),
+  jobTitle: text('job_title'),
 })
