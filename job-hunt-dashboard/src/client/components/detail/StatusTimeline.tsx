@@ -42,22 +42,6 @@ export function StatusTimeline({ events }: StatusTimelineProps) {
             <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-zinc-400 shrink-0" />
             <div>
               <p className="text-sm text-zinc-200 flex items-center gap-1.5">
-                {STATUS_LABELS[event.status] ?? event.status}
-                {event.source === 'email' && (
-                  <Mail size={12} className="text-zinc-500 shrink-0" />
-                )}
-              </p>
-              {event.emailSubject && (
-                <p className="text-xs text-zinc-400 truncate max-w-xs" title={event.emailSubject}>
-                  {event.emailSubject}
-                </p>
-              )}
-              {event.emailSender && (
-                <p className="text-xs text-zinc-500 truncate max-w-xs" title={event.emailSender}>
-                  From: {extractSenderName(event.emailSender)}
-                </p>
-              )}
-              <p className="text-xs text-zinc-500">
                 {new Intl.DateTimeFormat('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -65,7 +49,19 @@ export function StatusTimeline({ events }: StatusTimelineProps) {
                   hour: 'numeric',
                   minute: '2-digit',
                 }).format(new Date(event.timestamp))}
+                {' — '}
+                {STATUS_LABELS[event.status] ?? event.status}
+                {event.source === 'email' && (
+                  <Mail size={12} className="text-zinc-500 shrink-0" />
+                )}
               </p>
+              {(event.emailSender || event.emailSubject) && (
+                <p className="text-xs text-zinc-500 truncate max-w-xs" title={[event.emailSender ? extractSenderName(event.emailSender) : null, event.emailSubject].filter(Boolean).join(' — ')}>
+                  {event.emailSender && extractSenderName(event.emailSender)}
+                  {event.emailSender && event.emailSubject && ' — '}
+                  {event.emailSubject}
+                </p>
+              )}
             </div>
           </div>
         ))}
