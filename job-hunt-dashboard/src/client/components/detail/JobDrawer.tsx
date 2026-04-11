@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { ExternalLink, Archive, ArchiveRestore, Wand2, Copy } from 'lucide-react'
+import { useState, useEffect, Fragment } from 'react'
+import { ExternalLink, Archive, ArchiveRestore, Wand2, Copy, FileText } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Separator } from '../ui/separator'
 import type { Job } from '@shared/schemas'
@@ -10,9 +10,56 @@ import { StatusDropdown } from './StatusDropdown'
 import { useJobEvents } from '../../hooks/useJobEvents'
 import { StatusTimeline } from './StatusTimeline'
 import { useGenerateCoverLetter } from '../../hooks/useGenerateCoverLetter'
+import { useGenerateResume } from '../../hooks/useGenerateResume'
 import { useCoverLetterQuery } from '../../hooks/useCoverLetterQuery'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { useJobMutation } from '../../hooks/useJobMutation'
+
+function JobDetailFields({ job }: { job: Job }) {
+  const left = [
+    { label: 'Source', value: job.source },
+    { label: 'Location', value: job.location },
+    { label: 'Salary', value: job.salary },
+  ].filter((f) => f.value)
+  const right = [
+    { label: 'Contact', value: job.contactName },
+    { label: 'Email', value: job.contactEmail },
+    { label: 'Phone', value: job.contactPhone },
+  ].filter((f) => f.value)
+
+  if (!left.length && !right.length && !job.benefits) return null
+
+  return (
+    <div className="space-y-1.5">
+      {(left.length > 0 || right.length > 0) && (
+        <div className="grid grid-cols-2 gap-x-6">
+          <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 content-start">
+            {left.map(({ label, value }) => (
+              <Fragment key={label}>
+                <span className="text-xs text-zinc-500 uppercase tracking-wide self-center">{label}</span>
+                <span className="text-sm text-zinc-200 break-all">{value}</span>
+              </Fragment>
+            ))}
+          </div>
+          <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 content-start">
+            {right.map(({ label, value }) => (
+              <Fragment key={label}>
+                <span className="text-xs text-zinc-500 uppercase tracking-wide self-center">{label}</span>
+                <span className="text-sm text-zinc-200 break-all">{value}</span>
+              </Fragment>
+            ))}
+          </div>
+        </div>
+      )}
+      {job.benefits && (
+        <div className="grid grid-cols-[auto_1fr] gap-x-4">
+          <span className="text-xs text-zinc-500 uppercase tracking-wide self-start pt-0.5">Benefits</span>
+          <span className="text-sm text-zinc-200">{job.benefits}</span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface JobDrawerProps {
   job: Job | null
@@ -24,6 +71,7 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   const [showFullDescription, setShowFullDescription] = useState(false)
   const { data: events = [] } = useJobEvents(job?.id)
   const { mutate: generateCoverLetter, isPending, isError, error } = useGenerateCoverLetter(job?.id ?? 0)
+  const { mutate: generateResume, isPending: isResumePending, isError: isResumeError, error: resumeError } = useGenerateResume(job?.id ?? 0)
   const { mutate: patchJob, isPending: isArchiving } = useJobMutation(job?.id ?? 0)
   const { data: coverLetter } = useCoverLetterQuery(
     job?.id ?? 0,
@@ -109,18 +157,48 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                   </Tooltip>
                 </TooltipProvider>
               )}
+              {job.jobDescription ? (
+                <button
+                  onClick={() => generateResume()}
+                  disabled={isResumePending}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FileText size={13} />
+                  {isResumePending ? 'Generating…' : 'Resume'}
+                </button>
+              ) : (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-600 cursor-not-allowed select-none">
+                        <FileText size={13} />
+                        Resume
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>No job description available</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               {isError && (
                 <p className="w-full text-xs text-red-400">{error?.message ?? 'Generation failed'}</p>
               )}
+              {isResumeError && (
+                <p className="w-full text-xs text-red-400">{resumeError?.message ?? 'Resume generation failed'}</p>
+              )}
             </div>
           )}
+          {job && <JobDetailFields job={job} />}
           {job && <StatusDropdown job={job} />}
           {job && <StatusTimeline events={events} />}
           <Separator className="bg-zinc-800" />
-          <AssessmentSection label="Role Fit" content={job?.roleFit ?? null} />
-          <AssessmentSection label="Requirements Met" content={job?.requirementsMet ?? null} />
-          <AssessmentSection label="Requirements Missed" content={job?.requirementsMissed ?? null} />
-          <AssessmentSection label="Red Flags" content={job?.redFlags ?? null} />
+          <div className="grid grid-cols-2 gap-4 items-start">
+            <AssessmentSection label="Role Fit" content={job?.roleFit ?? null} />
+            <AssessmentSection label="Red Flags" content={job?.redFlags ?? null} />
+            <AssessmentSection label="Requirements Met" content={job?.requirementsMet ?? null} />
+            <AssessmentSection label="Requirements Missed" content={job?.requirementsMissed ?? null} />
+          </div>
           {job?.jobDescription && (
             <>
               <Separator className="bg-zinc-800" />
