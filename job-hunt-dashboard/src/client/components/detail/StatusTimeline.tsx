@@ -56,7 +56,7 @@ export function StatusTimeline({ events }: StatusTimelineProps) {
                 )}
               </p>
               {(event.emailSender || event.emailSubject) && (
-                <p className="text-xs text-zinc-500 truncate max-w-xs" title={[event.emailSender ? extractSenderName(event.emailSender) : null, event.emailSubject].filter(Boolean).join(' — ')}>
+                <p className="text-xs text-zinc-500">
                   {event.emailSender && extractSenderName(event.emailSender)}
                   {event.emailSender && event.emailSubject && ' — '}
                   {event.emailSubject}
