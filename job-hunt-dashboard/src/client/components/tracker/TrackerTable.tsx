@@ -14,8 +14,6 @@ import {
   TableHeader,
   TableRow,
 } from '../ui/table'
-import { TooltipProvider } from '../ui/tooltip'
-import { AgingRow } from './AgingRow'
 import type { Job } from '@shared/schemas'
 
 const columnHelper = createColumnHelper<Job>()
@@ -87,45 +85,44 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col max-h-[calc(100vh-88px)]">
       <div className="overflow-auto flex-1">
-        <TooltipProvider>
-          <table className="w-full caption-bottom text-sm">
-            <TableHeader className="sticky top-0 backdrop-blur-sm bg-zinc-900/80 border-b border-zinc-800">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-0 hover:bg-transparent">
-                  {headerGroup.headers.map((header) => {
-                    const sorted = header.column.getIsSorted()
-                    return (
-                      <TableHead
-                        key={header.id}
-                        className="px-3 h-9 text-xs font-medium uppercase text-zinc-400 cursor-pointer select-none"
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
-                      </TableHead>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows.map((row) => (
-                <AgingRow
-                  key={row.id}
-                  dateApplied={row.original.dateApplied}
-                  isSelected={row.original.id === selectedJobId}
-                  onClick={() => onRowClick(row.original)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-1.5 px-3 text-sm text-zinc-200">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </AgingRow>
-              ))}
-            </TableBody>
-          </table>
-        </TooltipProvider>
+        <table className="w-full caption-bottom text-sm">
+          <TableHeader className="sticky top-0 backdrop-blur-sm bg-zinc-900/80 border-b border-zinc-800">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="border-0 hover:bg-transparent">
+                {headerGroup.headers.map((header) => {
+                  const sorted = header.column.getIsSorted()
+                  return (
+                    <TableHead
+                      key={header.id}
+                      className="px-3 h-9 text-xs font-medium uppercase text-zinc-400 cursor-pointer select-none"
+                      onClick={header.column.getToggleSortingHandler()}
+                    >
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                    </TableHead>
+                  )
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow
+                key={row.id}
+                onClick={() => onRowClick(row.original)}
+                className={`border-zinc-800 cursor-pointer ${
+                  row.original.id === selectedJobId ? 'bg-zinc-800' : 'hover:bg-zinc-800/50'
+                }`}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} className="py-1.5 px-3 text-sm text-zinc-200">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </table>
       </div>
     </div>
   )
