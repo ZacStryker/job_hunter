@@ -1,25 +1,72 @@
 import { useState, useEffect } from 'react'
 import { Outlet, Link } from '@tanstack/react-router'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
+import { Button } from '../ui/button'
+import { Loader2 } from 'lucide-react'
 import { SyncButton } from './SyncButton'
 import { useSyncMutation } from '../../hooks/useSyncMutation'
+import { useWebhookMutation } from '../../hooks/useWebhookMutation'
+
+type ActiveAlert =
+  | { kind: 'sync-success'; data: { added: number; updated: number } }
+  | { kind: 'webhook-success'; label: string }
+  | { kind: 'error'; label: string; message: string }
+  | null
 
 export function Layout() {
   const syncMutation = useSyncMutation()
-  const [alertDismissed, setAlertDismissed] = useState(false)
+  const discoveryMutation = useWebhookMutation('/api/webhooks/discovery')
+  const analysisMutation = useWebhookMutation('/api/webhooks/analysis')
+
+  const [activeAlert, setActiveAlert] = useState<ActiveAlert>(null)
 
   useEffect(() => {
-    if (syncMutation.isPending) setAlertDismissed(false)
-  }, [syncMutation.isPending])
-
-  useEffect(() => {
-    if (syncMutation.isSuccess && !alertDismissed) {
-      const t = setTimeout(() => setAlertDismissed(true), 4000)
+    if (syncMutation.isSuccess) {
+      setActiveAlert({ kind: 'sync-success', data: syncMutation.data })
+      const t = setTimeout(() => setActiveAlert(null), 4000)
       return () => clearTimeout(t)
     }
-  }, [syncMutation.isSuccess, alertDismissed])
+  }, [syncMutation.isSuccess])
 
-  const showAlert = !alertDismissed && !syncMutation.isPending && (syncMutation.isSuccess || syncMutation.isError)
+  useEffect(() => {
+    if (syncMutation.isError) {
+      setActiveAlert({ kind: 'error', label: 'Sync', message: syncMutation.error?.message ?? 'Unknown error' })
+      const t = setTimeout(() => setActiveAlert(null), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [syncMutation.isError])
+
+  useEffect(() => {
+    if (discoveryMutation.isSuccess) {
+      setActiveAlert({ kind: 'webhook-success', label: 'Discovery' })
+      const t = setTimeout(() => setActiveAlert(null), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [discoveryMutation.isSuccess])
+
+  useEffect(() => {
+    if (discoveryMutation.isError) {
+      setActiveAlert({ kind: 'error', label: 'Discovery', message: discoveryMutation.error.message })
+      const t = setTimeout(() => setActiveAlert(null), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [discoveryMutation.isError])
+
+  useEffect(() => {
+    if (analysisMutation.isSuccess) {
+      setActiveAlert({ kind: 'webhook-success', label: 'Analysis' })
+      const t = setTimeout(() => setActiveAlert(null), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [analysisMutation.isSuccess])
+
+  useEffect(() => {
+    if (analysisMutation.isError) {
+      setActiveAlert({ kind: 'error', label: 'Analysis', message: analysisMutation.error.message })
+      const t = setTimeout(() => setActiveAlert(null), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [analysisMutation.isError])
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -35,7 +82,7 @@ export function Layout() {
             activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
             inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
           >
-            Pipeline
+            Jobs
           </Link>
           <Link
             to="/tracker"
@@ -43,7 +90,15 @@ export function Layout() {
             activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
             inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
           >
-            Tracker
+            Applications
+          </Link>
+          <Link
+            to="/messages"
+            className="px-3 py-1.5 text-sm transition-colors"
+            activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
+            inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
+          >
+            Messages
           </Link>
           <Link
             to="/archived"
@@ -51,29 +106,76 @@ export function Layout() {
             activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
             inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
           >
-            Archived
+            Archive
+          </Link>
+          <Link
+            to="/history"
+            className="px-3 py-1.5 text-sm transition-colors"
+            activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
+            inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
+          >
+            Logs
           </Link>
         </nav>
 
-        {/* Sync button — right */}
-        <SyncButton onSync={() => syncMutation.mutate()} isPending={syncMutation.isPending} />
+        {/* Action buttons — right */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={discoveryMutation.isPending || analysisMutation.isPending}
+            onClick={() => discoveryMutation.mutate()}
+          >
+            {discoveryMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Discovery…
+              </>
+            ) : (
+              'Discovery'
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={analysisMutation.isPending || discoveryMutation.isPending}
+            onClick={() => analysisMutation.mutate()}
+          >
+            {analysisMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Analysis…
+              </>
+            ) : (
+              'Analysis'
+            )}
+          </Button>
+          <SyncButton onSync={() => syncMutation.mutate()} isPending={syncMutation.isPending} />
+        </div>
       </header>
 
-      {showAlert && (
+      {activeAlert && (
         <div className="px-4 py-2">
-          {syncMutation.isSuccess && (
+          {activeAlert.kind === 'sync-success' && (
             <Alert>
               <AlertTitle>Sync complete</AlertTitle>
               <AlertDescription>
-                {syncMutation.data.added} records added, {syncMutation.data.updated} updated
+                {activeAlert.data.added} records added, {activeAlert.data.updated} updated
               </AlertDescription>
             </Alert>
           )}
-          {syncMutation.isError && (
+          {activeAlert.kind === 'webhook-success' && (
+            <Alert>
+              <AlertTitle>{activeAlert.label} triggered</AlertTitle>
+              <AlertDescription>Workflow started successfully.</AlertDescription>
+            </Alert>
+          )}
+          {activeAlert.kind === 'error' && (
             <Alert variant="destructive">
-              <AlertTitle>Sync failed</AlertTitle>
+              <AlertTitle>{activeAlert.label} failed</AlertTitle>
               <AlertDescription>
-                {syncMutation.error.message} — No data was modified.
+                {activeAlert.message}
+                {activeAlert.label === 'Sync' ? ' — No data was modified.' : ''}
               </AlertDescription>
             </Alert>
           )}
