@@ -3,6 +3,8 @@ import { Layout } from '../components/shared/Layout'
 import { PipelineRoute } from '../routes/index'
 import { TrackerRoute } from '../routes/tracker'
 import { ArchivedRoute } from '../routes/archived'
+import { MessagesRoute } from '../routes/messages'
+import { HistoryRoute } from '../routes/history'
 import { queryClient } from './query-client'
 import { fetchJobs } from '../hooks/useJobsQuery'
 
@@ -19,19 +21,32 @@ const indexRoute = createRoute({
 
 const trackerRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/tracker',
+  path: '/applications',
   component: TrackerRoute,
   loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
 })
 
 const archivedRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/archived',
+  path: '/archive',
   component: ArchivedRoute,
   loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, trackerRoute, archivedRoute])
+const messagesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/messages',
+  component: MessagesRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
+})
+
+const historyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/logs',
+  component: HistoryRoute,
+})
+
+const routeTree = rootRoute.addChildren([indexRoute, trackerRoute, archivedRoute, messagesRoute, historyRoute])
 
 export const router = createRouter({ routeTree })
 

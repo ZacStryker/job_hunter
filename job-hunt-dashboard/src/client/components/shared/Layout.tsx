@@ -85,7 +85,7 @@ export function Layout() {
             Jobs
           </Link>
           <Link
-            to="/tracker"
+            to="/applications"
             className="px-3 py-1.5 text-sm transition-colors"
             activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
             inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
@@ -101,7 +101,7 @@ export function Layout() {
             Messages
           </Link>
           <Link
-            to="/archived"
+            to="/archive"
             className="px-3 py-1.5 text-sm transition-colors"
             activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
             inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
@@ -109,7 +109,7 @@ export function Layout() {
             Archive
           </Link>
           <Link
-            to="/history"
+            to="/logs"
             className="px-3 py-1.5 text-sm transition-colors"
             activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
             inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
