@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import {
   ResponsiveContainer,
-  PieChart,
-  Pie,
   Cell,
   BarChart,
   Bar,
@@ -137,28 +135,23 @@ export function DashboardRoute() {
 
           {/* Charts grid */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Recommendation Breakdown — Donut */}
+            {/* Recommendation Breakdown — horizontal bar */}
             <ChartCard title="Recommendation Breakdown">
               {data.pipeline.byRecommendation.length === 0 ? (
                 <NoData />
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={data.pipeline.byRecommendation}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius="55%"
-                      outerRadius="80%"
-                      cx="50%"
-                      cy="50%"
-                    >
+                  <BarChart layout="vertical" data={data.pipeline.byRecommendation}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                    <XAxis type="number" {...AXIS_PROPS} />
+                    <YAxis type="category" dataKey="name" width={90} {...AXIS_PROPS} />
+                    <Tooltip contentStyle={TOOLTIP_STYLE} />
+                    <Bar dataKey="value">
                       {data.pipeline.byRecommendation.map((entry) => (
                         <Cell key={entry.name} fill={REC_COLOR_MAP[entry.name] ?? CHART_COLORS.default} />
                       ))}
-                    </Pie>
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                  </PieChart>
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
               )}
             </ChartCard>
