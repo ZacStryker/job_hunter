@@ -24,6 +24,10 @@ app.get('/', (c) => {
   const period = (STATS_PERIODS as readonly string[]).includes(rawPeriod) ? rawPeriod : 'all'
   const { datetimeCutoff, dateCutoff } = getPeriodCutoffs(period)
 
+  // Scraped count — all jobs (regardless of archived state) filtered by dateScraped
+  const scrapedWhere = dateCutoff ? gte(jobs.dateScraped, dateCutoff) : undefined
+  const [{ scrapedTotal }] = db.select({ scrapedTotal: count() }).from(jobs).where(scrapedWhere).all()
+
   // Archived jobs count — filtered by dateScraped to match other period-aware stats
   const archivedWhere = dateCutoff
     ? and(eq(jobs.archived, true), gte(jobs.dateScraped, dateCutoff))
@@ -112,6 +116,7 @@ app.get('/', (c) => {
 
   return c.json({
     pipeline: { total: pipelineTotal, byRecommendation, byFitScore },
+    scraped: { total: scrapedTotal },
     archived: { total: archivedTotal },
     applications: { total: appTotal, byStatus, responseRate },
     emails: { total: emailTotal, byType },

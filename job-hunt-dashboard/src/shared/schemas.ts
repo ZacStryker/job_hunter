@@ -94,6 +94,9 @@ export const statsSchema = z.object({
     byRecommendation: z.array(z.object({ name: z.string(), value: z.number() })),
     byFitScore: z.array(z.object({ bucket: z.string(), count: z.number() })),
   }),
+  scraped: z.object({
+    total: z.number(),
+  }),
   archived: z.object({
     total: z.number(),
   }),
