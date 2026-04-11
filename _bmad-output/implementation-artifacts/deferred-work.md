@@ -215,6 +215,23 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - **No client-side validation of `GET /:id/events` response against `statusEventSchema`** — raw JSON is cast to `StatusEvent[]` without Zod parsing. Pre-existing pattern across all API calls.
 - **ID validation copy-pasted across five route handlers in `api-jobs.ts`** — Extract into a shared helper in a future refactor.
 
+## Deferred from: fit score bucket refactor (2026-04-11)
+
+- `fitScore` has no range guard before bucketing — negative or >100 values produce arbitrary string keys that are silently inserted into the bucket map as extra properties, producing unexpected chart entries. Pre-existing: no DB-level CHECK constraint on `fit_score` (logged in Story 1.2 review). Add a `Math.max(0, Math.min(100, score))` clamp or a DB CHECK constraint if data quality issues arise.
+
+## Deferred from: code review of 11-1-dashboard-view (2026-04-11)
+
+- Synchronous `.all()` DB calls in `api-stats.ts` — pre-existing project-wide Bun/SQLite pattern; all routes use sync API by design.
+- Full table scans (five queries) per stats request — acceptable for single-user job-hunt tool; optimize with aggregating SQL if data volume grows.
+- `responseRate` counts any non-null `statusOverride` as a response — matches spec definition exactly; semantic meaning is intentional.
+- `useStatsQuery` casts `res.json()` without Zod validation — pre-existing pattern across all project hooks; add schema validation in a future hardening pass.
+- `30d` period uses fixed `2_592_000_000` ms rather than calendar month — matches spec-defined cutoff arithmetic; DST/month-length edge cases accepted.
+- `parseWorkflow` falls through for unrecognized webhook run names — by design per spec; unknown names grouped as-is on chart.
+- `api-stats.ts` route handler lacks try/catch — global `errorHandler` middleware handles unhandled errors; consistent with all other routes.
+- `dateScraped`/`dateApplied` null rows silently excluded from period-filtered queries — expected: jobs without a scrape/apply date don't belong in a date-filtered view.
+- Period selector state not synced to URL — design choice; single-user local tool, bookmarking/sharing not a requirement.
+- No `staleTime` on `useStatsQuery` — pre-existing pattern; refetch-on-focus is acceptable for this dashboard.
+
 ## Deferred from: Company typeahead implementation (2026-04-10)
 
 - **CompanyTypeahead missing stale company** [`MessagesTable.tsx`] — `distinctCompanies` is derived from `jobs` only. If a message has a company value that no longer has a corresponding job (deleted job, or externally set), that company does not appear in the typeahead options. The current value still displays correctly, but the user cannot re-select it — only clear it. Consider deriving options from `union(jobs.company, messages.company)`.
