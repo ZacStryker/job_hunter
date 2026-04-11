@@ -184,23 +184,6 @@ export function DashboardRoute() {
               )}
             </ChartCard>
 
-            {/* Application Status — horizontal */}
-            <ChartCard title="Application Status">
-              {data.applications.byStatus.length === 0 ? (
-                <NoData />
-              ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart layout="vertical" data={data.applications.byStatus}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis type="number" {...AXIS_PROPS} />
-                    <YAxis type="category" dataKey="status" width={120} {...AXIS_PROPS} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Bar dataKey="count" fill={CHART_COLORS.default} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </ChartCard>
-
             {/* Email Types */}
             <ChartCard title="Email Types">
               {data.emails.byType.length === 0 ? (
