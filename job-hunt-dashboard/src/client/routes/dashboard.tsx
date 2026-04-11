@@ -133,15 +133,15 @@ export function DashboardRoute() {
         <>
           {/* Stat cards */}
           <div className="grid grid-cols-6 gap-3">
-            <StatCard label="Scraped" value={String(data.scraped.total)} />
-            <StatCard label="Total Jobs" value={String(data.pipeline.total)} />
-            <StatCard label="Archived" value={String(data.archived.total)} />
-            <StatCard label="Applied" value={String(data.applications.total)} />
+            <StatCard label="Scrapes" value={String(data.scraped.total)} />
+            <StatCard label="Archives" value={String(data.archived.total)} />
+            <StatCard label="Matches" value={String(data.pipeline.total)} />
+            <StatCard label="Applications" value={String(data.applications.total)} />
             <StatCard
               label="Response Rate"
               value={data.applications.responseRate === null ? '—' : `${Math.round(data.applications.responseRate * 100)}%`}
             />
-            <StatCard label="Emails" value={String(data.emails.total)} />
+            <StatCard label="Messages" value={String(data.emails.total)} />
           </div>
 
           {/* Charts grid */}
