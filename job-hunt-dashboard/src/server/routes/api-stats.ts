@@ -24,8 +24,11 @@ app.get('/', (c) => {
   const period = (STATS_PERIODS as readonly string[]).includes(rawPeriod) ? rawPeriod : 'all'
   const { datetimeCutoff, dateCutoff } = getPeriodCutoffs(period)
 
-  // Archived jobs count — period-independent (archiving is a user action unrelated to scrape date)
-  const [{ archivedTotal }] = db.select({ archivedTotal: count() }).from(jobs).where(eq(jobs.archived, true)).all()
+  // Archived jobs count — filtered by dateScraped to match other period-aware stats
+  const archivedWhere = dateCutoff
+    ? and(eq(jobs.archived, true), gte(jobs.dateScraped, dateCutoff))
+    : eq(jobs.archived, true)
+  const [{ archivedTotal }] = db.select({ archivedTotal: count() }).from(jobs).where(archivedWhere).all()
 
   // Pipeline stats (non-archived jobs)
   const pipelineWhere = dateCutoff
