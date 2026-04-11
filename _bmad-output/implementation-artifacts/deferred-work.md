@@ -195,6 +195,26 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - **useGenerateResume no success feedback** [`useGenerateResume.ts`] — Resume generation (out-of-spec addition from this story) gives no toast or UI state change on success — button returns to idle state silently. Add an `onSuccess` callback or toast notification.
 - **Company dropdown → jobTitle PATCH race** [`MessagesTable.tsx:101-103`] — Changing company fires a PATCH for `{ company, jobTitle: null }` while a prior jobTitle PATCH may still be in-flight. No request cancellation; the later response wins, but if network is slow the company-change patch could overwrite a concurrent jobTitle save. Add a mutation key or abort prior request.
 
+## Deferred from: code review of 10-1-webhook-history-tab (2026-04-10)
+
+- **Unbounded `webhook_runs` table growth** [`api-webhook-runs.ts`] — `GET /api/webhook-runs` does a full table scan with no LIMIT; after months of use with cover letter/resume/discovery/analysis runs this becomes a large payload on every 15s poll. Add `.limit(500)` or pagination when history volume becomes a concern.
+- **`fireWebhook` leaks raw infrastructure error details to client** [`api-webhooks.ts`] — `err.message` from network/TLS errors forwarded verbatim to browser; can expose hostname or IP. Sanitize to a generic message in a future hardening pass.
+- **No CSRF protection on POST webhook endpoints** [`api-webhooks.ts`] — pre-existing API-wide concern; any page in the same browser can trigger Discovery/Analysis webhook calls. Address when adding auth layer.
+- **`runAt` stored as text with no DB-level format enforcement** [`api-webhook-runs.ts`] — ordering relies on ISO 8601 convention from `recordRun`; a non-ISO write would silently corrupt sort order. Add a CHECK constraint or Zod `.datetime()` refinement in a future hardening pass.
+- **AbortSignal TimeoutError not distinguished in error message** [`api-webhooks.ts`] — a 60s timeout surfaces as a generic network error message. Add `err.name === 'TimeoutError'` check for clearer user-facing messaging.
+- **No AbortController cleanup in `useWebhookMutation`** [`useWebhookMutation.ts`] — component unmount during in-flight fetch may produce a stale state update. Add cleanup signal when doing a general mutation hardening pass.
+- **No `staleTime` on `useWebhookRunsQuery`** [`useWebhookRunsQuery.ts`] — every navigation to `/history` triggers an immediate refetch even if data is fresh. Add `staleTime: 10_000` alongside `refetchInterval`.
+- **Empty-string company/jobTitle fuzzy matching** [`api-jobs.ts`] — messages with empty `company`/`jobTitle` can match all jobs with the same empty values; data quality edge case. Add a non-empty guard if it surfaces in practice.
+- **No server-side concurrency guard on webhook routes** [`api-webhooks.ts`] — concurrent POSTs to `/discovery` or `/analysis` fire duplicate downstream n8n workflow executions with no de-duplication or 409 response.
+
+## Deferred from: Status timeline email subject/sender display (2026-04-11)
+
+- **`StatusEvent` schema allows `emailSubject`/`emailSender` on manual events with no enforcement** [`schemas.ts`] — `z.string().optional()` adds no `source === 'email'` conditional constraint. A discriminated union or `.superRefine()` would make the invariant machine-checked. Low risk: server only sets these fields when constructing email events.
+- **Negative ID collision for synthesized email events** [`api-jobs.ts:83`] — `id: -m.id` is a hack to avoid PK collisions; React uses this as a `key`. If a message row is ever re-ingested with a new ID the key changes silently. Consider a string key like `email-{m.id}` in a future refactor.
+- **Full table scan on `messages` for lower() case-insensitive match** [`api-jobs.ts:72-80`] — `lower(company)` and `lower(jobTitle)` predicates bypass column indices. Add expression indices if messages table grows large.
+- **No client-side validation of `GET /:id/events` response against `statusEventSchema`** — raw JSON is cast to `StatusEvent[]` without Zod parsing. Pre-existing pattern across all API calls.
+- **ID validation copy-pasted across five route handlers in `api-jobs.ts`** — Extract into a shared helper in a future refactor.
+
 ## Deferred from: Company typeahead implementation (2026-04-10)
 
 - **CompanyTypeahead missing stale company** [`MessagesTable.tsx`] — `distinctCompanies` is derived from `jobs` only. If a message has a company value that no longer has a corresponding job (deleted job, or externally set), that company does not appear in the typeahead options. The current value still displays correctly, but the user cannot re-select it — only clear it. Consider deriving options from `union(jobs.company, messages.company)`.

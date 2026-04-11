@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { eq, desc, and, inArray } from 'drizzle-orm'
+import { eq, desc, and, inArray, sql, isNotNull } from 'drizzle-orm'
 import { db } from '../../db/client'
-import { jobs, statusEvents, coverLetters } from '../../db/schema'
+import { jobs, statusEvents, coverLetters, messages } from '../../db/schema'
 import { callN8nWebhook } from '../services/cover-letter-service'
+import { callResumeWebhook } from '../services/resume-service'
+import { recordRun } from './api-webhook-runs'
 import type { Job } from '../../shared/schemas'
 
 const app = new Hono()
@@ -18,24 +20,30 @@ const jobPatchSchema = z.object({
 
 app.get('/', (c) => {
   const allJobs = db.select().from(jobs).all()
-  const allEvents = db.select({
-    jobId: statusEvents.jobId,
-    status: statusEvents.status,
-    timestamp: statusEvents.timestamp,
-  }).from(statusEvents).all()
+  const allMessages = db.select({
+    company: messages.company,
+    jobTitle: messages.jobTitle,
+    type: messages.type,
+    receivedAt: messages.receivedAt,
+  }).from(messages).where(isNotNull(messages.type)).all()
 
-  const latestByJob = new Map<number, { status: string; timestamp: string }>()
-  for (const ev of allEvents) {
-    const existing = latestByJob.get(ev.jobId)
-    if (!existing || ev.timestamp > existing.timestamp) {
-      latestByJob.set(ev.jobId, { status: ev.status, timestamp: ev.timestamp })
+  const latestMessageByKey = new Map<string, { type: string; receivedAt: string }>()
+  for (const msg of allMessages) {
+    if (!msg.company || !msg.jobTitle) continue
+    const key = `${msg.company.toLowerCase()}|||${msg.jobTitle.toLowerCase()}`
+    const existing = latestMessageByKey.get(key)
+    if (!existing || msg.receivedAt > existing.receivedAt) {
+      latestMessageByKey.set(key, { type: msg.type!, receivedAt: msg.receivedAt })
     }
   }
 
-  const jobsWithLatestStatus = allJobs.map((job) => ({
-    ...job,
-    latestStatus: latestByJob.get(job.id)?.status ?? null,
-  }))
+  const jobsWithLatestStatus = allJobs.map((job) => {
+    const key = `${job.company.toLowerCase()}|||${job.jobTitle.toLowerCase()}`
+    return {
+      ...job,
+      latestStatus: latestMessageByKey.get(key)?.type ?? null,
+    }
+  })
 
   return c.json({ jobs: jobsWithLatestStatus })
 })
@@ -55,12 +63,36 @@ app.get('/:id/events', (c) => {
     return c.json({ error: 'Job not found' }, 404)
   }
 
-  const events = db
+  const manualEvents = db
     .select()
     .from(statusEvents)
-    .where(eq(statusEvents.jobId, rawId))
-    .orderBy(desc(statusEvents.timestamp))
+    .where(and(eq(statusEvents.jobId, rawId), eq(statusEvents.source, 'manual')))
     .all()
+
+  const matchedMessages = db
+    .select()
+    .from(messages)
+    .where(and(
+      sql`lower(${messages.company}) = lower(${job.company})`,
+      sql`lower(${messages.jobTitle}) = lower(${job.jobTitle})`,
+      isNotNull(messages.type),
+    ))
+    .all()
+
+  // Use negative IDs to avoid collisions with statusEvents integer PKs (both start at 1)
+  const emailEvents = matchedMessages.map((m) => ({
+    id: -m.id,
+    jobId: rawId,
+    status: m.type!,
+    timestamp: m.receivedAt,
+    source: 'email' as const,
+    emailSubject: m.subject || undefined,
+    emailSender: m.fromAddress || undefined,
+  }))
+
+  const events = [...manualEvents, ...emailEvents].sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  )
 
   return c.json({ events })
 })
@@ -179,6 +211,7 @@ app.post('/:id/generate-cover-letter', async (c) => {
     if (message === 'N8N_WEBHOOK_URL not configured') {
       return c.json({ error: 'Cover letter generation is not configured' }, 503)
     }
+    recordRun({ name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message })
     return c.json({ error: 'Cover letter generation failed' }, 502)
   }
 
@@ -201,7 +234,41 @@ app.post('/:id/generate-cover-letter', async (c) => {
     .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.createdAt, now)))
     .get()
 
+  recordRun({ name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1 })
   return c.json({ coverLetter: inserted })
+})
+
+app.post('/:id/generate-resume', async (c) => {
+  const idParam = c.req.param('id')
+  if (!/^\d+$/.test(idParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  if (rawId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const job = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
+  }
+  if (!job.jobDescription) {
+    return c.json({ error: 'Job has no job description' }, 400)
+  }
+
+  try {
+    await callResumeWebhook(job as Job)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (message === 'N8N_RESUME_WEBHOOK_URL not configured') {
+      return c.json({ error: 'Resume generation is not configured' }, 503)
+    }
+    recordRun({ name: `Resume - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message })
+    return c.json({ error: 'Resume generation failed' }, 502)
+  }
+
+  recordRun({ name: `Resume - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1 })
+  return c.json({ ok: true })
 })
 
 app.get('/:id/cover-letter', async (c) => {

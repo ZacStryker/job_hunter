@@ -1,7 +1,13 @@
 import { Mail } from 'lucide-react'
 import type { StatusEvent } from '@shared/schemas'
 
+function extractSenderName(fromAddress: string): string {
+  const match = fromAddress.match(/^(.+?)\s*<[^>]+>$/)
+  return match ? match[1].trim() : fromAddress
+}
+
 const STATUS_LABELS: Record<string, string> = {
+  // Manual override values
   phone_screen: 'Phone Screen',
   interview: 'Interview',
   technical: 'Technical Round',
@@ -9,6 +15,13 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'Rejected',
   withdrawn: 'Withdrawn',
   ghosted: 'Ghosted',
+  // Message types
+  Submitted: 'Submitted',
+  Rejected: 'Rejected',
+  Screening: 'Screening',
+  Interview: 'Interview',
+  Offer: 'Offer',
+  Other: 'Other',
 }
 
 interface StatusTimelineProps {
@@ -34,6 +47,16 @@ export function StatusTimeline({ events }: StatusTimelineProps) {
                   <Mail size={12} className="text-zinc-500 shrink-0" />
                 )}
               </p>
+              {event.emailSubject && (
+                <p className="text-xs text-zinc-400 truncate max-w-xs" title={event.emailSubject}>
+                  {event.emailSubject}
+                </p>
+              )}
+              {event.emailSender && (
+                <p className="text-xs text-zinc-500 truncate max-w-xs" title={event.emailSender}>
+                  From: {extractSenderName(event.emailSender)}
+                </p>
+              )}
               <p className="text-xs text-zinc-500">
                 {new Intl.DateTimeFormat('en-US', {
                   month: 'short',

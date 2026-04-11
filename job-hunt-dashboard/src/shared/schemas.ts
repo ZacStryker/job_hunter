@@ -14,6 +14,13 @@ export const jobInputSchema = z.object({
   jobDescription: z.string().nullable(),
   sourceUrl: z.string().nullable(),
   dateScraped: z.string().nullable(),
+  source: z.string().nullable(),
+  location: z.string().nullable(),
+  salary: z.string().nullable(),
+  benefits: z.string().nullable(),
+  contactName: z.string().nullable(),
+  contactEmail: z.string().nullable(),
+  contactPhone: z.string().nullable(),
 })
 
 // Full Job record — as returned by GET /api/jobs and used throughout client
@@ -43,6 +50,8 @@ export const statusEventSchema = z.object({
   status: z.string(),
   timestamp: z.string(), // ISO 8601 full datetime
   source: z.enum(['manual', 'email']),
+  emailSubject: z.string().optional(),
+  emailSender: z.string().optional(),
 })
 
 export const coverLetterSchema = z.object({
@@ -53,8 +62,32 @@ export const coverLetterSchema = z.object({
 })
 export type CoverLetter = z.infer<typeof coverLetterSchema>
 
+export const MESSAGE_TYPES = ['Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other'] as const
+
+export const messageSchema = z.object({
+  id: z.number().int(),
+  uid: z.string(),
+  receivedAt: z.string(),
+  fromAddress: z.string(),
+  subject: z.string(),
+  type: z.enum(MESSAGE_TYPES).nullable(),
+  company: z.string().nullable(),
+  jobTitle: z.string().nullable(),
+})
+
+export const webhookRunSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  runAt: z.string(),
+  success: z.boolean(),
+  itemCount: z.number().int().nullable(),
+  errorMessage: z.string().nullable(),
+})
+export type WebhookRun = z.infer<typeof webhookRunSchema>
+
 export type Job = z.infer<typeof jobSchema>
 export type JobInput = z.infer<typeof jobInputSchema>
 export type IngestPayload = z.infer<typeof ingestPayloadSchema>
 export type SyncResult = z.infer<typeof syncResultSchema>
 export type StatusEvent = z.infer<typeof statusEventSchema>
+export type Message = z.infer<typeof messageSchema>
