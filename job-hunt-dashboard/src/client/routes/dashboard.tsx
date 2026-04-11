@@ -33,6 +33,15 @@ const CHART_COLORS = {
   default: '#a1a1aa',
 }
 
+const EMAIL_TYPE_COLOR_MAP: Record<string, string> = {
+  Submitted: '#a1a1aa',
+  Screening: '#60a5fa',
+  Rejected: '#f87171',
+  Other: '#facc15',
+  Interview: '#86efac',
+  Offer: '#16a34a',
+}
+
 const REC_COLOR_MAP: Record<string, string> = {
   apply: CHART_COLORS.apply,
   investigate: CHART_COLORS.investigate,
@@ -179,19 +188,26 @@ export function DashboardRoute() {
 
             {/* Email Types */}
             <ChartCard title="Email Types">
-              {data.emails.byType.length === 0 ? (
-                <NoData />
-              ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={data.emails.byType}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="type" {...AXIS_PROPS} />
-                    <YAxis {...AXIS_PROPS} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Bar dataKey="count" fill={CHART_COLORS.default} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
+              {(() => {
+                const classified = data.emails.byType.filter((e) => e.type !== 'Unclassified')
+                return classified.length === 0 ? (
+                  <NoData />
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={classified}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                      <XAxis dataKey="type" {...AXIS_PROPS} />
+                      <YAxis {...AXIS_PROPS} />
+                      <Tooltip contentStyle={TOOLTIP_STYLE} />
+                      <Bar dataKey="count">
+                        {classified.map((entry) => (
+                          <Cell key={entry.type} fill={EMAIL_TYPE_COLOR_MAP[entry.type] ?? CHART_COLORS.default} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )
+              })()}
             </ChartCard>
 
             {/* Automation Runs — grouped bar */}
