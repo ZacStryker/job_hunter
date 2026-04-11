@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { db } from '../../db/client'
 import { jobs, messages, webhookRuns, coverLetters } from '../../db/schema'
-import { and, eq, gte } from 'drizzle-orm'
+import { and, count, eq, gte } from 'drizzle-orm'
 import { STATS_PERIODS } from '../../shared/schemas'
 
 const app = new Hono()
@@ -23,6 +23,9 @@ app.get('/', (c) => {
   const rawPeriod = c.req.query('period') ?? 'all'
   const period = (STATS_PERIODS as readonly string[]).includes(rawPeriod) ? rawPeriod : 'all'
   const { datetimeCutoff, dateCutoff } = getPeriodCutoffs(period)
+
+  // Archived jobs count — period-independent (archiving is a user action unrelated to scrape date)
+  const [{ archivedTotal }] = db.select({ archivedTotal: count() }).from(jobs).where(eq(jobs.archived, true)).all()
 
   // Pipeline stats (non-archived jobs)
   const pipelineWhere = dateCutoff
@@ -106,6 +109,7 @@ app.get('/', (c) => {
 
   return c.json({
     pipeline: { total: pipelineTotal, byRecommendation, byFitScore },
+    archived: { total: archivedTotal },
     applications: { total: appTotal, byStatus, responseRate },
     emails: { total: emailTotal, byType },
     automation: { totalRuns, successRate, byWorkflow, coverLettersGenerated },

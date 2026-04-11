@@ -132,8 +132,9 @@ export function DashboardRoute() {
       {data && (
         <>
           {/* Stat cards */}
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-5 gap-3">
             <StatCard label="Total Jobs" value={String(data.pipeline.total)} />
+            <StatCard label="Archived" value={String(data.archived.total)} />
             <StatCard label="Applied" value={String(data.applications.total)} />
             <StatCard
               label="Response Rate"

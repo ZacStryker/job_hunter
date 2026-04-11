@@ -85,6 +85,36 @@ export const webhookRunSchema = z.object({
 })
 export type WebhookRun = z.infer<typeof webhookRunSchema>
 
+export const STATS_PERIODS = ['24h', '7d', '30d', 'all'] as const
+export type StatsPeriod = typeof STATS_PERIODS[number]
+
+export const statsSchema = z.object({
+  pipeline: z.object({
+    total: z.number(),
+    byRecommendation: z.array(z.object({ name: z.string(), value: z.number() })),
+    byFitScore: z.array(z.object({ bucket: z.string(), count: z.number() })),
+  }),
+  archived: z.object({
+    total: z.number(),
+  }),
+  applications: z.object({
+    total: z.number(),
+    byStatus: z.array(z.object({ status: z.string(), count: z.number() })),
+    responseRate: z.number().nullable(),
+  }),
+  emails: z.object({
+    total: z.number(),
+    byType: z.array(z.object({ type: z.string(), count: z.number() })),
+  }),
+  automation: z.object({
+    totalRuns: z.number(),
+    successRate: z.number().nullable(),
+    byWorkflow: z.array(z.object({ workflow: z.string(), success: z.number(), failed: z.number() })),
+    coverLettersGenerated: z.number(),
+  }),
+})
+export type Stats = z.infer<typeof statsSchema>
+
 export type Job = z.infer<typeof jobSchema>
 export type JobInput = z.infer<typeof jobInputSchema>
 export type IngestPayload = z.infer<typeof ingestPayloadSchema>

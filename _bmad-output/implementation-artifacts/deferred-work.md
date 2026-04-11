@@ -236,3 +236,10 @@ _(No deferred findings — all dismissed findings were false positives or covere
 
 - **CompanyTypeahead missing stale company** [`MessagesTable.tsx`] — `distinctCompanies` is derived from `jobs` only. If a message has a company value that no longer has a corresponding job (deleted job, or externally set), that company does not appear in the typeahead options. The current value still displays correctly, but the user cannot re-select it — only clear it. Consider deriving options from `union(jobs.company, messages.company)`.
 - **`e.stopPropagation()` on company/type/jobTitle cell wrappers** [`MessagesTable.tsx`] — Pre-existing pattern from original Select cells. There is no row-level `onClick` handler, so these `stopPropagation` calls are no-ops. Remove in a future cleanup pass.
+
+## Deferred from: Dashboard archived stat card (2026-04-11)
+
+- **No test coverage for `archived.total` in `api-stats.test.ts`** — The stats route test file was not updated. Consider adding: (1) a test asserting `archived.total` is present and correct, (2) a test verifying archived count is period-independent (unchanged when period filter is active).
+- **`grid-cols-5` has no responsive breakpoint** [`dashboard.tsx`] — Five equal-width cards will collapse at narrow viewports. Consider adding `sm:grid-cols-3 md:grid-cols-5` or similar responsive qualifiers.
+- **Archived and Applied can overlap** [`api-stats.ts`] — A job can be both `applied=true` and `archived=true`, so `archived.total` and `applications.total` are not mutually exclusive. The current UI implies they represent separate pipeline stages. Worth clarifying in data model docs or enforcing mutual exclusion.
+- **Count fields use `z.number()` without `.int().nonnegative()`** [`schemas.ts`] — `pipeline.total`, `applications.total`, `emails.total`, `archived.total` all accept floats and negatives at the schema layer. Consider tightening to `z.number().int().nonnegative()`.
