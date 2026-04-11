@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   createColumnHelper,
   flexRender,
@@ -37,37 +37,7 @@ function loadVisibility(): VisibilityState {
 
 const columnHelper = createColumnHelper<Job>()
 
-const selectionColumn = columnHelper.display({
-  id: 'select',
-  header: ({ table }) => (
-    <div onClick={(e) => e.stopPropagation()}>
-      <input
-        type="checkbox"
-        checked={table.getIsAllRowsSelected()}
-        ref={(el) => {
-          if (el) el.indeterminate = table.getIsSomeRowsSelected()
-        }}
-        onChange={table.getToggleAllRowsSelectedHandler()}
-        className="cursor-pointer accent-zinc-400"
-        aria-label="Select all"
-      />
-    </div>
-  ),
-  cell: ({ row }) => (
-    <div onClick={(e) => e.stopPropagation()}>
-      <input
-        type="checkbox"
-        checked={row.getIsSelected()}
-        onChange={row.getToggleSelectedHandler()}
-        className="cursor-pointer accent-zinc-400"
-        aria-label="Select row"
-      />
-    </div>
-  ),
-})
-
-const columns = [
-  selectionColumn,
+const staticColumns = [
   columnHelper.accessor('company', {
     header: 'Company',
     cell: (info) => info.getValue(),
@@ -135,6 +105,7 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(loadVisibility)
   const [sorting, setSorting] = useState<SortingState>([{ id: 'fitScore', desc: true }])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const lastSelectedIndexRef = useRef<number | null>(null)
 
   function handleVisibilityChange(updater: Updater<VisibilityState>) {
     setColumnVisibility((prev) => {
@@ -148,6 +119,68 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
     })
   }
 
+  const selectionColumn = columnHelper.display({
+    id: 'select',
+    header: ({ table }) => (
+      <div onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={table.getIsAllRowsSelected()}
+          ref={(el) => {
+            if (el) el.indeterminate = table.getIsSomeRowsSelected()
+          }}
+          onChange={(e) => {
+            table.getToggleAllRowsSelectedHandler()(e)
+            lastSelectedIndexRef.current = null
+          }}
+          className="cursor-pointer accent-zinc-400"
+          aria-label="Select all"
+        />
+      </div>
+    ),
+    cell: ({ row, table }) => {
+      const rows = table.getRowModel().rows
+      const rowIndex = rows.findIndex((r) => r.id === row.id)
+
+      function handleChange() {
+        row.toggleSelected()
+        lastSelectedIndexRef.current = rowIndex
+      }
+
+      function handleClick(e: React.MouseEvent<HTMLInputElement>) {
+        if (e.shiftKey && lastSelectedIndexRef.current !== null) {
+          e.preventDefault() // prevent default toggle + onChange
+          const from = Math.min(lastSelectedIndexRef.current, rowIndex)
+          const to = Math.max(lastSelectedIndexRef.current, rowIndex)
+          setRowSelection((prev) => {
+            const next = { ...prev }
+            for (let i = from; i <= to; i++) {
+              next[rows[i].id] = true
+            }
+            return next
+          })
+          lastSelectedIndexRef.current = rowIndex
+        }
+        // non-shift clicks fall through to onChange
+      }
+
+      return (
+        <div onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={row.getIsSelected()}
+            onChange={handleChange}
+            onClick={handleClick}
+            className="cursor-pointer accent-zinc-400"
+            aria-label="Select row"
+          />
+        </div>
+      )
+    },
+  })
+
+  const columns = [selectionColumn, ...staticColumns]
+
   const table = useReactTable({
     data: jobs,
     columns,
@@ -158,7 +191,10 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
     enableRowSelection: true,
     state: { columnVisibility, sorting, rowSelection },
     onColumnVisibilityChange: handleVisibilityChange,
-    onSortingChange: setSorting,
+    onSortingChange: (updater) => {
+      setSorting(updater)
+      lastSelectedIndexRef.current = null
+    },
     onRowSelectionChange: setRowSelection,
   })
 
