@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   createColumnHelper,
   flexRender,
@@ -57,7 +57,7 @@ interface TrackerTableProps {
 }
 
 export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTableProps) {
-  const appliedJobs = jobs.filter((j) => j.applied)
+  const appliedJobs = useMemo(() => jobs.filter((j) => j.applied), [jobs])
   const [sorting, setSorting] = useState<SortingState>([{ id: 'dateApplied', desc: true }])
 
   const table = useReactTable({
