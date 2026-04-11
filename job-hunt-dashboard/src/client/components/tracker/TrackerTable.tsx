@@ -1,3 +1,12 @@
+import { useState } from 'react'
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from '@tanstack/react-table'
+import type { SortingState } from '@tanstack/react-table'
 import {
   TableBody,
   TableCell,
@@ -9,21 +18,7 @@ import { TooltipProvider } from '../ui/tooltip'
 import { AgingRow } from './AgingRow'
 import type { Job } from '@shared/schemas'
 
-const STATUS_LABELS: Record<string, string> = {
-  phone_screen: 'Phone Screen',
-  interview: 'Interview',
-  technical: 'Technical Round',
-  offer: 'Offer Received',
-  rejected: 'Rejected',
-  withdrawn: 'Withdrawn',
-  ghosted: 'Ghosted',
-}
-
-interface TrackerTableProps {
-  jobs: Job[]
-  onRowClick: (job: Job) => void
-  selectedJobId: number | null
-}
+const columnHelper = createColumnHelper<Job>()
 
 function formatDate(dateApplied: string): string {
   return new Intl.DateTimeFormat('en-US', {
@@ -33,15 +28,56 @@ function formatDate(dateApplied: string): string {
   }).format(new Date(dateApplied + 'T00:00:00'))
 }
 
+const columns = [
+  columnHelper.accessor('company', {
+    header: 'Company',
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor('jobTitle', {
+    header: 'Job Title',
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor('latestStatus', {
+    header: 'Status',
+    cell: (info) => info.getValue() ?? '—',
+    sortUndefined: 1,
+  }),
+  columnHelper.accessor('dateApplied', {
+    header: 'Date Applied',
+    cell: (info) => {
+      const v = info.getValue()
+      return v ? formatDate(v) : '—'
+    },
+    sortUndefined: 1,
+  }),
+]
+
+interface TrackerTableProps {
+  jobs: Job[]
+  onRowClick: (job: Job) => void
+  selectedJobId: number | null
+}
+
 export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTableProps) {
   const appliedJobs = jobs.filter((j) => j.applied)
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'dateApplied', desc: true }])
+
+  const table = useReactTable({
+    data: appliedJobs,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    enableMultiSort: false,
+    state: { sorting },
+    onSortingChange: setSorting,
+  })
 
   if (appliedJobs.length === 0) {
     return (
       <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
         <div className="flex items-center justify-center py-16 px-4">
           <p className="text-sm text-zinc-400">
-            No applied jobs yet. Mark jobs as applied in the Pipeline view.
+            No applied jobs yet. Mark jobs as applied in the Jobs view.
           </p>
         </div>
       </div>
@@ -54,29 +90,37 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
         <TooltipProvider>
           <table className="w-full caption-bottom text-sm">
             <TableHeader className="sticky top-0 backdrop-blur-sm bg-zinc-900/80 border-b border-zinc-800">
-              <TableRow className="border-0 hover:bg-transparent">
-                <TableHead className="px-3 h-9 text-xs font-medium uppercase text-zinc-400">Company</TableHead>
-                <TableHead className="px-3 h-9 text-xs font-medium uppercase text-zinc-400">Job Title</TableHead>
-                <TableHead className="px-3 h-9 text-xs font-medium uppercase text-zinc-400">Status</TableHead>
-                <TableHead className="px-3 h-9 text-xs font-medium uppercase text-zinc-400">Date Applied</TableHead>
-              </TableRow>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id} className="border-0 hover:bg-transparent">
+                  {headerGroup.headers.map((header) => {
+                    const sorted = header.column.getIsSorted()
+                    return (
+                      <TableHead
+                        key={header.id}
+                        className="px-3 h-9 text-xs font-medium uppercase text-zinc-400 cursor-pointer select-none"
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                      </TableHead>
+                    )
+                  })}
+                </TableRow>
+              ))}
             </TableHeader>
             <TableBody>
-              {appliedJobs.map((job) => (
+              {table.getRowModel().rows.map((row) => (
                 <AgingRow
-                  key={job.id}
-                  dateApplied={job.dateApplied}
-                  isSelected={job.id === selectedJobId}
-                  onClick={() => onRowClick(job)}
+                  key={row.id}
+                  dateApplied={row.original.dateApplied}
+                  isSelected={row.original.id === selectedJobId}
+                  onClick={() => onRowClick(row.original)}
                 >
-                  <TableCell className="py-1.5 px-3 text-sm text-zinc-200">{job.company}</TableCell>
-                  <TableCell className="py-1.5 px-3 text-sm text-zinc-200">{job.jobTitle}</TableCell>
-                  <TableCell className="py-1.5 px-3 text-sm text-zinc-200">
-                    {job.latestStatus ? (STATUS_LABELS[job.latestStatus] ?? job.latestStatus) : '—'}
-                  </TableCell>
-                  <TableCell className="py-1.5 px-3 text-sm text-zinc-200">
-                    {job.dateApplied ? formatDate(job.dateApplied) : '—'}
-                  </TableCell>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="py-1.5 px-3 text-sm text-zinc-200">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
                 </AgingRow>
               ))}
             </TableBody>

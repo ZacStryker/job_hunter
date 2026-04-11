@@ -1,15 +1,12 @@
+import { useState } from 'react'
 import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
+  getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-
-function parseName(name: string): { workflow: string; job: string } {
-  if (name.startsWith('Cover Letter - ')) return { workflow: 'Cover Letter', job: name.slice('Cover Letter - '.length) }
-  if (name.startsWith('Resume - ')) return { workflow: 'Resume', job: name.slice('Resume - '.length) }
-  return { workflow: name, job: '' }
-}
+import type { SortingState } from '@tanstack/react-table'
 import {
   TableBody,
   TableCell,
@@ -20,6 +17,12 @@ import {
 import type { WebhookRun } from '@shared/schemas'
 import { useWebhookRunsQuery } from '../hooks/useWebhookRunsQuery'
 
+function parseName(name: string): { workflow: string; job: string } {
+  if (name.startsWith('Cover Letter - ')) return { workflow: 'Cover Letter', job: name.slice('Cover Letter - '.length) }
+  if (name.startsWith('Resume - ')) return { workflow: 'Resume', job: name.slice('Resume - '.length) }
+  return { workflow: name, job: '' }
+}
+
 const columnHelper = createColumnHelper<WebhookRun>()
 
 const columns = [
@@ -27,18 +30,15 @@ const columns = [
     header: 'Run Date',
     cell: (info) => new Date(info.getValue()).toLocaleString(),
   }),
-  columnHelper.display({
+  columnHelper.accessor((row) => parseName(row.name).workflow, {
     id: 'workflow',
     header: 'Workflow',
-    cell: (info) => parseName(info.row.original.name).workflow,
+    cell: (info) => info.getValue(),
   }),
-  columnHelper.display({
+  columnHelper.accessor((row) => parseName(row.name).job, {
     id: 'job',
     header: 'Job',
-    cell: (info) => {
-      const job = parseName(info.row.original.name).job
-      return job || <span className="text-zinc-600">—</span>
-    },
+    cell: (info) => info.getValue() || <span className="text-zinc-600">—</span>,
   }),
   columnHelper.accessor('success', {
     header: 'Success',
@@ -65,11 +65,16 @@ const columns = [
 
 export function HistoryRoute() {
   const { data: runs = [], isPending, isError, error } = useWebhookRunsQuery()
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'runAt', desc: true }])
 
   const table = useReactTable({
     data: runs,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    enableMultiSort: false,
+    state: { sorting },
+    onSortingChange: setSorting,
   })
 
   return (
@@ -97,11 +102,19 @@ export function HistoryRoute() {
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="border-zinc-800">
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="text-zinc-400 bg-zinc-900 px-3 py-2">
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  ))}
+                  {headerGroup.headers.map((header) => {
+                    const sorted = header.column.getIsSorted()
+                    return (
+                      <TableHead
+                        key={header.id}
+                        className="text-zinc-400 bg-zinc-900 px-3 py-2 cursor-pointer select-none"
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                      </TableHead>
+                    )
+                  })}
                 </TableRow>
               ))}
             </TableHeader>
