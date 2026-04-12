@@ -50,7 +50,7 @@ const REC_COLOR_MAP: Record<string, string> = {
 }
 
 const REC_ALL_KEYS = ['apply', 'investigate', 'skip', 'None'] as const
-const EMAIL_TYPE_ALL_KEYS = ['Submitted', 'Screening', 'Interview', 'Offer', 'Rejected', 'Other'] as const
+const EMAIL_TYPE_ALL_KEYS = ['Submitted', 'Rejected', 'Other', 'Screening', 'Interview', 'Offer'] as const
 
 const FIT_COLOR_MAP: Record<string, string> = {
   '0-9': CHART_COLORS.low,
