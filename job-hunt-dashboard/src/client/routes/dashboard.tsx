@@ -4,6 +4,7 @@ import {
   Cell,
   BarChart,
   Bar,
+  LabelList,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -68,6 +69,11 @@ const FIT_COLOR_MAP: Record<string, string> = {
 const DARK_GRID = '#3f3f46'
 const DARK_TICK = '#a1a1aa'
 const TOOLTIP_STYLE = { background: '#18181b', border: '1px solid #3f3f46', color: '#f4f4f5' }
+const TOOLTIP_TEXT_STYLE = { color: '#f4f4f5' }
+const TOOLTIP_PROPS = { contentStyle: TOOLTIP_STYLE, labelStyle: TOOLTIP_TEXT_STYLE, itemStyle: TOOLTIP_TEXT_STYLE }
+
+const LABEL_STYLE = { fill: DARK_TICK, fontSize: 11 } as const
+const labelFormatter = (v: unknown) => (v as number) === 0 ? '' : String(v)
 
 const AXIS_PROPS = {
   tick: { fill: DARK_TICK },
@@ -162,11 +168,12 @@ export function DashboardRoute() {
                       <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                       <XAxis type="number" {...AXIS_PROPS} />
                       <YAxis type="category" dataKey="name" width={90} {...AXIS_PROPS} />
-                      <Tooltip contentStyle={TOOLTIP_STYLE} />
+                      <Tooltip {...TOOLTIP_PROPS} />
                       <Bar dataKey="value">
                         {recData.map((entry) => (
                           <Cell key={entry.name} fill={REC_COLOR_MAP[entry.name] ?? CHART_COLORS.default} />
                         ))}
+                        <LabelList dataKey="value" position="right" {...LABEL_STYLE} formatter={labelFormatter} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -184,11 +191,12 @@ export function DashboardRoute() {
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="bucket" {...AXIS_PROPS} />
                     <YAxis {...AXIS_PROPS} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
+                    <Tooltip {...TOOLTIP_PROPS} />
                     <Bar dataKey="count">
                       {data.pipeline.byFitScore.map((entry) => (
                         <Cell key={entry.bucket} fill={FIT_COLOR_MAP[entry.bucket] ?? CHART_COLORS.default} />
                       ))}
+                      <LabelList dataKey="count" position="top" {...LABEL_STYLE} formatter={labelFormatter} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -208,11 +216,12 @@ export function DashboardRoute() {
                       <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                       <XAxis dataKey="type" {...AXIS_PROPS} />
                       <YAxis {...AXIS_PROPS} />
-                      <Tooltip contentStyle={TOOLTIP_STYLE} />
+                      <Tooltip {...TOOLTIP_PROPS} />
                       <Bar dataKey="count">
                         {emailData.map((entry) => (
                           <Cell key={entry.type} fill={EMAIL_TYPE_COLOR_MAP[entry.type] ?? CHART_COLORS.default} />
                         ))}
+                        <LabelList dataKey="count" position="top" {...LABEL_STYLE} formatter={labelFormatter} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -230,10 +239,14 @@ export function DashboardRoute() {
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="workflow" {...AXIS_PROPS} />
                     <YAxis {...AXIS_PROPS} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
+                    <Tooltip {...TOOLTIP_PROPS} />
                     <Legend wrapperStyle={{ color: DARK_TICK }} />
-                    <Bar dataKey="success" fill={CHART_COLORS.success} />
-                    <Bar dataKey="failed" fill={CHART_COLORS.failed} />
+                    <Bar dataKey="success" fill={CHART_COLORS.success}>
+                      <LabelList dataKey="success" position="top" {...LABEL_STYLE} formatter={labelFormatter} />
+                    </Bar>
+                    <Bar dataKey="failed" fill={CHART_COLORS.failed}>
+                      <LabelList dataKey="failed" position="top" {...LABEL_STYLE} formatter={labelFormatter} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               )}
