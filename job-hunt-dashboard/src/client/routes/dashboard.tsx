@@ -73,6 +73,7 @@ const AXIS_PROPS = {
   tick: { fill: DARK_TICK },
   axisLine: { stroke: DARK_GRID },
   tickLine: false as const,
+  allowDecimals: false,
 }
 
 function NoData() {
