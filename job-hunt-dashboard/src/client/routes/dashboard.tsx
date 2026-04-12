@@ -173,7 +173,7 @@ export function DashboardRoute() {
                         {recData.map((entry) => (
                           <Cell key={entry.name} fill={REC_COLOR_MAP[entry.name] ?? CHART_COLORS.default} />
                         ))}
-                        <LabelList dataKey="value" position="right" {...LABEL_STYLE} formatter={labelFormatter} />
+                        <LabelList dataKey="value" position="insideRight" {...LABEL_STYLE} formatter={labelFormatter} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -196,7 +196,7 @@ export function DashboardRoute() {
                       {data.pipeline.byFitScore.map((entry) => (
                         <Cell key={entry.bucket} fill={FIT_COLOR_MAP[entry.bucket] ?? CHART_COLORS.default} />
                       ))}
-                      <LabelList dataKey="count" position="top" {...LABEL_STYLE} formatter={labelFormatter} />
+                      <LabelList dataKey="count" position="insideTop" {...LABEL_STYLE} formatter={labelFormatter} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -221,7 +221,7 @@ export function DashboardRoute() {
                         {emailData.map((entry) => (
                           <Cell key={entry.type} fill={EMAIL_TYPE_COLOR_MAP[entry.type] ?? CHART_COLORS.default} />
                         ))}
-                        <LabelList dataKey="count" position="top" {...LABEL_STYLE} formatter={labelFormatter} />
+                        <LabelList dataKey="count" position="insideTop" {...LABEL_STYLE} formatter={labelFormatter} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -242,10 +242,10 @@ export function DashboardRoute() {
                     <Tooltip {...TOOLTIP_PROPS} />
                     <Legend wrapperStyle={{ color: DARK_TICK }} />
                     <Bar dataKey="success" fill={CHART_COLORS.success}>
-                      <LabelList dataKey="success" position="top" {...LABEL_STYLE} formatter={labelFormatter} />
+                      <LabelList dataKey="success" position="insideTop" {...LABEL_STYLE} formatter={labelFormatter} />
                     </Bar>
                     <Bar dataKey="failed" fill={CHART_COLORS.failed}>
-                      <LabelList dataKey="failed" position="top" {...LABEL_STYLE} formatter={labelFormatter} />
+                      <LabelList dataKey="failed" position="insideTop" {...LABEL_STYLE} formatter={labelFormatter} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
