@@ -46,7 +46,11 @@ const REC_COLOR_MAP: Record<string, string> = {
   apply: CHART_COLORS.apply,
   investigate: CHART_COLORS.investigate,
   skip: CHART_COLORS.skip,
+  None: CHART_COLORS.default,
 }
+
+const REC_ALL_KEYS = ['apply', 'investigate', 'skip', 'None'] as const
+const EMAIL_TYPE_ALL_KEYS = ['Submitted', 'Screening', 'Interview', 'Offer', 'Rejected', 'Other'] as const
 
 const FIT_COLOR_MAP: Record<string, string> = {
   '0-9': CHART_COLORS.low,
@@ -148,23 +152,25 @@ export function DashboardRoute() {
           <div className="grid grid-cols-2 gap-3">
             {/* Recommendation Breakdown — horizontal bar */}
             <ChartCard title="Recommendation Breakdown">
-              {data.pipeline.byRecommendation.length === 0 ? (
-                <NoData />
-              ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart layout="vertical" data={data.pipeline.byRecommendation}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis type="number" {...AXIS_PROPS} />
-                    <YAxis type="category" dataKey="name" width={90} {...AXIS_PROPS} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Bar dataKey="value">
-                      {data.pipeline.byRecommendation.map((entry) => (
-                        <Cell key={entry.name} fill={REC_COLOR_MAP[entry.name] ?? CHART_COLORS.default} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
+              {(() => {
+                const recIndex = Object.fromEntries(data.pipeline.byRecommendation.map((e) => [e.name, e.value]))
+                const recData = REC_ALL_KEYS.map((key) => ({ name: key, value: recIndex[key] ?? 0 }))
+                return (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart layout="vertical" data={recData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                      <XAxis type="number" {...AXIS_PROPS} />
+                      <YAxis type="category" dataKey="name" width={90} {...AXIS_PROPS} />
+                      <Tooltip contentStyle={TOOLTIP_STYLE} />
+                      <Bar dataKey="value">
+                        {recData.map((entry) => (
+                          <Cell key={entry.name} fill={REC_COLOR_MAP[entry.name] ?? CHART_COLORS.default} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )
+              })()}
             </ChartCard>
 
             {/* Fit Score Distribution */}
@@ -191,18 +197,19 @@ export function DashboardRoute() {
             {/* Email Types */}
             <ChartCard title="Email Types">
               {(() => {
-                const classified = data.emails.byType.filter((e) => e.type !== 'Unclassified')
-                return classified.length === 0 ? (
-                  <NoData />
-                ) : (
+                const typeIndex = Object.fromEntries(
+                  data.emails.byType.filter((e) => e.type !== 'Unclassified').map((e) => [e.type, e.count]),
+                )
+                const emailData = EMAIL_TYPE_ALL_KEYS.map((key) => ({ type: key, count: typeIndex[key] ?? 0 }))
+                return (
                   <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={classified}>
+                    <BarChart data={emailData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                       <XAxis dataKey="type" {...AXIS_PROPS} />
                       <YAxis {...AXIS_PROPS} />
                       <Tooltip contentStyle={TOOLTIP_STYLE} />
                       <Bar dataKey="count">
-                        {classified.map((entry) => (
+                        {emailData.map((entry) => (
                           <Cell key={entry.type} fill={EMAIL_TYPE_COLOR_MAP[entry.type] ?? CHART_COLORS.default} />
                         ))}
                       </Bar>
