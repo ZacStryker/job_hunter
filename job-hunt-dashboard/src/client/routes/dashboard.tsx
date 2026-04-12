@@ -72,8 +72,17 @@ const TOOLTIP_STYLE = { background: '#18181b', border: '1px solid #3f3f46', colo
 const TOOLTIP_TEXT_STYLE = { color: '#f4f4f5' }
 const TOOLTIP_PROPS = { contentStyle: TOOLTIP_STYLE, labelStyle: TOOLTIP_TEXT_STYLE, itemStyle: TOOLTIP_TEXT_STYLE }
 
-const LABEL_STYLE = { fill: '#ffffff', fontSize: 13, fontWeight: 600, offset: 10 } as const
-const labelFormatter = (v: unknown) => (v as number) === 0 ? '' : String(v)
+type LabelContentProps = { x?: number; y?: number; width?: number; height?: number; value?: number }
+
+function LabelInsideTop({ x = 0, y = 0, width = 0, height = 0, value = 0 }: LabelContentProps): React.JSX.Element {
+  if (!value || height < 30) return <></>
+  return <text x={x + width / 2} y={y + 20} fill="#ffffff" textAnchor="middle" fontSize={13} fontWeight={600}>{value}</text>
+}
+
+function LabelInsideRight({ x = 0, y = 0, width = 0, height = 0, value = 0 }: LabelContentProps): React.JSX.Element {
+  if (!value || width < 40) return <></>
+  return <text x={x + width - 10} y={y + height / 2 + 5} fill="#ffffff" textAnchor="end" fontSize={13} fontWeight={600}>{value}</text>
+}
 
 const AXIS_PROPS = {
   tick: { fill: DARK_TICK },
@@ -173,7 +182,7 @@ export function DashboardRoute() {
                         {recData.map((entry) => (
                           <Cell key={entry.name} fill={REC_COLOR_MAP[entry.name] ?? CHART_COLORS.default} />
                         ))}
-                        <LabelList dataKey="value" position="insideRight" {...LABEL_STYLE} formatter={labelFormatter} />
+                        <LabelList dataKey="value" content={LabelInsideRight as (props: object) => React.JSX.Element} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -196,7 +205,7 @@ export function DashboardRoute() {
                       {data.pipeline.byFitScore.map((entry) => (
                         <Cell key={entry.bucket} fill={FIT_COLOR_MAP[entry.bucket] ?? CHART_COLORS.default} />
                       ))}
-                      <LabelList dataKey="count" position="insideTop" {...LABEL_STYLE} formatter={labelFormatter} />
+                      <LabelList dataKey="count" content={LabelInsideTop as (props: object) => React.JSX.Element} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -221,7 +230,7 @@ export function DashboardRoute() {
                         {emailData.map((entry) => (
                           <Cell key={entry.type} fill={EMAIL_TYPE_COLOR_MAP[entry.type] ?? CHART_COLORS.default} />
                         ))}
-                        <LabelList dataKey="count" position="insideTop" {...LABEL_STYLE} formatter={labelFormatter} />
+                        <LabelList dataKey="count" content={LabelInsideTop as (props: object) => React.JSX.Element} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -242,10 +251,10 @@ export function DashboardRoute() {
                     <Tooltip {...TOOLTIP_PROPS} />
                     <Legend wrapperStyle={{ color: DARK_TICK }} />
                     <Bar dataKey="success" fill={CHART_COLORS.success}>
-                      <LabelList dataKey="success" position="insideTop" {...LABEL_STYLE} formatter={labelFormatter} />
+                      <LabelList dataKey="success" content={LabelInsideTop as (props: object) => React.JSX.Element} />
                     </Bar>
                     <Bar dataKey="failed" fill={CHART_COLORS.failed}>
-                      <LabelList dataKey="failed" position="insideTop" {...LABEL_STYLE} formatter={labelFormatter} />
+                      <LabelList dataKey="failed" content={LabelInsideTop as (props: object) => React.JSX.Element} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
