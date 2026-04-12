@@ -123,7 +123,7 @@ app.get('/', (c) => {
   const dailyMap: Record<string, { apply: number; investigate: number; skip: number; none: number }> = {}
   for (const job of dailyRows) {
     if (!job.dateScraped) continue
-    const date = job.dateScraped
+    const date = job.dateScraped.slice(0, 10)
     if (!dailyMap[date]) dailyMap[date] = { apply: 0, investigate: 0, skip: 0, none: 0 }
     if (job.recommendation === 'apply') dailyMap[date].apply++
     else if (job.recommendation === 'investigate') dailyMap[date].investigate++
