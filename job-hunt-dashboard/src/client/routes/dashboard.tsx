@@ -93,6 +93,16 @@ const AXIS_PROPS = {
   allowDecimals: false,
 }
 
+function formatPerDayDate(d: unknown): string {
+  if (typeof d !== 'string') return String(d)
+  const parts = d.split('-')
+  if (parts.length !== 3) return d
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const m = parseInt(parts[1], 10) - 1
+  const day = parseInt(parts[2], 10)
+  return (m >= 0 && m < 12) ? `${MONTHS[m]} ${day}` : d
+}
+
 function NoData() {
   return (
     <div className="flex items-center justify-center h-[180px] text-sm text-zinc-500">
@@ -110,11 +120,51 @@ function StatCard({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+function ChartCard({
+  title,
+  children,
+  tableHeaders,
+  tableData,
+}: {
+  title: string
+  children: React.ReactNode
+  tableHeaders: string[]
+  tableData: (string | number)[][]
+}) {
+  const [showTable, setShowTable] = useState(false)
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-      <div className="text-sm font-medium text-zinc-400 mb-3">{title}</div>
-      {children}
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-sm font-medium text-zinc-400">{title}</div>
+        <button
+          onClick={() => setShowTable((s) => !s)}
+          className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded hover:bg-zinc-800 transition-colors"
+        >
+          {showTable ? 'Chart' : 'Data'}
+        </button>
+      </div>
+      {showTable ? (
+        <div className="overflow-auto h-[220px]">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-zinc-900">
+              <tr className="border-b border-zinc-700">
+                {tableHeaders.map((h) => (
+                  <th key={h} className="text-left pb-2 pr-6 text-zinc-500 font-medium">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tableData.map((row, i) => (
+                <tr key={i} className="border-b border-zinc-800">
+                  {row.map((cell, j) => (
+                    <td key={j} className="py-1.5 pr-6 text-zinc-300">{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : children}
     </div>
   )
 }
@@ -168,7 +218,11 @@ export function DashboardRoute() {
 
           {/* Jobs per day by recommendation */}
           {data.scraped.perDay.length > 0 && (
-            <ChartCard title="Jobs per Day by Recommendation">
+            <ChartCard
+              title="Jobs per Day by Recommendation"
+              tableHeaders={['Date', 'Apply', 'Investigate', 'Skip', 'None']}
+              tableData={data.scraped.perDay.map((e) => [e.date, e.apply, e.investigate, e.skip, e.none])}
+            >
               <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={data.scraped.perDay}>
                   <defs>
@@ -190,15 +244,7 @@ export function DashboardRoute() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                  <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={(d: unknown) => {
-                    if (typeof d !== 'string') return String(d)
-                    const parts = d.split('-')
-                    if (parts.length !== 3) return d
-                    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-                    const m = parseInt(parts[1], 10) - 1
-                    const day = parseInt(parts[2], 10)
-                    return (m >= 0 && m < 12) ? `${MONTHS[m]} ${day}` : d
-                  }} />
+                  <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
                   <YAxis {...AXIS_PROPS} />
                   <Tooltip {...TOOLTIP_PROPS} />
                   <Legend wrapperStyle={{ color: DARK_TICK }} />
@@ -214,11 +260,15 @@ export function DashboardRoute() {
           {/* Charts grid */}
           <div className="grid grid-cols-2 gap-3">
             {/* Recommendation Breakdown — horizontal bar */}
-            <ChartCard title="Recommendation Breakdown">
-              {(() => {
-                const recIndex = Object.fromEntries(data.pipeline.byRecommendation.map((e) => [e.name, e.value]))
-                const recData = REC_ALL_KEYS.map((key) => ({ name: key, value: recIndex[key] ?? 0 }))
-                return (
+            {(() => {
+              const recIndex = Object.fromEntries(data.pipeline.byRecommendation.map((e) => [e.name, e.value]))
+              const recData = REC_ALL_KEYS.map((key) => ({ name: key, value: recIndex[key] ?? 0 }))
+              return (
+                <ChartCard
+                  title="Recommendation Breakdown"
+                  tableHeaders={['Recommendation', 'Count']}
+                  tableData={recData.map((e) => [e.name, e.value])}
+                >
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart layout="vertical" data={recData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
@@ -233,12 +283,16 @@ export function DashboardRoute() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                )
-              })()}
-            </ChartCard>
+                </ChartCard>
+              )
+            })()}
 
             {/* Fit Score Distribution */}
-            <ChartCard title="Fit Score Distribution">
+            <ChartCard
+              title="Fit Score Distribution"
+              tableHeaders={['Bucket', 'Count']}
+              tableData={data.pipeline.byFitScore.map((e) => [e.bucket, e.count])}
+            >
               {data.pipeline.byFitScore.every((b) => b.count === 0) ? (
                 <NoData />
               ) : (
@@ -260,13 +314,17 @@ export function DashboardRoute() {
             </ChartCard>
 
             {/* Email Types */}
-            <ChartCard title="Email Types">
-              {(() => {
-                const typeIndex = Object.fromEntries(
-                  data.emails.byType.filter((e) => e.type !== 'Unclassified').map((e) => [e.type, e.count]),
-                )
-                const emailData = EMAIL_TYPE_ALL_KEYS.map((key) => ({ type: key, count: typeIndex[key] ?? 0 }))
-                return (
+            {(() => {
+              const typeIndex = Object.fromEntries(
+                data.emails.byType.filter((e) => e.type !== 'Unclassified').map((e) => [e.type, e.count]),
+              )
+              const emailData = EMAIL_TYPE_ALL_KEYS.map((key) => ({ type: key, count: typeIndex[key] ?? 0 }))
+              return (
+                <ChartCard
+                  title="Email Types"
+                  tableHeaders={['Type', 'Count']}
+                  tableData={emailData.map((e) => [e.type, e.count])}
+                >
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={emailData}>
                       <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
@@ -281,12 +339,16 @@ export function DashboardRoute() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                )
-              })()}
-            </ChartCard>
+                </ChartCard>
+              )
+            })()}
 
             {/* Automation Runs — grouped bar */}
-            <ChartCard title="Automation Runs">
+            <ChartCard
+              title="Automation Runs"
+              tableHeaders={['Workflow', 'Success', 'Failed']}
+              tableData={data.automation.byWorkflow.map((e) => [e.workflow, e.success, e.failed])}
+            >
               {data.automation.byWorkflow.length === 0 ? (
                 <NoData />
               ) : (
