@@ -5,6 +5,8 @@ import {
   BarChart,
   Bar,
   LabelList,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -163,6 +165,43 @@ export function DashboardRoute() {
             />
             <StatCard label="Messages" value={String(data.emails.total)} />
           </div>
+
+          {/* Jobs per day by recommendation */}
+          {data.scraped.perDay.length > 0 && (
+            <ChartCard title="Jobs per Day by Recommendation">
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={data.scraped.perDay}>
+                  <defs>
+                    <linearGradient id="gradApply" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.apply} stopOpacity={0.6} />
+                      <stop offset="95%" stopColor={CHART_COLORS.apply} stopOpacity={0.1} />
+                    </linearGradient>
+                    <linearGradient id="gradInvestigate" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.investigate} stopOpacity={0.6} />
+                      <stop offset="95%" stopColor={CHART_COLORS.investigate} stopOpacity={0.1} />
+                    </linearGradient>
+                    <linearGradient id="gradSkip" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.skip} stopOpacity={0.6} />
+                      <stop offset="95%" stopColor={CHART_COLORS.skip} stopOpacity={0.1} />
+                    </linearGradient>
+                    <linearGradient id="gradNone" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.default} stopOpacity={0.6} />
+                      <stop offset="95%" stopColor={CHART_COLORS.default} stopOpacity={0.1} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                  <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={(d: string) => d.slice(5)} />
+                  <YAxis {...AXIS_PROPS} />
+                  <Tooltip {...TOOLTIP_PROPS} />
+                  <Legend wrapperStyle={{ color: DARK_TICK }} />
+                  <Area type="monotone" dataKey="apply" stackId="1" stroke={CHART_COLORS.apply} fill="url(#gradApply)" />
+                  <Area type="monotone" dataKey="investigate" stackId="1" stroke={CHART_COLORS.investigate} fill="url(#gradInvestigate)" />
+                  <Area type="monotone" dataKey="skip" stackId="1" stroke={CHART_COLORS.skip} fill="url(#gradSkip)" />
+                  <Area type="monotone" dataKey="none" stackId="1" stroke={CHART_COLORS.default} fill="url(#gradNone)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          )}
 
           {/* Charts grid */}
           <div className="grid grid-cols-2 gap-3">

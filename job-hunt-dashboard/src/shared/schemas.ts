@@ -96,6 +96,13 @@ export const statsSchema = z.object({
   }),
   scraped: z.object({
     total: z.number(),
+    perDay: z.array(z.object({
+      date: z.string(),
+      apply: z.number(),
+      investigate: z.number(),
+      skip: z.number(),
+      none: z.number(),
+    })),
   }),
   archived: z.object({
     total: z.number(),

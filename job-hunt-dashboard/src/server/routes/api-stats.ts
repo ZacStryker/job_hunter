@@ -114,9 +114,29 @@ app.get('/', (c) => {
     : db.select().from(coverLetters).all()
   const coverLettersGenerated = clRows.length
 
+  // Jobs per day by recommendation
+  const dailyRows = db.select({ dateScraped: jobs.dateScraped, recommendation: jobs.recommendation })
+    .from(jobs)
+    .where(dateCutoff ? gte(jobs.dateScraped, dateCutoff) : undefined)
+    .all()
+
+  const dailyMap: Record<string, { apply: number; investigate: number; skip: number; none: number }> = {}
+  for (const job of dailyRows) {
+    if (!job.dateScraped) continue
+    const date = job.dateScraped
+    if (!dailyMap[date]) dailyMap[date] = { apply: 0, investigate: 0, skip: 0, none: 0 }
+    if (job.recommendation === 'apply') dailyMap[date].apply++
+    else if (job.recommendation === 'investigate') dailyMap[date].investigate++
+    else if (job.recommendation === 'skip') dailyMap[date].skip++
+    else dailyMap[date].none++
+  }
+  const perDay = Object.entries(dailyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, counts]) => ({ date, ...counts }))
+
   return c.json({
     pipeline: { total: pipelineTotal, byRecommendation, byFitScore },
-    scraped: { total: scrapedTotal },
+    scraped: { total: scrapedTotal, perDay },
     archived: { total: archivedTotal },
     applications: { total: appTotal, byStatus, responseRate },
     emails: { total: emailTotal, byType },
