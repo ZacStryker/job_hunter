@@ -72,7 +72,7 @@ const TOOLTIP_STYLE = { background: '#18181b', border: '1px solid #3f3f46', colo
 const TOOLTIP_TEXT_STYLE = { color: '#f4f4f5' }
 const TOOLTIP_PROPS = { contentStyle: TOOLTIP_STYLE, labelStyle: TOOLTIP_TEXT_STYLE, itemStyle: TOOLTIP_TEXT_STYLE }
 
-const LABEL_STYLE = { fill: '#ffffff', fontSize: 11 } as const
+const LABEL_STYLE = { fill: '#ffffff', fontSize: 12, fontWeight: 600, stroke: '#000000', strokeWidth: 3, paintOrder: 'stroke' } as const
 const labelFormatter = (v: unknown) => (v as number) === 0 ? '' : String(v)
 
 const AXIS_PROPS = {
