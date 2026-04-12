@@ -19,10 +19,13 @@ function parseWorkflow(name: string): string {
   return name
 }
 
-type AppliedFilter = 'applied' | 'unapplied' | 'all'
+type AppliedFilter  = 'applied' | 'unapplied' | 'all'
+type ArchivedFilter = 'active'  | 'archived'  | 'all'
 
-function buildBaseWhere(showArchived: boolean, appliedFilter: AppliedFilter) {
-  const archivedCond = !showArchived ? eq(jobs.archived, false) : undefined
+function buildBaseWhere(archivedFilter: ArchivedFilter, appliedFilter: AppliedFilter) {
+  const archivedCond =
+    archivedFilter === 'active'   ? eq(jobs.archived, false) :
+    archivedFilter === 'archived' ? eq(jobs.archived, true)  : undefined
   const appliedCond =
     appliedFilter === 'applied'   ? eq(jobs.applied, true)  :
     appliedFilter === 'unapplied' ? eq(jobs.applied, false) : undefined
@@ -34,13 +37,16 @@ app.get('/', (c) => {
   const rawPeriod = c.req.query('period') ?? 'all'
   const period = (STATS_PERIODS as readonly string[]).includes(rawPeriod) ? rawPeriod : 'all'
   const { datetimeCutoff, dateCutoff } = getPeriodCutoffs(period)
-  const showArchived = c.req.query('showArchived') === 'true'
+  const rawArchivedFilter = c.req.query('archivedFilter')
+  const archivedFilter: ArchivedFilter =
+    rawArchivedFilter === 'archived' ? 'archived' :
+    rawArchivedFilter === 'all'      ? 'all'       : 'active'
   const rawAppliedFilter = c.req.query('appliedFilter')
   const appliedFilter: AppliedFilter =
     rawAppliedFilter === 'unapplied' ? 'unapplied' :
     rawAppliedFilter === 'all'       ? 'all'        : 'applied'
 
-  const baseWhere = buildBaseWhere(showArchived, appliedFilter)
+  const baseWhere = buildBaseWhere(archivedFilter, appliedFilter)
 
   // Load all jobs matching base conditions + dateScraped cutoff
   const scrapedWhere = and(baseWhere, dateCutoff ? gte(jobs.dateScraped, dateCutoff) : undefined)
@@ -49,8 +55,8 @@ app.get('/', (c) => {
   const scrapedTotal = viewJobs.length
   const archivedTotal = viewJobs.filter(j => j.archived).length
 
-  // Pipeline = non-archived subset (when showArchived=true, filter in-memory; when false, viewJobs already excludes them)
-  const pipelineJobs = showArchived ? viewJobs.filter(j => !j.archived) : viewJobs
+  // Pipeline: when 'all', keep charts focused on non-archived; otherwise viewJobs already has the right subset
+  const pipelineJobs = archivedFilter === 'all' ? viewJobs.filter(j => !j.archived) : viewJobs
   const pipelineTotal = pipelineJobs.length
 
   const recCounts: Record<string, number> = {}
@@ -87,10 +93,13 @@ app.get('/', (c) => {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, counts]) => ({ date, ...counts }))
 
-  // Application stats (always applied=true, showArchived-aware, dateApplied cutoff)
+  // Application stats (always applied=true, archivedFilter-aware, dateApplied cutoff)
+  const archivedAppCond =
+    archivedFilter === 'active'   ? eq(jobs.archived, false) :
+    archivedFilter === 'archived' ? eq(jobs.archived, true)  : undefined
   const appWhere = and(
     eq(jobs.applied, true),
-    !showArchived ? eq(jobs.archived, false) : undefined,
+    archivedAppCond,
     dateCutoff ? gte(jobs.dateApplied, dateCutoff) : undefined,
   )
   const appliedJobs = db.select().from(jobs).where(appWhere).all()
