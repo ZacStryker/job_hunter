@@ -190,7 +190,7 @@ export function DashboardRoute() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                  <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={(d: string) => d.slice(5)} />
+                  <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={(d: string) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
                   <YAxis {...AXIS_PROPS} />
                   <Tooltip {...TOOLTIP_PROPS} />
                   <Legend wrapperStyle={{ color: DARK_TICK }} />
