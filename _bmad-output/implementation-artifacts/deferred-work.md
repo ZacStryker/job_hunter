@@ -243,3 +243,18 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - **`grid-cols-5` has no responsive breakpoint** [`dashboard.tsx`] — Five equal-width cards will collapse at narrow viewports. Consider adding `sm:grid-cols-3 md:grid-cols-5` or similar responsive qualifiers.
 - **Archived and Applied can overlap** [`api-stats.ts`] — A job can be both `applied=true` and `archived=true`, so `archived.total` and `applications.total` are not mutually exclusive. The current UI implies they represent separate pipeline stages. Worth clarifying in data model docs or enforcing mutual exclusion.
 - **Count fields use `z.number()` without `.int().nonnegative()`** [`schemas.ts`] — `pipeline.total`, `applications.total`, `emails.total`, `archived.total` all accept floats and negatives at the schema layer. Consider tightening to `z.number().int().nonnegative()`.
+
+## Deferred from: code review of 11-2-dashboard-global-filters (2026-04-12)
+
+- **Period date columns inconsistent across metrics** [`api-stats.ts`] — `dateScraped` used for viewJobs cutoff, `dateApplied` for appliedJobs cutoff, `receivedAt` for emails. Pre-existing design; a job scraped long ago but applied recently can appear in applications but not in the scraped count for the same period window.
+- **No Zod/schema validation on showArchived/showUnapplied params** [`api-stats.ts`] — `period` is validated against `STATS_PERIODS`; the new boolean params use loose `=== 'true'` string coercion. Inconsistent with project validation approach; no runtime risk but future maintainers may add invalid param handling unevenly.
+- **No test explicitly asserts scraped.total excludes unapplied jobs when showUnapplied=false** [`api-stats.test.ts`] — AC7 covers the Scrapes stat card, but the filter test group only checks `pipeline.total`. Minor coverage gap; the code is correct (same baseWhere applies) but the omission is a documentation gap.
+- **Null dateScraped jobs counted in scrapedTotal (period=all) but silently skipped in perDay** [`api-stats.ts`] — When no date cutoff is applied, jobs with null `dateScraped` pass the baseWhere filter and land in viewJobs (adding to scrapedTotal) but are skipped in the dailyMap loop, causing the perDay chart total to undercount vs scrapedTotal. Pre-existing behavior.
+
+## Deferred from: spec-dashboard-applied-filter-selector (2026-04-12)
+
+- **`AppliedFilter` type declared in two files with no shared import** [`api-stats.ts`, `useStatsQuery.ts`] — Server and client both define their own `AppliedFilter = 'applied' | 'unapplied' | 'all'` union. If they diverge, the contract breaks silently. Consider adding `AppliedFilter` to `@shared/schemas` in a future cleanup pass.
+- **No test for bogus `appliedFilter` query param** [`api-stats.test.ts`] — Server silently defaults bogus values to `'applied'`, which is correct, but there's no explicit test asserting this behaviour. Low risk; low priority.
+- **`matchingJobKeys` null-key collision** [`api-stats.ts`] — If a job has `company=null` or `jobTitle=null`, the `\x00`-separated key becomes `"null\x00..."`, which could false-match an email for a company literally named `"null"`. Pre-existing from story 11-2.
+- **`dateApplied` NULL excluded by period filter** [`api-stats.ts`] — Jobs with `applied=true` but `dateApplied=null` are silently excluded from period-filtered application stats because `gte(jobs.dateApplied, dateCutoff)` rejects nulls. Pre-existing behaviour.
+- **Inconsistent period cutoff columns across metrics** [`api-stats.ts`] — Pipeline uses `dateScraped`, applications use `dateApplied`, emails use `receivedAt`. Pre-existing design; a job scraped long ago but applied recently can appear in applications but not scraped count for the same period window.

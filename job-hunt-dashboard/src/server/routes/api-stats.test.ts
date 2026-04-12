@@ -100,18 +100,18 @@ describe('GET /api/stats business logic', () => {
     expect(data).not.toHaveProperty('data')
   })
 
-  test('pipeline.total counts non-archived jobs only', async () => {
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived) VALUES ('A', 'Dev', 0)`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived) VALUES ('B', 'Dev', 1)`)
+  test('pipeline.total counts non-archived, applied jobs by default', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('A', 'Dev', 0, 1)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('B', 'Dev', 1, 1)`)
     const res = await statsApp.request('/', { method: 'GET' })
     const data = await res.json() as { pipeline: { total: number } }
     expect(data.pipeline.total).toBe(1)
   })
 
   test('byRecommendation groups correctly including null→None', async () => {
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, recommendation, archived) VALUES ('A', 'Dev', 'apply', 0)`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, recommendation, archived) VALUES ('B', 'Dev', NULL, 0)`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, recommendation, archived) VALUES ('C', 'Dev', 'apply', 0)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, recommendation, archived, applied) VALUES ('A', 'Dev', 'apply', 0, 1)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, recommendation, archived, applied) VALUES ('B', 'Dev', NULL, 0, 1)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, recommendation, archived, applied) VALUES ('C', 'Dev', 'apply', 0, 1)`)
     const res = await statsApp.request('/', { method: 'GET' })
     const data = await res.json() as { pipeline: { byRecommendation: { name: string; value: number }[] } }
     const recs = data.pipeline.byRecommendation
@@ -122,10 +122,10 @@ describe('GET /api/stats business logic', () => {
   })
 
   test('byFitScore buckets correctly', async () => {
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, fit_score, archived) VALUES ('A', 'Dev', 50, 0)`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, fit_score, archived) VALUES ('B', 'Dev', 70, 0)`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, fit_score, archived) VALUES ('C', 'Dev', 90, 0)`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, fit_score, archived) VALUES ('D', 'Dev', NULL, 0)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, fit_score, archived, applied) VALUES ('A', 'Dev', 50, 0, 1)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, fit_score, archived, applied) VALUES ('B', 'Dev', 70, 0, 1)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, fit_score, archived, applied) VALUES ('C', 'Dev', 90, 0, 1)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, fit_score, archived, applied) VALUES ('D', 'Dev', NULL, 0, 1)`)
     const res = await statsApp.request('/', { method: 'GET' })
     const data = await res.json() as { pipeline: { byFitScore: { bucket: string; count: number }[] } }
     const buckets = data.pipeline.byFitScore
@@ -173,15 +173,15 @@ describe('GET /api/stats business logic', () => {
     const now = Date.now()
     const sixDaysAgo = new Date(now - 6 * 86_400_000).toISOString().slice(0, 10)
     const eightDaysAgo = new Date(now - 8 * 86_400_000).toISOString().slice(0, 10)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, archived) VALUES ('Recent', 'Dev', '${sixDaysAgo}', 0)`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, archived) VALUES ('Old', 'Dev', '${eightDaysAgo}', 0)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, archived, applied) VALUES ('Recent', 'Dev', '${sixDaysAgo}', 0, 1)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, archived, applied) VALUES ('Old', 'Dev', '${eightDaysAgo}', 0, 1)`)
     const res = await statsApp.request('/?period=7d', { method: 'GET' })
     const data = await res.json() as { pipeline: { total: number } }
     expect(data.pipeline.total).toBe(1)
   })
 
   test('period=all returns same as no period param', async () => {
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived) VALUES ('A', 'Dev', 0)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('A', 'Dev', 0, 1)`)
     const [res1, res2] = await Promise.all([
       statsApp.request('/', { method: 'GET' }),
       statsApp.request('/?period=all', { method: 'GET' }),
@@ -214,6 +214,97 @@ describe('GET /api/stats business logic', () => {
     expect(coverLetter?.success).toBe(1)
     expect(coverLetter?.failed).toBe(0)
     expect(discovery?.failed).toBe(1)
+  })
+})
+
+describe('appliedFilter / showArchived filters', () => {
+  test('appliedFilter=applied (default) excludes unapplied jobs from pipeline', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('Acme', 'Dev', 0, 0)`)
+    const res = await statsApp.request('/', { method: 'GET' })
+    const data = await res.json() as { pipeline: { total: number } }
+    expect(data.pipeline.total).toBe(0)
+  })
+
+  test('appliedFilter=all includes unapplied jobs in pipeline', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('Acme', 'Dev', 0, 0)`)
+    const res = await statsApp.request('/?appliedFilter=all', { method: 'GET' })
+    const data = await res.json() as { pipeline: { total: number } }
+    expect(data.pipeline.total).toBe(1)
+  })
+
+  test('appliedFilter=unapplied includes only unapplied jobs in pipeline', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('Acme', 'Dev', 0, 0)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('Beta', 'Dev', 0, 1)`)
+    const res = await statsApp.request('/?appliedFilter=unapplied', { method: 'GET' })
+    const data = await res.json() as { pipeline: { total: number } }
+    expect(data.pipeline.total).toBe(1)
+  })
+
+  test('showArchived=false (default) excludes archived jobs; archived stat = 0', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('Acme', 'Dev', 1, 1)`)
+    const res = await statsApp.request('/', { method: 'GET' })
+    const data = await res.json() as { pipeline: { total: number }; archived: { total: number } }
+    expect(data.pipeline.total).toBe(0)
+    expect(data.archived.total).toBe(0)
+  })
+
+  test('showArchived=true includes archived jobs; archived stat = 1', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('Acme', 'Dev', 1, 1)`)
+    const res = await statsApp.request('/?showArchived=true', { method: 'GET' })
+    const data = await res.json() as { scraped: { total: number }; archived: { total: number } }
+    expect(data.scraped.total).toBe(1)
+    expect(data.archived.total).toBe(1)
+  })
+
+  test('showArchived=true&appliedFilter=all includes all jobs', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('A', 'Dev', 0, 1)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('B', 'Dev', 0, 0)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('C', 'Dev', 1, 1)`)
+    const res = await statsApp.request('/?showArchived=true&appliedFilter=all', { method: 'GET' })
+    const data = await res.json() as { scraped: { total: number } }
+    expect(data.scraped.total).toBe(3)
+  })
+
+  test('email matched to applied non-archived job included when showUnapplied=false', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('Acme', 'Engineer', 0, 1)`)
+    prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, company, job_title) VALUES ('u1', '2026-01-01T00:00:00Z', 'hr@acme.com', 'Your application', 'Acme', 'Engineer')`)
+    const res = await statsApp.request('/', { method: 'GET' })
+    const data = await res.json() as { emails: { total: number } }
+    expect(data.emails.total).toBe(1)
+  })
+
+  test('unmatched email (null company) excluded when appliedFilter=applied (default)', async () => {
+    prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, company, job_title) VALUES ('u1', '2026-01-01T00:00:00Z', 'hr@acme.com', 'Newsletter', NULL, NULL)`)
+    const res = await statsApp.request('/', { method: 'GET' })
+    const data = await res.json() as { emails: { total: number } }
+    expect(data.emails.total).toBe(0)
+  })
+
+  test('unmatched email (null company) included when appliedFilter=all', async () => {
+    prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, company, job_title) VALUES ('u1', '2026-01-01T00:00:00Z', 'hr@acme.com', 'Newsletter', NULL, NULL)`)
+    const res = await statsApp.request('/?appliedFilter=all', { method: 'GET' })
+    const data = await res.json() as { emails: { total: number } }
+    expect(data.emails.total).toBe(1)
+  })
+
+  test('email matched to archived job excluded when showArchived=false (default)', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('Acme', 'Engineer', 1, 1)`)
+    prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, company, job_title) VALUES ('u1', '2026-01-01T00:00:00Z', 'hr@acme.com', 'Your application', 'Acme', 'Engineer')`)
+    const res = await statsApp.request('/', { method: 'GET' })
+    const data = await res.json() as { emails: { total: number } }
+    expect(data.emails.total).toBe(0)
+  })
+
+  test('automation runs not affected by showArchived or appliedFilter', async () => {
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success) VALUES ('Discovery', '2026-04-01T10:00:00.000Z', 1)`)
+    const [res1, res2] = await Promise.all([
+      statsApp.request('/', { method: 'GET' }),
+      statsApp.request('/?showArchived=true&appliedFilter=all', { method: 'GET' }),
+    ])
+    const data1 = await res1.json() as { automation: { totalRuns: number } }
+    const data2 = await res2.json() as { automation: { totalRuns: number } }
+    expect(data1.automation.totalRuns).toBe(1)
+    expect(data2.automation.totalRuns).toBe(1)
   })
 })
 

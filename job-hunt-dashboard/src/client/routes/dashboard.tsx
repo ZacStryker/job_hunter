@@ -15,7 +15,7 @@ import {
 } from 'recharts'
 import type { StatsPeriod } from '@shared/schemas'
 import { STATS_PERIODS } from '@shared/schemas'
-import { useStatsQuery } from '../hooks/useStatsQuery'
+import { useStatsQuery, type AppliedFilter } from '../hooks/useStatsQuery'
 
 const PERIOD_LABELS: Record<StatsPeriod, string> = {
   '24h': '24h',
@@ -171,11 +171,12 @@ function ChartCard({
 
 export function DashboardRoute() {
   const [period, setPeriod] = useState<StatsPeriod>('all')
-  const { data, isPending, isError, error } = useStatsQuery(period)
+  const [appliedFilter, setAppliedFilter] = useState<AppliedFilter>('applied')
+  const { data, isPending, isError, error } = useStatsQuery(period, false, appliedFilter)
 
   return (
     <div className="p-4 space-y-4">
-      {/* Period selector */}
+      {/* Period selector + filter toggles */}
       <div className="flex items-center gap-1">
         {STATS_PERIODS.map((p) => (
           <button
@@ -189,6 +190,23 @@ export function DashboardRoute() {
             ].join(' ')}
           >
             {PERIOD_LABELS[p]}
+          </button>
+        ))}
+
+        <div className="w-px h-5 bg-zinc-700 mx-2" />
+
+        {(['applied', 'unapplied', 'all'] as AppliedFilter[]).map((f) => (
+          <button
+            key={f}
+            onClick={() => setAppliedFilter(f)}
+            className={[
+              'px-3 py-1.5 text-sm rounded transition-colors',
+              appliedFilter === f
+                ? 'bg-zinc-700 text-zinc-100'
+                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800',
+            ].join(' ')}
+          >
+            {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
       </div>
