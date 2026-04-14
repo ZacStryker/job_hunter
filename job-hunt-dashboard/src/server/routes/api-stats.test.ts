@@ -258,13 +258,13 @@ describe('appliedFilter / archivedFilter filters', () => {
     expect(data.pipeline.total).toBe(1)
   })
 
-  test('archivedFilter=all: scraped.total includes archived but pipeline.total excludes archived', async () => {
+  test('archivedFilter=all: scraped.total and pipeline.total both include archived', async () => {
     prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('A', 'Dev', 0, 1)`)
     prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('B', 'Dev', 1, 1)`)
     const res = await statsApp.request('/?archivedFilter=all', { method: 'GET' })
     const data = await res.json() as { scraped: { total: number }; pipeline: { total: number } }
     expect(data.scraped.total).toBe(2)
-    expect(data.pipeline.total).toBe(1)
+    expect(data.pipeline.total).toBe(2)
   })
 
   test('archivedFilter=all&appliedFilter=all includes all jobs in scraped', async () => {
@@ -284,26 +284,27 @@ describe('appliedFilter / archivedFilter filters', () => {
     expect(data.emails.total).toBe(1)
   })
 
-  test('unmatched email (null company) excluded when appliedFilter=applied (default)', async () => {
+  test('email with null company always included regardless of appliedFilter', async () => {
     prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, company, job_title) VALUES ('u1', '2026-01-01T00:00:00Z', 'hr@acme.com', 'Newsletter', NULL, NULL)`)
-    const res = await statsApp.request('/', { method: 'GET' })
-    const data = await res.json() as { emails: { total: number } }
-    expect(data.emails.total).toBe(0)
+    const [res1, res2] = await Promise.all([
+      statsApp.request('/', { method: 'GET' }),
+      statsApp.request('/?appliedFilter=all', { method: 'GET' }),
+    ])
+    const [d1, d2] = await Promise.all([res1.json(), res2.json()]) as { emails: { total: number } }[]
+    expect(d1.emails.total).toBe(1)
+    expect(d2.emails.total).toBe(1)
   })
 
-  test('unmatched email (null company) included when appliedFilter=all', async () => {
-    prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, company, job_title) VALUES ('u1', '2026-01-01T00:00:00Z', 'hr@acme.com', 'Newsletter', NULL, NULL)`)
-    const res = await statsApp.request('/?appliedFilter=all', { method: 'GET' })
-    const data = await res.json() as { emails: { total: number } }
-    expect(data.emails.total).toBe(1)
-  })
-
-  test('email matched to archived job excluded when archivedFilter=active (default)', async () => {
+  test('email matched to archived job always included regardless of archivedFilter', async () => {
     prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('Acme', 'Engineer', 1, 1)`)
     prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, company, job_title) VALUES ('u1', '2026-01-01T00:00:00Z', 'hr@acme.com', 'Your application', 'Acme', 'Engineer')`)
-    const res = await statsApp.request('/', { method: 'GET' })
-    const data = await res.json() as { emails: { total: number } }
-    expect(data.emails.total).toBe(0)
+    const [res1, res2] = await Promise.all([
+      statsApp.request('/', { method: 'GET' }),
+      statsApp.request('/?archivedFilter=archived', { method: 'GET' }),
+    ])
+    const [d1, d2] = await Promise.all([res1.json(), res2.json()]) as { emails: { total: number } }[]
+    expect(d1.emails.total).toBe(1)
+    expect(d2.emails.total).toBe(1)
   })
 
   test('automation runs not affected by archivedFilter or appliedFilter', async () => {

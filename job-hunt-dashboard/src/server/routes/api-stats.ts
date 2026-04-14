@@ -55,8 +55,7 @@ app.get('/', (c) => {
   const scrapedTotal = viewJobs.length
   const archivedTotal = viewJobs.filter(j => j.archived).length
 
-  // Pipeline: when 'all', keep charts focused on non-archived; otherwise viewJobs already has the right subset
-  const pipelineJobs = archivedFilter === 'all' ? viewJobs.filter(j => !j.archived) : viewJobs
+  const pipelineJobs = viewJobs
   const pipelineTotal = pipelineJobs.length
 
   const recCounts: Record<string, number> = {}
@@ -115,21 +114,10 @@ app.get('/', (c) => {
   const byStatus = Object.entries(statusCounts).map(([status, count]) => ({ status, count }))
   const responseRate = appTotal === 0 ? null : withStatus / appTotal
 
-  // Email stats — in-memory filtering against jobs matching base conditions (no date restriction)
-  const matchingJobs = db.select({ company: jobs.company, jobTitle: jobs.jobTitle })
-    .from(jobs)
-    .where(baseWhere)
-    .all()
-  const matchingJobKeys = new Set(matchingJobs.map(j => `${j.company}\x00${j.jobTitle}`))
-
-  const allEmails = datetimeCutoff
+  // Email stats — date filter only, no job/archived/applied filtering
+  const relevantEmails = datetimeCutoff
     ? db.select().from(messages).where(gte(messages.receivedAt, datetimeCutoff)).all()
     : db.select().from(messages).all()
-
-  const relevantEmails = allEmails.filter(m => {
-    if (m.company === null || m.jobTitle === null) return appliedFilter !== 'applied'
-    return matchingJobKeys.has(`${m.company}\x00${m.jobTitle}`)
-  })
 
   const emailTotal = relevantEmails.length
   const typeCounts: Record<string, number> = {}

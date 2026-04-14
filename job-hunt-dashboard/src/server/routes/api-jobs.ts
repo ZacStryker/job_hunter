@@ -48,6 +48,30 @@ app.get('/', (c) => {
   return c.json({ jobs: jobsWithLatestStatus })
 })
 
+app.get('/:id', (c) => {
+  const idParam = c.req.param('id')
+  if (!/^\d+$/.test(idParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  if (rawId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const job = db.select({
+    company: jobs.company,
+    jobTitle: jobs.jobTitle,
+    location: jobs.location,
+    jobDescription: jobs.jobDescription,
+  }).from(jobs).where(eq(jobs.id, rawId)).get()
+
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
+  }
+
+  return c.json({ job })
+})
+
 app.get('/:id/events', (c) => {
   const idParam = c.req.param('id')
   if (!/^\d+$/.test(idParam)) {

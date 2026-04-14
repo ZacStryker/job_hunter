@@ -111,5 +111,12 @@ function mapRow(headers: string[], row: string[], detailMap: Map<string, DetailR
     jobDescription: detail?.jobDescription ?? null,
     sourceUrl: get('url'),
     dateScraped: detail?.dateScraped ?? null,
+    source: get('source'),
+    location: get('location'),
+    salary: get('salary'),
+    benefits: get('benefits'),
+    contactName: get('contact_name'),
+    contactEmail: get('contact_email'),
+    contactPhone: get('contact_phone'),
   }
 }

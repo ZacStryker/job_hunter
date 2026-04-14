@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-04-07 # story 8-2 done
+last_updated: 2026-04-13 # epic 12 story 12-1 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -98,3 +98,24 @@ development_status:
   8-1-pipeline-table-date-scraped-and-status-columns: done
   8-2-archive-jobs: done
   epic-8-retrospective: optional
+
+  # Epic 9: Messages View — Inbox Email Browser
+  epic-9: in-progress
+  9-1-messages-view: done
+  epic-9-retrospective: optional
+
+  # Epic 10: Webhook History Tab
+  epic-10: in-progress
+  10-1-webhook-history-tab: done
+  epic-10-retrospective: optional
+
+  # Epic 11: Dashboard View
+  epic-11: in-progress
+  11-1-dashboard-view: done
+  11-2-dashboard-global-filters: done
+  epic-11-retrospective: optional
+
+  # Epic 12: User Profile & Resume Data
+  epic-12: in-progress
+  12-1-profile-view: done
+  epic-12-retrospective: optional

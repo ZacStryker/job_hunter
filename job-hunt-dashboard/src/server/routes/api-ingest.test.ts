@@ -44,6 +44,13 @@ const CREATE_JOBS_TABLE = `
     job_description TEXT,
     source_url TEXT,
     date_scraped TEXT,
+    source TEXT,
+    location TEXT,
+    salary TEXT,
+    benefits TEXT,
+    contact_name TEXT,
+    contact_email TEXT,
+    contact_phone TEXT,
     applied INTEGER NOT NULL DEFAULT 0,
     status TEXT,
     status_override TEXT,
@@ -129,6 +136,13 @@ const baseJob: JobInput = {
   jobDescription: 'Build and maintain scalable services',
   sourceUrl: 'https://example.com/job/1',
   dateScraped: '2026-03-29T00:00:00.000Z',
+  source: null,
+  location: null,
+  salary: null,
+  benefits: null,
+  contactName: null,
+  contactEmail: null,
+  contactPhone: null,
 }
 
 // ---------------------------------------------------------------------------
@@ -186,6 +200,13 @@ describe('upsert business logic', () => {
       jobDescription: null,
       sourceUrl: null,
       dateScraped: null,
+      source: null,
+      location: null,
+      salary: null,
+      benefits: null,
+      contactName: null,
+      contactEmail: null,
+      contactPhone: null,
     }
 
     expect(runIngest(testDb, [baseJob, job2])).toEqual({ added: 2, updated: 0 })
@@ -322,7 +343,7 @@ describe('POST /api/ingest HTTP contract (production handler)', () => {
     prodSqlite.run(
       `INSERT INTO jobs (company, job_title, applied, archived) VALUES ('Acme', 'Engineer', 0, 1)`
     )
-    const payload: JobInput[] = [{ company: 'Acme', jobTitle: 'Engineer', fitScore: 80, recommendation: 'apply', roleFit: null, requirementsMet: null, requirementsMissed: null, redFlags: null, jobDescription: null, sourceUrl: null, dateScraped: null }]
+    const payload: JobInput[] = [{ company: 'Acme', jobTitle: 'Engineer', fitScore: 80, recommendation: 'apply', roleFit: null, requirementsMet: null, requirementsMissed: null, redFlags: null, jobDescription: null, sourceUrl: null, dateScraped: null, source: null, location: null, salary: null, benefits: null, contactName: null, contactEmail: null, contactPhone: null }]
     const res = await ingestApp.request('/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

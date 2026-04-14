@@ -5,8 +5,12 @@ import { runMigrations } from './db/migrate'
 import ingestRoute from './server/routes/api-ingest'
 import syncRoute from './server/routes/api-sync'
 import jobsRoute from './server/routes/api-jobs'
+import messagesRoute from './server/routes/api-messages'
+import webhookRunsRoute from './server/routes/api-webhook-runs'
+import webhooksRoute from './server/routes/api-webhooks'
+import statsRoute from './server/routes/api-stats'
+import profileRoute from './server/routes/api-profile'
 import { errorHandler } from './server/middleware/error-handler'
-import { startImapPoller } from './server/services/imap-poller'
 
 const app = new Hono()
 
@@ -28,11 +32,14 @@ if (missingVars.length > 0) {
   process.exit(1)
 }
 
-startImapPoller()
-
 app.route('/api/ingest', ingestRoute)
 app.route('/api/sync', syncRoute)
 app.route('/api/jobs', jobsRoute)
+app.route('/api/messages', messagesRoute)
+app.route('/api/webhook-runs', webhookRunsRoute)
+app.route('/api/webhooks', webhooksRoute)
+app.route('/api/stats', statsRoute)
+app.route('/api/profile', profileRoute)
 app.onError(errorHandler)
 
 // Resolve dist/ relative to this file, not CWD — safe for any working directory

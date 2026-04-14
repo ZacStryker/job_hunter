@@ -2,7 +2,11 @@ import { ImapFlow } from 'imapflow'
 import { eq } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { messages } from '../../db/schema'
-import type { ImapCredentials } from './imap-poller'
+export interface ImapCredentials {
+  host: string
+  user: string
+  pass: string
+}
 
 const BLOCKED_SENDERS = ['zac@zacstryker.com', 'indeedapply@indeed.com']
 

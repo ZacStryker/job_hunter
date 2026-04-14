@@ -31,6 +31,13 @@ export function ingestJobs(rows: JobInput[]): { added: number; updated: number }
             jobDescription: sql`excluded.job_description`,
             sourceUrl: sql`excluded.source_url`,
             dateScraped: sql`excluded.date_scraped`,
+            source: sql`excluded.source`,
+            location: sql`excluded.location`,
+            salary: sql`excluded.salary`,
+            benefits: sql`excluded.benefits`,
+            contactName: sql`excluded.contact_name`,
+            contactEmail: sql`excluded.contact_email`,
+            contactPhone: sql`excluded.contact_phone`,
           },
         })
         .run()

@@ -21,6 +21,13 @@ const CREATE_JOBS_TABLE = `
     job_description TEXT,
     source_url TEXT,
     date_scraped TEXT,
+    source TEXT,
+    location TEXT,
+    salary TEXT,
+    benefits TEXT,
+    contact_name TEXT,
+    contact_email TEXT,
+    contact_phone TEXT,
     applied INTEGER NOT NULL DEFAULT 0,
     status TEXT,
     status_override TEXT,
@@ -41,13 +48,29 @@ const CREATE_STATUS_EVENTS_TABLE = `
   )
 `
 
+const CREATE_MESSAGES_TABLE = `
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uid TEXT NOT NULL UNIQUE,
+    message_id TEXT UNIQUE,
+    received_at TEXT NOT NULL,
+    from_address TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    type TEXT,
+    company TEXT,
+    job_title TEXT
+  )
+`
+
 beforeAll(() => {
   prodSqlite.run(CREATE_JOBS_TABLE)
   prodSqlite.run(CREATE_STATUS_EVENTS_TABLE)
+  prodSqlite.run(CREATE_MESSAGES_TABLE)
 })
 
 beforeEach(() => {
   prodSqlite.run('DELETE FROM status_events')
+  prodSqlite.run('DELETE FROM messages')
   prodSqlite.run('DELETE FROM jobs')
 })
 
@@ -307,6 +330,113 @@ describe('GET /api/jobs/:id/events', () => {
 
     expect(count.n).toBe(1)
   })
+
+  test('returns message-based events for matching company+jobTitle', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Engineer', 0)`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Acme') as { id: number }
+    prodSqlite.run(
+      `INSERT INTO messages (uid, received_at, from_address, subject, type, company, job_title)
+       VALUES ('uid1', '2026-04-08T10:00:00.000Z', 'hr@acme.com', 'Your application', 'Rejected', 'Acme', 'Engineer')`
+    )
+
+    const res = await jobsApp.request(`/${row.id}/events`, { method: 'GET' })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { events: { status: string; source: string; timestamp: string }[] }
+    expect(data.events).toHaveLength(1)
+    expect(data.events[0].status).toBe('Rejected')
+    expect(data.events[0].source).toBe('email')
+    expect(data.events[0].timestamp).toBe('2026-04-08T10:00:00.000Z')
+  })
+
+  test('does not return messages with null type', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Engineer', 0)`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Acme') as { id: number }
+    prodSqlite.run(
+      `INSERT INTO messages (uid, received_at, from_address, subject, type, company, job_title)
+       VALUES ('uid1', '2026-04-08T10:00:00.000Z', 'hr@acme.com', 'Your application', NULL, 'Acme', 'Engineer')`
+    )
+
+    const res = await jobsApp.request(`/${row.id}/events`, { method: 'GET' })
+    const data = await res.json() as { events: unknown[] }
+    expect(data.events).toHaveLength(0)
+  })
+
+  test('does not return messages for different company or jobTitle', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Engineer', 0)`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Acme') as { id: number }
+    prodSqlite.run(
+      `INSERT INTO messages (uid, received_at, from_address, subject, type, company, job_title)
+       VALUES ('uid1', '2026-04-08T10:00:00.000Z', 'hr@other.com', 'Re: application', 'Interview', 'OtherCo', 'Engineer')`
+    )
+
+    const res = await jobsApp.request(`/${row.id}/events`, { method: 'GET' })
+    const data = await res.json() as { events: unknown[] }
+    expect(data.events).toHaveLength(0)
+  })
+
+  test('merges manual events and message events sorted by timestamp desc', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Engineer', 0)`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Acme') as { id: number }
+    prodSqlite.run(
+      `INSERT INTO status_events (job_id, status, timestamp, source) VALUES (?, 'phone_screen', '2026-04-07T09:00:00.000Z', 'manual')`,
+      [row.id]
+    )
+    prodSqlite.run(
+      `INSERT INTO messages (uid, received_at, from_address, subject, type, company, job_title)
+       VALUES ('uid1', '2026-04-09T10:00:00.000Z', 'hr@acme.com', 'Interview invite', 'Interview', 'Acme', 'Engineer')`
+    )
+
+    const res = await jobsApp.request(`/${row.id}/events`, { method: 'GET' })
+    const data = await res.json() as { events: { status: string; source: string }[] }
+    expect(data.events).toHaveLength(2)
+    expect(data.events[0].status).toBe('Interview')
+    expect(data.events[0].source).toBe('email')
+    expect(data.events[1].status).toBe('phone_screen')
+    expect(data.events[1].source).toBe('manual')
+  })
+})
+
+describe('GET /api/jobs/:id', () => {
+  test('returns 200 with company, jobTitle, location, and jobDescription', async () => {
+    prodSqlite.run(
+      `INSERT INTO jobs (company, job_title, location, job_description, applied) VALUES ('Acme', 'Engineer', 'Remote', 'Build things', 0)`
+    )
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Acme') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, { method: 'GET' })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { job: Record<string, unknown> }
+    expect(data).toHaveProperty('job')
+    expect(data.job.company).toBe('Acme')
+    expect(data.job.jobTitle).toBe('Engineer')
+    expect(data.job.location).toBe('Remote')
+    expect(data.job.jobDescription).toBe('Build things')
+    expect(Object.keys(data.job)).toHaveLength(4)
+  })
+
+  test('returns null for missing optional fields', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Beta', 'Dev', 0)`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Beta') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, { method: 'GET' })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { job: Record<string, unknown> }
+    expect(data.job.location).toBeNull()
+    expect(data.job.jobDescription).toBeNull()
+  })
+
+  test('returns 404 with error key for non-existent job', async () => {
+    const res = await jobsApp.request('/99999', { method: 'GET' })
+    expect(res.status).toBe(404)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    expect(data).not.toHaveProperty('message')
+  })
+
+  test('returns 400 with error key for non-numeric id', async () => {
+    const res = await jobsApp.request('/abc', { method: 'GET' })
+    expect(res.status).toBe(400)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+  })
 })
 
 describe('GET /api/jobs', () => {
@@ -343,27 +473,37 @@ describe('GET /api/jobs', () => {
     expect(job.latestStatus).toBeNull()
   })
 
-  test('latestStatus is null when job has no status events', async () => {
+  test('latestStatus is null when job has no messages', async () => {
     prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Eng', 0)`)
     const res = await jobsApp.request('/', { method: 'GET' })
     const data = await res.json() as { jobs: Record<string, unknown>[] }
     expect(data.jobs[0].latestStatus).toBeNull()
   })
 
-  test('latestStatus reflects the most recent status event', async () => {
+  test('latestStatus reflects the most recent message type', async () => {
     prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Eng', 0)`)
-    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Acme') as { id: number }
     prodSqlite.run(
-      `INSERT INTO status_events (job_id, status, timestamp) VALUES (?, 'phone_screen', '2026-04-06T10:00:00.000Z')`,
-      [row.id]
+      `INSERT INTO messages (uid, received_at, from_address, subject, type, company, job_title)
+       VALUES ('uid1', '2026-04-06T10:00:00.000Z', 'hr@acme.com', 'App received', 'Submitted', 'Acme', 'Eng')`
     )
     prodSqlite.run(
-      `INSERT INTO status_events (job_id, status, timestamp) VALUES (?, 'interview', '2026-04-07T10:00:00.000Z')`,
-      [row.id]
+      `INSERT INTO messages (uid, received_at, from_address, subject, type, company, job_title)
+       VALUES ('uid2', '2026-04-07T10:00:00.000Z', 'hr@acme.com', 'Next steps', 'Screening', 'Acme', 'Eng')`
     )
     const res = await jobsApp.request('/', { method: 'GET' })
     const data = await res.json() as { jobs: Record<string, unknown>[] }
-    expect(data.jobs[0].latestStatus).toBe('interview')
+    expect(data.jobs[0].latestStatus).toBe('Screening')
+  })
+
+  test('latestStatus is null when all matching messages have null type', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Eng', 0)`)
+    prodSqlite.run(
+      `INSERT INTO messages (uid, received_at, from_address, subject, type, company, job_title)
+       VALUES ('uid1', '2026-04-06T10:00:00.000Z', 'hr@acme.com', 'FYI', NULL, 'Acme', 'Eng')`
+    )
+    const res = await jobsApp.request('/', { method: 'GET' })
+    const data = await res.json() as { jobs: Record<string, unknown>[] }
+    expect(data.jobs[0].latestStatus).toBeNull()
   })
 })
 

@@ -12,8 +12,10 @@ export async function callN8nWebhook(job: Job): Promise<string> {
   }
 
   const payload = {
+    company: job.company,
+    job_title: job.jobTitle,
+    location: job.location ?? '',
     job_description: job.jobDescription,
-    source: '',
     job_url: job.sourceUrl ?? '',
     notes: '',
   }
@@ -29,11 +31,19 @@ export async function callN8nWebhook(job: Job): Promise<string> {
     throw new Error(`n8n webhook returned ${response.status}`)
   }
 
-  const raw = await response.json()
-  const data = (Array.isArray(raw) ? raw[0] : raw) as { cover_letter?: string }
-  const coverLetter = data.cover_letter
-  if (!coverLetter) {
-    throw new Error('n8n response missing cover_letter field')
+  const contentType = response.headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    const raw = await response.json()
+    const data = (Array.isArray(raw) ? raw[0] : raw) as { cover_letter?: string }
+    const coverLetter = data.cover_letter
+    if (!coverLetter) {
+      throw new Error('n8n response missing cover_letter field')
+    }
+    return coverLetter
   }
-  return coverLetter
+  const text = (await response.text()).trim()
+  if (!text) {
+    throw new Error('n8n returned empty cover letter')
+  }
+  return text
 }

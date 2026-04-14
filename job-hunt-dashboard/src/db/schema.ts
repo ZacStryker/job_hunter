@@ -48,6 +48,29 @@ export const statusEvents = sqliteTable('status_events', {
   source: text('source').notNull().default('manual'),
 })
 
+export const webhookRuns = sqliteTable('webhook_runs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  runAt: text('run_at').notNull(),          // ISO 8601 datetime
+  success: integer('success', { mode: 'boolean' }).notNull(),
+  itemCount: integer('item_count'),          // nullable — null when unknown
+  errorMessage: text('error_message'),       // nullable — set only on failure
+})
+
+export const profile = sqliteTable('profile', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name'),
+  email: text('email'),
+  phone: text('phone'),
+  location: text('location'),
+  linkedinUrl: text('linkedin_url'),
+  githubUrl: text('github_url'),
+  summary: text('summary'),
+  experience: text('experience'),
+  skills: text('skills'),
+  education: text('education'),
+})
+
 export const messages = sqliteTable('messages', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   uid: text('uid').notNull().unique(), // IMAP UID — dedup key (folder:uid)

@@ -258,3 +258,10 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - **`matchingJobKeys` null-key collision** [`api-stats.ts`] — If a job has `company=null` or `jobTitle=null`, the `\x00`-separated key becomes `"null\x00..."`, which could false-match an email for a company literally named `"null"`. Pre-existing from story 11-2.
 - **`dateApplied` NULL excluded by period filter** [`api-stats.ts`] — Jobs with `applied=true` but `dateApplied=null` are silently excluded from period-filtered application stats because `gte(jobs.dateApplied, dateCutoff)` rejects nulls. Pre-existing behaviour.
 - **Inconsistent period cutoff columns across metrics** [`api-stats.ts`] — Pipeline uses `dateScraped`, applications use `dateApplied`, emails use `receivedAt`. Pre-existing design; a job scraped long ago but applied recently can appear in applications but not scraped count for the same period window.
+
+## Deferred from: code review of 12-1-profile-view (2026-04-13)
+
+- **Loader `fetchProfile` error surfaces as raw error boundary crash** [`src/client/lib/router.ts`] — No `errorComponent` configured on `profileRoute` (or any route). `fetchProfile` throwing (network, Zod parse failure) crashes the subtree. Pre-existing systemic pattern across all routes.
+- **Empty string stored via direct API shows blank instead of `—`** [`src/client/routes/profile.tsx`] — `{data?.name ?? '—'}` only guards null/undefined; `""` renders blank. The UI converts empty to null on save, but direct API callers (curl, n8n) can store empty strings. Low priority for single-user localhost app.
+- **`archivedTotal` always 0 when `archivedFilter=active`** [`src/server/routes/api-stats.ts`] — `viewJobs` is pre-filtered to exclude archived, so `viewJobs.filter(j => j.archived).length` is always 0 in the default view. Dashboard "Archives" KPI is misleading at default filter. Pre-existing.
+- **`sheets-sync` new contact field header name assumptions** [`src/server/services/sheets-sync.ts`] — `get('contact_name')`, `get('contact_email')`, `get('contact_phone')` return null if the Google Sheet columns don't use those exact header names. Silent data gap with no warning.

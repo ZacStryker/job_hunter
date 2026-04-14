@@ -28,3 +28,9 @@ Thumbs.db
 npm-debug.log*
 
 # bun.lockb is committed (do not gitignore)
+
+# Screenshots / dev utilities
+screenshot.py
+screenshot.sh
+screenshot.ts
+screenshots/

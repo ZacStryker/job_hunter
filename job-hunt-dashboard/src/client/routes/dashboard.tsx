@@ -243,7 +243,11 @@ export function DashboardRoute() {
           <div className="grid grid-cols-6 gap-3">
             <StatCard label="Scrapes" value={String(data.scraped.total)} />
             <StatCard label="Archives" value={String(data.archived.total)} />
-            <StatCard label="Matches" value={String(data.pipeline.total)} />
+            <StatCard label="Matches" value={String(
+              data.pipeline.byRecommendation
+                .filter(r => r.name === 'apply' || r.name === 'investigate')
+                .reduce((sum, r) => sum + r.value, 0)
+            )} />
             <StatCard label="Applications" value={String(data.applications.total)} />
             <StatCard
               label="Response Rate"

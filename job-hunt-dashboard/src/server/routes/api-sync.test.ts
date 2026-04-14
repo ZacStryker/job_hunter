@@ -51,6 +51,13 @@ describe('POST /api/sync', () => {
         jobDescription: null,
         sourceUrl: null,
         dateScraped: null,
+        source: null,
+        location: null,
+        salary: null,
+        benefits: null,
+        contactName: null,
+        contactEmail: null,
+        contactPhone: null,
       },
       {
         company: 'Beta',
@@ -64,6 +71,13 @@ describe('POST /api/sync', () => {
         jobDescription: null,
         sourceUrl: null,
         dateScraped: null,
+        source: null,
+        location: null,
+        salary: null,
+        benefits: null,
+        contactName: null,
+        contactEmail: null,
+        contactPhone: null,
       },
     ])
     mockIngestJobs = () => ({ added: 2, updated: 1 })

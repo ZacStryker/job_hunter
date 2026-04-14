@@ -125,6 +125,33 @@ export const statsSchema = z.object({
 })
 export type Stats = z.infer<typeof statsSchema>
 
+export const profileSchema = z.object({
+  id: z.number().int(),
+  name: z.string().nullable(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  location: z.string().nullable(),
+  linkedinUrl: z.string().nullable(),
+  githubUrl: z.string().nullable(),
+  summary: z.string().nullable(),
+  experience: z.string().nullable(),
+  skills: z.string().nullable(),
+  education: z.string().nullable(),
+})
+
+export const profileInputSchema = profileSchema.omit({ id: true })
+
+export type Profile = z.infer<typeof profileSchema>
+export type ProfileInput = z.infer<typeof profileInputSchema>
+
+export const jobDetailSchema = jobSchema.pick({
+  company: true,
+  jobTitle: true,
+  location: true,
+  jobDescription: true,
+})
+export type JobDetail = z.infer<typeof jobDetailSchema>
+
 export type Job = z.infer<typeof jobSchema>
 export type JobInput = z.infer<typeof jobInputSchema>
 export type IngestPayload = z.infer<typeof ingestPayloadSchema>

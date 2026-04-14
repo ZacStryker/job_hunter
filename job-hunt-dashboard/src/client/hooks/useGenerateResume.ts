@@ -1,13 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { CoverLetter } from '@shared/schemas'
 
-export function useGenerateCoverLetter(jobId: number) {
+export function useGenerateResume(jobId: number) {
   const queryClient = useQueryClient()
 
-  return useMutation<CoverLetter, Error>({
+  return useMutation<void, Error>({
     mutationFn: async () => {
       if (!jobId) throw new Error('No job selected')
-      const res = await fetch(`/api/jobs/${jobId}/generate-cover-letter`, { method: 'POST' })
+      const res = await fetch(`/api/jobs/${jobId}/generate-resume`, { method: 'POST' })
       if (!res.ok) {
         let message = `HTTP ${res.status}`
         try {
@@ -18,15 +17,9 @@ export function useGenerateCoverLetter(jobId: number) {
         }
         throw new Error(message)
       }
-      const data = await res.json() as { coverLetter: CoverLetter }
-      return data.coverLetter
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['webhook-runs'] })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
-      queryClient.invalidateQueries({ queryKey: ['coverLetter', jobId] })
     },
   })
 }

@@ -77,6 +77,14 @@ export function Layout() {
         {/* View tabs — center */}
         <nav className="flex-1 flex justify-center gap-1">
           <Link
+            to="/dashboard"
+            className="px-3 py-1.5 text-sm transition-colors"
+            activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
+            inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
+          >
+            Dashboard
+          </Link>
+          <Link
             to="/"
             className="px-3 py-1.5 text-sm transition-colors"
             activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
@@ -115,6 +123,14 @@ export function Layout() {
             inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
           >
             Logs
+          </Link>
+          <Link
+            to="/profile"
+            className="px-3 py-1.5 text-sm transition-colors"
+            activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
+            inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
+          >
+            Profile
           </Link>
         </nav>
 

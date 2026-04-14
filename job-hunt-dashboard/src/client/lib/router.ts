@@ -1,5 +1,6 @@
 import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
 import { Layout } from '../components/shared/Layout'
+import { DashboardRoute } from '../routes/dashboard'
 import { PipelineRoute } from '../routes/index'
 import { TrackerRoute } from '../routes/tracker'
 import { ArchivedRoute } from '../routes/archived'
@@ -7,9 +8,17 @@ import { MessagesRoute } from '../routes/messages'
 import { HistoryRoute } from '../routes/history'
 import { queryClient } from './query-client'
 import { fetchJobs } from '../hooks/useJobsQuery'
+import { ProfileRoute } from '../routes/profile'
+import { fetchProfile } from '../hooks/useProfileQuery'
 
 const rootRoute = createRootRoute({
   component: Layout,
+})
+
+const dashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dashboard',
+  component: DashboardRoute,
 })
 
 const indexRoute = createRoute({
@@ -46,7 +55,14 @@ const historyRoute = createRoute({
   component: HistoryRoute,
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, trackerRoute, archivedRoute, messagesRoute, historyRoute])
+const profileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/profile',
+  component: ProfileRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['profile'], queryFn: fetchProfile }),
+})
+
+const routeTree = rootRoute.addChildren([dashboardRoute, indexRoute, trackerRoute, archivedRoute, messagesRoute, historyRoute, profileRoute])
 
 export const router = createRouter({ routeTree })
 

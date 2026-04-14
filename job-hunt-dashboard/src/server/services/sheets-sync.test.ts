@@ -54,6 +54,13 @@ test('valid spreadsheet response → returns correctly mapped JobInput[]', async
     jobDescription: 'Job desc',
     sourceUrl: 'https://example.com',
     dateScraped: '2026-03-01',
+    source: null,
+    location: null,
+    salary: null,
+    benefits: null,
+    contactName: null,
+    contactEmail: null,
+    contactPhone: null,
   })
 
   expect(jobs[1].company).toBe('Beta Inc')
