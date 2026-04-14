@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-04-14 # epic 13 stories scoped and added to backlog
+last_updated: 2026-04-14 # 13-1 story enriched and moved to ready-for-dev
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -121,8 +121,8 @@ development_status:
   epic-12-retrospective: optional
 
   # Epic 13: Remove n8n & Google Sheets — Self-Contained Pipeline
-  epic-13: backlog
-  13-1-remove-google-sheets-integration: backlog
+  epic-13: in-progress
+  13-1-remove-google-sheets-integration: ready-for-dev
   13-2-schema-analysis-status-and-external-job-id: backlog
   13-3-discovery-service-scraper-to-db: backlog
   13-4-analysis-service-db-scraper-anthropic: backlog
