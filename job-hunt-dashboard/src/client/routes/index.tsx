@@ -61,7 +61,7 @@ export function PipelineRoute() {
   const bulkArchiveMutation = useBulkArchiveMutation()
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
 
-  const activeJobs = (jobs ?? []).filter(j => !j.archived && j.analysisStatus !== 'done')
+  const activeJobs = (jobs ?? []).filter(j => !j.archived && j.fitScore == null)
 
   useEffect(() => {
     if (selectedJobId !== null && !activeJobs.find((j) => j.id === selectedJobId)) {
