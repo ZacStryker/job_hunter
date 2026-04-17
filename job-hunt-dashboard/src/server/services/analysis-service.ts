@@ -150,6 +150,7 @@ export async function runAnalysis(): Promise<{ processed: number; failed: number
           contactEmail: result.contact_email ?? null,
           contactPhone: result.contact_phone ?? null,
           analysisStatus: 'done',
+          dateAnalyzed: new Date().toLocaleDateString('en-CA'),
           ...(result.recommended_action === 'skip' ? { archived: true } : {}),
         })
         .where(eq(jobs.id, job.id))

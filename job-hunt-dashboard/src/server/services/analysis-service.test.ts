@@ -18,6 +18,7 @@ const CREATE_JOBS_TABLE = `
     location TEXT,
     external_job_id TEXT,
     analysis_status TEXT,
+    date_analyzed TEXT,
     fit_score INTEGER,
     recommendation TEXT,
     role_fit TEXT,
@@ -153,6 +154,7 @@ describe('runAnalysis()', () => {
       .get(id) as Record<string, unknown>
 
     expect(row.analysis_status).toBe('done')
+    expect(row.date_analyzed).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(row.fit_score).toBe(85)
     expect(row.recommendation).toBe('apply')
     expect(row.role_fit).toBe('Strong match for senior dev role')

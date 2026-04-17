@@ -35,6 +35,7 @@ export function MatchesRoute() {
           jobs={matchedJobs}
           onRowClick={(job) => setSelectedJobId(job.id === selectedJobId ? null : job.id)}
           selectedJobId={selectedJobId}
+          fixedColumns={['company', 'jobTitle', 'fitScore', 'recommendation', 'date_analyzed', 'notes']}
         />
       </div>
       <JobDrawer

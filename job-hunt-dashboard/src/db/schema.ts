@@ -13,6 +13,7 @@ export const jobs = sqliteTable('jobs', {
   externalJobId: text('external_job_id'),
   // Analysis-owned (set by Analysis service — never overwrite on ingest)
   analysisStatus: text('analysis_status'),
+  dateAnalyzed: text('date_analyzed'),
   fitScore: integer('fit_score'),
   recommendation: text('recommendation'),
   roleFit: text('role_fit'),

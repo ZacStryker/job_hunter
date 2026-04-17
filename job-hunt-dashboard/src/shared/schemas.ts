@@ -36,6 +36,7 @@ export const jobSchema = jobInputSchema.extend({
   archived: z.boolean(),
   resumeGeneratedAt: z.string().nullable(),
   latestStatus: z.string().nullable(),
+  dateAnalyzed: z.string().nullable(),
 })
 
 // POST /api/ingest body — array of scraper-sourced records

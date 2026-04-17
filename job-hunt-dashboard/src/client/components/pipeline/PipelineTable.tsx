@@ -54,6 +54,18 @@ const staticColumns = [
     header: 'Recommendation',
     cell: (info) => <ActionChip recommendation={info.getValue()} />,
   }),
+  columnHelper.accessor('dateAnalyzed', {
+    id: 'date_analyzed',
+    header: 'Date Analyzed',
+    cell: (info) => {
+      const v = info.getValue()
+      return v ? (
+        <span className="text-zinc-300">{v.slice(0, 10)}</span>
+      ) : (
+        <span className="text-zinc-500">—</span>
+      )
+    },
+  }),
   columnHelper.accessor('roleFit', {
     id: 'notes',
     header: 'Notes',
