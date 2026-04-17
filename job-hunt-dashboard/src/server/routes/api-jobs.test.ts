@@ -23,6 +23,8 @@ const CREATE_JOBS_TABLE = `
     date_scraped TEXT,
     source TEXT,
     location TEXT,
+    external_job_id TEXT,
+    analysis_status TEXT,
     salary TEXT,
     benefits TEXT,
     contact_name TEXT,
@@ -34,6 +36,7 @@ const CREATE_JOBS_TABLE = `
     cover_letter_sent_at TEXT,
     date_applied TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
+    resume_generated_at TEXT,
     UNIQUE(company, job_title)
   )
 `

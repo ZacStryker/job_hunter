@@ -1,0 +1,47 @@
+import { useState, useEffect } from 'react'
+import { useJobsQuery } from '../hooks/useJobsQuery'
+import { PipelineTable } from '../components/pipeline/PipelineTable'
+import { JobDrawer } from '../components/detail/JobDrawer'
+
+export function MatchesRoute() {
+  const { data: jobs = [] } = useJobsQuery()
+  const matchedJobs = jobs.filter(
+    j => !j.archived && j.analysisStatus === 'done' && (j.recommendation === 'apply' || j.recommendation === 'investigate')
+  )
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (selectedJobId !== null && !matchedJobs.find(j => j.id === selectedJobId)) {
+      setSelectedJobId(null)
+    }
+  }, [matchedJobs, selectedJobId])
+
+  if (matchedJobs.length === 0) {
+    return (
+      <div className="p-4">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
+          <div className="flex items-center justify-center py-16 px-4">
+            <p className="text-sm text-zinc-400">No matches yet. Run analysis to populate matches.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div className="p-4">
+        <PipelineTable
+          jobs={matchedJobs}
+          onRowClick={(job) => setSelectedJobId(job.id === selectedJobId ? null : job.id)}
+          selectedJobId={selectedJobId}
+        />
+      </div>
+      <JobDrawer
+        job={matchedJobs.find(j => j.id === selectedJobId) ?? null}
+        open={selectedJobId !== null}
+        onClose={() => setSelectedJobId(null)}
+      />
+    </>
+  )
+}

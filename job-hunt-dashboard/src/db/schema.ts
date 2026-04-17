@@ -2,9 +2,17 @@ import { integer, text, sqliteTable, uniqueIndex } from 'drizzle-orm/sqlite-core
 
 export const jobs = sqliteTable('jobs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  // Sheets-owned (overwritten on every sync — do NOT protect)
+  // Scraper-owned (refreshed on every ingest)
   company: text('company').notNull(),
   jobTitle: text('job_title').notNull(),
+  sourceUrl: text('source_url'),
+  dateScraped: text('date_scraped'),
+  source: text('source'),
+  location: text('location'),
+  // Scraper/pipeline (set on INSERT — never overwritten on conflict)
+  externalJobId: text('external_job_id'),
+  // Analysis-owned (set by Analysis service — never overwrite on ingest)
+  analysisStatus: text('analysis_status'),
   fitScore: integer('fit_score'),
   recommendation: text('recommendation'),
   roleFit: text('role_fit'),
@@ -12,23 +20,19 @@ export const jobs = sqliteTable('jobs', {
   requirementsMissed: text('requirements_missed'),
   redFlags: text('red_flags'),
   jobDescription: text('job_description'),
-  sourceUrl: text('source_url'),
-  dateScraped: text('date_scraped'),
-  source: text('source'),
-  location: text('location'),
   salary: text('salary'),
   benefits: text('benefits'),
   contactName: text('contact_name'),
   contactEmail: text('contact_email'),
   contactPhone: text('contact_phone'),
-  // User-owned (NEVER overwritten on sync — protected by ON CONFLICT clause in Story 2.1)
+  // User-owned (NEVER overwritten on ingest — protected by ON CONFLICT clause)
   applied: integer('applied', { mode: 'boolean' }).notNull().default(false),
   status: text('status'),
   statusOverride: text('status_override'),
   coverLetterSentAt: text('cover_letter_sent_at'),
   dateApplied: text('date_applied'),
-  // User-owned (NEVER overwritten on sync — protected by ON CONFLICT clause in Story 2.1)
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+  resumeGeneratedAt: text('resume_generated_at'),
 }, (table) => [
   uniqueIndex('company_job_title_idx').on(table.company, table.jobTitle),
 ])
@@ -82,4 +86,11 @@ export const messages = sqliteTable('messages', {
   type: text('type'),     // null | 'Submitted' | 'Rejected' | 'Screening' | 'Interview' | 'Offer' | 'Other'
   company: text('company'),
   jobTitle: text('job_title'),
+})
+
+export const prompts = sqliteTable('prompts', {
+  flow: text('flow').primaryKey(),
+  systemPrompt: text('system_prompt'),
+  userMessage: text('user_message').notNull(),
+  updatedAt: text('updated_at').notNull(),
 })

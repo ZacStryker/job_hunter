@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// Sheets-sourced input record (no id, no user-owned fields)
+// Scraper-sourced input record (no id, no user-owned fields)
 // Used for POST /api/ingest payload validation
 export const jobInputSchema = z.object({
   company: z.string(),
@@ -21,6 +21,8 @@ export const jobInputSchema = z.object({
   contactName: z.string().nullable(),
   contactEmail: z.string().nullable(),
   contactPhone: z.string().nullable(),
+  analysisStatus: z.enum(['pending', 'analyzing', 'done', 'failed']).nullable(),
+  externalJobId: z.string().nullable(),
 })
 
 // Full Job record — as returned by GET /api/jobs and used throughout client
@@ -32,13 +34,14 @@ export const jobSchema = jobInputSchema.extend({
   coverLetterSentAt: z.string().nullable(),
   dateApplied: z.string().nullable(),
   archived: z.boolean(),
+  resumeGeneratedAt: z.string().nullable(),
   latestStatus: z.string().nullable(),
 })
 
-// POST /api/ingest body — array of Sheets-sourced records
+// POST /api/ingest body — array of scraper-sourced records
 export const ingestPayloadSchema = z.array(jobInputSchema)
 
-// Success response for POST /api/ingest and POST /api/sync
+// Success response for POST /api/ingest
 export const syncResultSchema = z.object({
   added: z.number().int(),
   updated: z.number().int(),
@@ -158,3 +161,20 @@ export type IngestPayload = z.infer<typeof ingestPayloadSchema>
 export type SyncResult = z.infer<typeof syncResultSchema>
 export type StatusEvent = z.infer<typeof statusEventSchema>
 export type Message = z.infer<typeof messageSchema>
+
+export const PROMPT_FLOWS = ['analysis', 'cover_letter', 'resume'] as const
+export const promptFlowSchema = z.enum(PROMPT_FLOWS)
+export const promptSchema = z.object({
+  flow: promptFlowSchema,
+  systemPrompt: z.string().nullable(),
+  userMessage: z.string(),
+  updatedAt: z.string().nullable(),
+  isCustom: z.boolean(),
+})
+export const promptInputSchema = z.object({
+  systemPrompt: z.string().nullable(),
+  userMessage: z.string().min(1).refine(s => s.trim().length > 0, { message: 'userMessage must not be blank' }),
+})
+export type Prompt = z.infer<typeof promptSchema>
+export type PromptInput = z.infer<typeof promptInputSchema>
+export type PromptFlow = z.infer<typeof promptFlowSchema>

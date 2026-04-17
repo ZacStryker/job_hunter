@@ -1,49 +1,64 @@
+import { db } from '../../db/client'
+import { profile } from '../../db/schema'
+import { loadEffectivePrompt } from './prompt-defaults'
 import type { Job } from '../../shared/schemas'
 
-export async function callN8nWebhook(job: Job): Promise<string> {
-  const webhookUrl = process.env.N8N_WEBHOOK_URL
-  if (!webhookUrl) {
-    throw new Error('N8N_WEBHOOK_URL not configured')
-  }
+interface AnthropicResponse {
+  content: Array<{ type: string; text: string }>
+}
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (process.env.N8N_WEBHOOK_SECRET) {
-    headers['Authorization'] = `Bearer ${process.env.N8N_WEBHOOK_SECRET}`
-  }
+export async function generateCoverLetter(job: Job): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
-  const payload = {
-    company: job.company,
-    job_title: job.jobTitle,
-    location: job.location ?? '',
-    job_description: job.jobDescription,
-    job_url: job.sourceUrl ?? '',
-    notes: '',
-  }
+  const profileRow = db.select().from(profile).limit(1).get() ?? null
+  const promptConfig = loadEffectivePrompt('cover_letter')
 
-  const response = await fetch(webhookUrl, {
+  const profileText =
+    'Name: ' + (profileRow?.name ?? '') + '\n' +
+    'Email: ' + (profileRow?.email ?? '') + '\n' +
+    'Phone: ' + (profileRow?.phone ?? '') + '\n' +
+    'Location: ' + (profileRow?.location ?? '') + '\n' +
+    'LinkedIn: ' + (profileRow?.linkedinUrl ?? '') + '\n' +
+    'Website: ' + (profileRow?.githubUrl ?? '') + '\n' +
+    'Summary: ' + (profileRow?.summary ?? '') + '\n' +
+    'Experience: ' + (profileRow?.experience ?? '') + '\n' +
+    'Skills: ' + (profileRow?.skills ?? '') + '\n' +
+    'Education: ' + (profileRow?.education ?? '')
+
+  const systemPrompt = (promptConfig.systemPrompt ?? '')
+    .replaceAll('{{CANDIDATE_PROFILE}}', profileText)
+
+  const jobDetails =
+    'Role: Company: ' + job.company +
+    ' Title: ' + job.jobTitle +
+    ' Location: ' + (job.location ?? '') +
+    ' Description: ' + (job.jobDescription ?? '')
+
+  const userMessage = promptConfig.userMessage
+    .replaceAll('{{JOB_DETAILS}}', jobDetails)
+
+  const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(60_000),
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+    signal: AbortSignal.timeout(120_000),
   })
 
-  if (!response.ok) {
-    throw new Error(`n8n webhook returned ${response.status}`)
-  }
+  if (!anthropicRes.ok) throw new Error(`Anthropic error ${anthropicRes.status}`)
 
-  const contentType = response.headers.get('content-type') ?? ''
-  if (contentType.includes('application/json')) {
-    const raw = await response.json()
-    const data = (Array.isArray(raw) ? raw[0] : raw) as { cover_letter?: string }
-    const coverLetter = data.cover_letter
-    if (!coverLetter) {
-      throw new Error('n8n response missing cover_letter field')
-    }
-    return coverLetter
-  }
-  const text = (await response.text()).trim()
-  if (!text) {
-    throw new Error('n8n returned empty cover letter')
-  }
-  return text
+  const data = await anthropicRes.json() as AnthropicResponse
+  const coverLetter = data.content.find((b) => b.type === 'text')?.text?.trim() ?? ''
+  if (!coverLetter) throw new Error('Anthropic returned empty cover letter')
+
+  return coverLetter
 }

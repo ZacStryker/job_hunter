@@ -1,0 +1,167 @@
+import { eq } from 'drizzle-orm'
+import { db } from '../../db/client'
+import { jobs, profile } from '../../db/schema'
+import { loadEffectivePrompt } from './prompt-defaults'
+
+interface AnthropicMessage {
+  content: Array<{ type: string; text: string }>
+}
+
+interface AnalysisResult {
+  score: number
+  role_fit: string
+  red_flags: string
+  requirements_met: string
+  requirements_missed: string
+  salary: string
+  benefits: string
+  contact_name: string
+  contact_email: string
+  contact_phone: string
+  recommended_action: string
+}
+
+function applyAnalysisTemplate(
+  template: string,
+  candidateName: string,
+  profileJson: string,
+  jobJson: string
+): string {
+  return template
+    .replaceAll('{{CANDIDATE_NAME}}', candidateName)
+    .replaceAll('{{CANDIDATE_PROFILE_JSON}}', profileJson)
+    .replaceAll('{{JOB_LISTING_JSON}}', jobJson)
+}
+
+export async function runAnalysis(): Promise<{ processed: number; failed: number }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
+
+  const scraperUrl = process.env.SCRAPER_URL
+  const scraperToken = process.env.SCRAPER_TOKEN
+
+  // Fetch profile once before the loop
+  const profileRow = db.select().from(profile).limit(1).get() ?? null
+
+  // Load prompt config once before the loop
+  const promptConfig = loadEffectivePrompt('analysis')
+
+  // Query up to 10 pending jobs
+  const pendingJobs = db
+    .select()
+    .from(jobs)
+    .where(eq(jobs.analysisStatus, 'pending'))
+    .limit(10)
+    .all()
+
+  let processed = 0
+  let failed = 0
+
+  for (const job of pendingJobs) {
+    // Mark as analyzing before any external call
+    db.update(jobs).set({ analysisStatus: 'analyzing' }).where(eq(jobs.id, job.id)).run()
+
+    try {
+      // Step 1: Fetch description from scraper — failure is non-fatal, continues with empty description
+      let description = ''
+      if (scraperUrl && job.sourceUrl) {
+        try {
+          const scraperRes = await fetch(`${scraperUrl}/scrape/listing`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(scraperToken ? { Authorization: `Bearer ${scraperToken}` } : {}),
+            },
+            body: JSON.stringify({ source: job.source, url: job.sourceUrl }),
+            signal: AbortSignal.timeout(60_000),
+          })
+          if (!scraperRes.ok) throw new Error(`Scraper HTTP ${scraperRes.status}`)
+          const scraperData = await scraperRes.json() as { description?: string }
+          description = scraperData.description?.replace(/[\r\n]+/g, ' ').trim() ?? ''
+        } catch (scraperErr) {
+          console.error(`[analysis] scraper failed for job ${job.id}:`, scraperErr instanceof Error ? scraperErr.message : String(scraperErr))
+          // Continue to Anthropic with empty description — scraper failure is not job failure
+        }
+      }
+
+      // Step 2: Build prompt via template substitution
+      const candidateName = profileRow?.name ?? 'a candidate'
+      const profileJson = JSON.stringify({
+        Name: profileRow?.name ?? null,
+        Email: profileRow?.email ?? null,
+        Phone: profileRow?.phone ?? null,
+        Location: profileRow?.location ?? null,
+        Summary: profileRow?.summary ?? null,
+        Experience: profileRow?.experience ?? null,
+        Skills: profileRow?.skills ?? null,
+        Education: profileRow?.education ?? null,
+      })
+      const jobJson = JSON.stringify({
+        Company: job.company,
+        Title: job.jobTitle,
+        Location: job.location ?? null,
+        Description: description || null,
+      })
+      const userMessage = applyAnalysisTemplate(promptConfig.userMessage, candidateName, profileJson, jobJson)
+
+      // Step 3: Call Anthropic (single user message — no system field)
+      const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-7',
+          max_tokens: 1024,
+          messages: [{ role: 'user', content: userMessage }],
+        }),
+        signal: AbortSignal.timeout(120_000),
+      })
+      if (!anthropicRes.ok) throw new Error(`Anthropic error ${anthropicRes.status}`)
+
+      const anthropicData = await anthropicRes.json() as AnthropicMessage
+      const text = anthropicData.content.find((b) => b.type === 'text')?.text ?? ''
+
+      // Parse JSON — try direct parse first, fall back to regex extraction
+      let result: AnalysisResult
+      try {
+        result = JSON.parse(text) as AnalysisResult
+      } catch {
+        const jsonMatch = text.match(/\{[\s\S]*\}/)
+        if (!jsonMatch) throw new Error('No JSON found in Anthropic response')
+        result = JSON.parse(jsonMatch[0]) as AnalysisResult
+      }
+
+      // Step 4: Write results to DB
+      db.update(jobs)
+        .set({
+          fitScore: typeof result.score === 'number' ? result.score : null,
+          recommendation: result.recommended_action ?? null,
+          roleFit: result.role_fit ?? null,
+          requirementsMet: result.requirements_met ?? null,
+          requirementsMissed: result.requirements_missed ?? null,
+          redFlags: result.red_flags ?? null,
+          jobDescription: description || null,
+          salary: result.salary ?? null,
+          benefits: result.benefits ?? null,
+          contactName: result.contact_name ?? null,
+          contactEmail: result.contact_email ?? null,
+          contactPhone: result.contact_phone ?? null,
+          analysisStatus: 'done',
+          ...(result.recommended_action === 'skip' ? { archived: true } : {}),
+        })
+        .where(eq(jobs.id, job.id))
+        .run()
+
+      processed++
+    } catch (err) {
+      console.error(`[analysis] job ${job.id} failed:`, err instanceof Error ? err.message : String(err))
+      db.update(jobs).set({ analysisStatus: 'failed' }).where(eq(jobs.id, job.id)).run()
+      failed++
+    }
+  }
+
+  return { processed, failed }
+}

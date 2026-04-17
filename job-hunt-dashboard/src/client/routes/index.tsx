@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Button } from '../components/ui/button'
 import { Skeleton } from '../components/ui/skeleton'
 import { useJobsQuery } from '../hooks/useJobsQuery'
-import { useSyncMutation } from '../hooks/useSyncMutation'
 import { useBulkArchiveMutation } from '../hooks/useBulkArchiveMutation'
 import { PipelineTable } from '../components/pipeline/PipelineTable'
 import { JobDrawer } from '../components/detail/JobDrawer'
@@ -45,26 +43,15 @@ function SkeletonCard() {
   )
 }
 
-function EmptyState({ syncMutation }: { syncMutation: ReturnType<typeof useSyncMutation> }) {
+function EmptyState() {
   return (
     <div className="p-4">
       <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
         <div className="flex items-center justify-center py-16 px-4">
           <div className="text-center space-y-3">
             <p className="text-sm text-zinc-400">
-              No jobs yet. Hit Sync to pull from Google Sheets.
+              No jobs pending analysis. Run the scraper to discover new jobs.
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => syncMutation.mutate()}
-              disabled={syncMutation.isPending}
-            >
-              {syncMutation.isPending ? 'Syncing…' : 'Sync'}
-            </Button>
-            {syncMutation.isError && (
-              <p className="text-xs text-red-400">Sync failed. Try again.</p>
-            )}
           </div>
         </div>
       </div>
@@ -74,11 +61,10 @@ function EmptyState({ syncMutation }: { syncMutation: ReturnType<typeof useSyncM
 
 export function PipelineRoute() {
   const { data: jobs, isPending } = useJobsQuery()
-  const syncMutation = useSyncMutation()
   const bulkArchiveMutation = useBulkArchiveMutation()
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
 
-  const activeJobs = (jobs ?? []).filter(j => !j.archived)
+  const activeJobs = (jobs ?? []).filter(j => !j.archived && j.analysisStatus !== 'done')
 
   useEffect(() => {
     if (selectedJobId !== null && !activeJobs.find((j) => j.id === selectedJobId)) {
@@ -111,5 +97,5 @@ export function PipelineRoute() {
     )
   }
 
-  return <EmptyState syncMutation={syncMutation} />
+  return <EmptyState />
 }

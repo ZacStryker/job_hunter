@@ -29,6 +29,9 @@ npm-debug.log*
 
 # bun.lockb is committed (do not gitignore)
 
+# Scraper auth (LinkedIn session tokens — do not commit)
+scraper/auth/
+
 # Screenshots / dev utilities
 screenshot.py
 screenshot.sh

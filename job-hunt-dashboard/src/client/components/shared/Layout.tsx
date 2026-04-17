@@ -3,38 +3,18 @@ import { Outlet, Link } from '@tanstack/react-router'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Loader2 } from 'lucide-react'
-import { SyncButton } from './SyncButton'
-import { useSyncMutation } from '../../hooks/useSyncMutation'
 import { useWebhookMutation } from '../../hooks/useWebhookMutation'
 
 type ActiveAlert =
-  | { kind: 'sync-success'; data: { added: number; updated: number } }
   | { kind: 'webhook-success'; label: string }
   | { kind: 'error'; label: string; message: string }
   | null
 
 export function Layout() {
-  const syncMutation = useSyncMutation()
   const discoveryMutation = useWebhookMutation('/api/webhooks/discovery')
   const analysisMutation = useWebhookMutation('/api/webhooks/analysis')
 
   const [activeAlert, setActiveAlert] = useState<ActiveAlert>(null)
-
-  useEffect(() => {
-    if (syncMutation.isSuccess) {
-      setActiveAlert({ kind: 'sync-success', data: syncMutation.data })
-      const t = setTimeout(() => setActiveAlert(null), 4000)
-      return () => clearTimeout(t)
-    }
-  }, [syncMutation.isSuccess])
-
-  useEffect(() => {
-    if (syncMutation.isError) {
-      setActiveAlert({ kind: 'error', label: 'Sync', message: syncMutation.error?.message ?? 'Unknown error' })
-      const t = setTimeout(() => setActiveAlert(null), 4000)
-      return () => clearTimeout(t)
-    }
-  }, [syncMutation.isError])
 
   useEffect(() => {
     if (discoveryMutation.isSuccess) {
@@ -93,6 +73,14 @@ export function Layout() {
             Jobs
           </Link>
           <Link
+            to="/matches"
+            className="px-3 py-1.5 text-sm transition-colors"
+            activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
+            inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
+          >
+            Matches
+          </Link>
+          <Link
             to="/applications"
             className="px-3 py-1.5 text-sm transition-colors"
             activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
@@ -132,6 +120,14 @@ export function Layout() {
           >
             Profile
           </Link>
+          <Link
+            to="/prompts"
+            className="px-3 py-1.5 text-sm transition-colors"
+            activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
+            inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
+          >
+            Prompts
+          </Link>
         </nav>
 
         {/* Action buttons — right */}
@@ -166,20 +162,11 @@ export function Layout() {
               'Analysis'
             )}
           </Button>
-          <SyncButton onSync={() => syncMutation.mutate()} isPending={syncMutation.isPending} />
         </div>
       </header>
 
       {activeAlert && (
         <div className="px-4 py-2">
-          {activeAlert.kind === 'sync-success' && (
-            <Alert>
-              <AlertTitle>Sync complete</AlertTitle>
-              <AlertDescription>
-                {activeAlert.data.added} records added, {activeAlert.data.updated} updated
-              </AlertDescription>
-            </Alert>
-          )}
           {activeAlert.kind === 'webhook-success' && (
             <Alert>
               <AlertTitle>{activeAlert.label} triggered</AlertTitle>
@@ -191,7 +178,6 @@ export function Layout() {
               <AlertTitle>{activeAlert.label} failed</AlertTitle>
               <AlertDescription>
                 {activeAlert.message}
-                {activeAlert.label === 'Sync' ? ' — No data was modified.' : ''}
               </AlertDescription>
             </Alert>
           )}

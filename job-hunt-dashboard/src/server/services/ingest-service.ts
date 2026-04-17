@@ -22,22 +22,10 @@ export function ingestJobs(rows: JobInput[]): { added: number; updated: number }
         .onConflictDoUpdate({
           target: [jobs.company, jobs.jobTitle],
           set: {
-            fitScore: sql`excluded.fit_score`,
-            recommendation: sql`excluded.recommendation`,
-            roleFit: sql`excluded.role_fit`,
-            requirementsMet: sql`excluded.requirements_met`,
-            requirementsMissed: sql`excluded.requirements_missed`,
-            redFlags: sql`excluded.red_flags`,
-            jobDescription: sql`excluded.job_description`,
             sourceUrl: sql`excluded.source_url`,
             dateScraped: sql`excluded.date_scraped`,
             source: sql`excluded.source`,
             location: sql`excluded.location`,
-            salary: sql`excluded.salary`,
-            benefits: sql`excluded.benefits`,
-            contactName: sql`excluded.contact_name`,
-            contactEmail: sql`excluded.contact_email`,
-            contactPhone: sql`excluded.contact_phone`,
           },
         })
         .run()

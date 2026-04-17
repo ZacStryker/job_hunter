@@ -2,14 +2,15 @@ import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import { join } from 'node:path'
 import { runMigrations } from './db/migrate'
+import { startScraperProcess, stopScraperProcess } from './server/services/scraper-process'
 import ingestRoute from './server/routes/api-ingest'
-import syncRoute from './server/routes/api-sync'
 import jobsRoute from './server/routes/api-jobs'
 import messagesRoute from './server/routes/api-messages'
 import webhookRunsRoute from './server/routes/api-webhook-runs'
 import webhooksRoute from './server/routes/api-webhooks'
 import statsRoute from './server/routes/api-stats'
 import profileRoute from './server/routes/api-profile'
+import promptsRoute from './server/routes/api-prompts'
 import { errorHandler } from './server/middleware/error-handler'
 
 const app = new Hono()
@@ -18,10 +19,6 @@ runMigrations()
 const REQUIRED_ENV_VARS = [
   'PORT',
   'DB_PATH',
-  'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET',
-  'GOOGLE_REFRESH_TOKEN',
-  'GOOGLE_SPREADSHEET_ID',
 ] as const
 
 const missingVars = REQUIRED_ENV_VARS.filter((key) => !process.env[key])
@@ -33,13 +30,13 @@ if (missingVars.length > 0) {
 }
 
 app.route('/api/ingest', ingestRoute)
-app.route('/api/sync', syncRoute)
 app.route('/api/jobs', jobsRoute)
 app.route('/api/messages', messagesRoute)
 app.route('/api/webhook-runs', webhookRunsRoute)
 app.route('/api/webhooks', webhooksRoute)
 app.route('/api/stats', statsRoute)
 app.route('/api/profile', profileRoute)
+app.route('/api/prompts', promptsRoute)
 app.onError(errorHandler)
 
 // Resolve dist/ relative to this file, not CWD — safe for any working directory
@@ -48,6 +45,19 @@ const distDir = join(import.meta.dir, '..', 'dist')
 // Serve SPA bundle in production
 app.use('/*', serveStatic({ root: distDir }))
 app.get('/*', serveStatic({ path: join(distDir, 'index.html') }))
+
+await startScraperProcess().catch((err: Error) => {
+  console.error('[scraper] startup failed:', err.message)
+})
+
+process.on('SIGTERM', () => {
+  stopScraperProcess()
+  process.exit(0)
+})
+process.on('SIGINT', () => {
+  stopScraperProcess()
+  process.exit(0)
+})
 
 const port = parseInt(process.env.PORT ?? '3000', 10)
 if (isNaN(port)) throw new Error(`Invalid PORT env var: "${process.env.PORT}"`)

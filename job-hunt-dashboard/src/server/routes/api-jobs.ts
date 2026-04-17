@@ -1,10 +1,13 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { eq, desc, and, inArray, sql, isNotNull } from 'drizzle-orm'
+import { mkdirSync, renameSync } from 'node:fs'
+import { join } from 'node:path'
 import { db } from '../../db/client'
-import { jobs, statusEvents, coverLetters, messages } from '../../db/schema'
-import { callN8nWebhook } from '../services/cover-letter-service'
-import { callResumeWebhook } from '../services/resume-service'
+import { jobs, statusEvents, coverLetters, messages, profile } from '../../db/schema'
+import { generateCoverLetter } from '../services/cover-letter-service'
+import { buildDocx } from '../utils/build-docx'
+import { generateResume } from '../services/resume-service'
 import { recordRun } from './api-webhook-runs'
 import type { Job } from '../../shared/schemas'
 
@@ -229,10 +232,10 @@ app.post('/:id/generate-cover-letter', async (c) => {
 
   let coverLetterText: string
   try {
-    coverLetterText = await callN8nWebhook(job as Job)
+    coverLetterText = await generateCoverLetter(job as Job)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    if (message === 'N8N_WEBHOOK_URL not configured') {
+    if (message === 'ANTHROPIC_API_KEY not configured') {
       return c.json({ error: 'Cover letter generation is not configured' }, 503)
     }
     recordRun({ name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message })
@@ -280,19 +283,79 @@ app.post('/:id/generate-resume', async (c) => {
     return c.json({ error: 'Job has no job description' }, 400)
   }
 
+  let pdfBuffer: Buffer
   try {
-    await callResumeWebhook(job as Job)
+    pdfBuffer = await generateResume(job as Job)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    if (message === 'N8N_RESUME_WEBHOOK_URL not configured') {
+    if (message === 'ANTHROPIC_API_KEY not configured') {
       return c.json({ error: 'Resume generation is not configured' }, 503)
     }
     recordRun({ name: `Resume - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message })
     return c.json({ error: 'Resume generation failed' }, 502)
   }
 
+  const profileRow = db.select().from(profile).limit(1).get()
+  const candidateName = profileRow?.name ?? 'Resume'
+  const fileName = `${candidateName} - Resume - ${job.company} - ${job.jobTitle}.pdf`
+    .replace(/[–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/"/g, "'")
+
+  // Persist PDF to disk (atomic: write to temp then rename)
+  try {
+    const resumesDir = join(process.cwd(), 'data', 'resumes')
+    mkdirSync(resumesDir, { recursive: true })
+    const finalPath = join(resumesDir, `${rawId}.pdf`)
+    const tmpPath = join(resumesDir, `${rawId}.pdf.tmp`)
+    await Bun.write(tmpPath, pdfBuffer)
+    renameSync(tmpPath, finalPath)
+    db.update(jobs).set({ resumeGeneratedAt: new Date().toISOString() }).where(eq(jobs.id, rawId)).run()
+  } catch (err) {
+    console.error('Failed to persist resume PDF:', err)
+    // Non-fatal — user still gets their download
+  }
+
   recordRun({ name: `Resume - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1 })
-  return c.json({ ok: true })
+  return new Response(pdfBuffer, {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+    },
+  })
+})
+
+app.get('/:id/resume', async (c) => {
+  const idParam = c.req.param('id')
+  if (!/^\d+$/.test(idParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  if (rawId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const job = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
+  }
+
+  const resumePath = join(process.cwd(), 'data', 'resumes', `${rawId}.pdf`)
+  let pdfBuffer: ArrayBuffer
+  try {
+    pdfBuffer = await Bun.file(resumePath).arrayBuffer()
+  } catch {
+    return c.json({ error: 'Resume not found' }, 404)
+  }
+  const profileRow = db.select().from(profile).limit(1).get()
+  const candidateName = profileRow?.name ?? 'Resume'
+  const fileName = `${candidateName} - Resume - ${job.company} - ${job.jobTitle}.pdf`
+    .replace(/[–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/"/g, "'")
+
+  return new Response(pdfBuffer, {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${fileName}"`,
+    },
+  })
 })
 
 app.get('/:id/cover-letter', async (c) => {
@@ -315,6 +378,39 @@ app.get('/:id/cover-letter', async (c) => {
   }
 
   return c.json({ coverLetter: letter })
+})
+
+app.get('/:id/cover-letter/docx', async (c) => {
+  const idParam = c.req.param('id')
+  if (!/^\d+$/.test(idParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  if (rawId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const letter = db.select().from(coverLetters)
+    .where(eq(coverLetters.jobId, rawId))
+    .orderBy(desc(coverLetters.createdAt))
+    .get()
+  if (!letter) {
+    return c.json({ error: 'No cover letter found' }, 404)
+  }
+
+  const job = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
+  const company = job?.company ?? 'Unknown'
+  const jobTitle = job?.jobTitle ?? 'Unknown'
+  const fileName = `Cover Letter - ${company} - ${jobTitle}.docx`
+    .replace(/[–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/"/g, "'")
+
+  const docx = buildDocx(letter.content)
+  return new Response(docx, {
+    headers: {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+    },
+  })
 })
 
 export default app

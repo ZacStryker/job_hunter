@@ -1,0 +1,114 @@
+process.env.DB_PATH = ':memory:'
+
+import { describe, test, expect, beforeAll, beforeEach, afterEach, mock } from 'bun:test'
+import { Database } from 'bun:sqlite'
+
+const { generateCoverLetter } = await import('./cover-letter-service')
+const { db: prodDb } = await import('../../db/client')
+const prodSqlite = (prodDb as unknown as { $client: Database }).$client
+
+const CREATE_PROFILE_TABLE = `
+  CREATE TABLE IF NOT EXISTS profile (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT, email TEXT, phone TEXT, location TEXT,
+    linkedin_url TEXT, github_url TEXT, summary TEXT,
+    experience TEXT, skills TEXT, education TEXT
+  )
+`
+
+const CREATE_PROMPTS_TABLE = `
+  CREATE TABLE IF NOT EXISTS prompts (
+    flow TEXT PRIMARY KEY NOT NULL,
+    system_prompt TEXT,
+    user_message TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )
+`
+
+const MOCK_JOB = {
+  id: 1,
+  company: 'Acme Corp',
+  jobTitle: 'Senior Engineer',
+  location: 'Amsterdam',
+  jobDescription: 'Build great things at scale.',
+  fitScore: null, recommendation: null, roleFit: null, requirementsMet: null,
+  requirementsMissed: null, redFlags: null, sourceUrl: null, dateScraped: null,
+  source: null, externalJobId: null, analysisStatus: null, salary: null,
+  benefits: null, contactName: null, contactEmail: null, contactPhone: null,
+  applied: false, status: null, statusOverride: null, coverLetterSentAt: null,
+  dateApplied: null, archived: false,
+} as import('../../shared/schemas').Job
+
+let originalFetch: typeof globalThis.fetch
+
+beforeAll(() => {
+  originalFetch = globalThis.fetch
+  prodSqlite.run(CREATE_PROFILE_TABLE)
+  prodSqlite.run(CREATE_PROMPTS_TABLE)
+  process.env.ANTHROPIC_API_KEY = 'test-key'
+})
+
+beforeEach(() => {
+  prodSqlite.run('DELETE FROM profile')
+})
+
+afterEach(() => {
+  globalThis.fetch = originalFetch
+})
+
+function mockAnthropicSuccess(text = 'Dear Hiring Manager,\n\nI am excited.\n\nSincerely,\nZac'): void {
+  globalThis.fetch = mock(() =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify({ content: [{ type: 'text', text }] }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    )
+  ) as typeof globalThis.fetch
+}
+
+describe('generateCoverLetter()', () => {
+  test('happy path: returns cover letter text', async () => {
+    mockAnthropicSuccess('Dear Hiring Manager,\n\nThis is a great role.')
+
+    const result = await generateCoverLetter(MOCK_JOB)
+    expect(result).toBe('Dear Hiring Manager,\n\nThis is a great role.')
+  })
+
+  test('missing ANTHROPIC_API_KEY: throws before any fetch', async () => {
+    const original = process.env.ANTHROPIC_API_KEY
+    delete process.env.ANTHROPIC_API_KEY
+
+    await expect(generateCoverLetter(MOCK_JOB)).rejects.toThrow('ANTHROPIC_API_KEY not configured')
+
+    process.env.ANTHROPIC_API_KEY = original
+  })
+
+  test('missing profile: proceeds with empty fields, returns text', async () => {
+    mockAnthropicSuccess('Dear Hiring Manager,\n\nI apply.')
+
+    const result = await generateCoverLetter(MOCK_JOB)
+    expect(result).toBe('Dear Hiring Manager,\n\nI apply.')
+  })
+
+  test('Anthropic HTTP error: throws with status', async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(new Response(null, { status: 500 }))
+    ) as typeof globalThis.fetch
+
+    await expect(generateCoverLetter(MOCK_JOB)).rejects.toThrow('Anthropic error 500')
+  })
+
+  test('Anthropic returns empty text: throws', async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ content: [{ type: 'text', text: '   ' }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    ) as typeof globalThis.fetch
+
+    await expect(generateCoverLetter(MOCK_JOB)).rejects.toThrow('Anthropic returned empty cover letter')
+  })
+})

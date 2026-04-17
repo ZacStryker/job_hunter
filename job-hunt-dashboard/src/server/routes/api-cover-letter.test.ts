@@ -4,10 +4,10 @@ import { describe, test, expect, mock, beforeAll, beforeEach } from 'bun:test'
 import { Database } from 'bun:sqlite'
 
 // --- Mock cover-letter-service BEFORE dynamic import ---
-let mockCallN8nWebhook: () => Promise<string> = async () => 'Mock cover letter text'
+let mockGenerateCoverLetter: () => Promise<string> = async () => 'Mock cover letter text'
 
 mock.module('../services/cover-letter-service', () => ({
-  callN8nWebhook: () => mockCallN8nWebhook(),
+  generateCoverLetter: () => mockGenerateCoverLetter(),
 }))
 
 // --- Import AFTER mock ---
@@ -31,6 +31,8 @@ const CREATE_JOBS_TABLE = `
     date_scraped TEXT,
     source TEXT,
     location TEXT,
+    external_job_id TEXT,
+    analysis_status TEXT,
     salary TEXT,
     benefits TEXT,
     contact_name TEXT,
@@ -42,6 +44,7 @@ const CREATE_JOBS_TABLE = `
     cover_letter_sent_at TEXT,
     date_applied TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
+    resume_generated_at TEXT,
     UNIQUE(company, job_title)
   )
 `
@@ -62,7 +65,7 @@ beforeAll(() => {
 beforeEach(() => {
   prodSqlite.run('DELETE FROM cover_letters')
   prodSqlite.run('DELETE FROM jobs')
-  mockCallN8nWebhook = async () => 'Mock cover letter text'
+  mockGenerateCoverLetter = async () => 'Mock cover letter text'
 })
 
 describe('POST /:id/generate-cover-letter', () => {
@@ -110,12 +113,12 @@ describe('POST /:id/generate-cover-letter', () => {
     expect(data).not.toHaveProperty('message')
   })
 
-  test('returns 503 when N8N_WEBHOOK_URL is not configured', async () => {
+  test('returns 503 when ANTHROPIC_API_KEY is not configured', async () => {
     prodSqlite.run(
       `INSERT INTO jobs (company, job_title, job_description) VALUES ('Acme', 'Engineer', 'Build stuff')`
     )
     const row = prodSqlite.query('SELECT id FROM jobs LIMIT 1').get() as { id: number }
-    mockCallN8nWebhook = async () => { throw new Error('N8N_WEBHOOK_URL not configured') }
+    mockGenerateCoverLetter = async () => { throw new Error('ANTHROPIC_API_KEY not configured') }
 
     const res = await jobsApp.request(`/${row.id}/generate-cover-letter`, { method: 'POST' })
     expect(res.status).toBe(503)
@@ -124,12 +127,12 @@ describe('POST /:id/generate-cover-letter', () => {
     expect(data).not.toHaveProperty('message')
   })
 
-  test('returns 502 for other webhook errors', async () => {
+  test('returns 502 for other generation errors', async () => {
     prodSqlite.run(
       `INSERT INTO jobs (company, job_title, job_description) VALUES ('Acme', 'Engineer', 'Build stuff')`
     )
     const row = prodSqlite.query('SELECT id FROM jobs LIMIT 1').get() as { id: number }
-    mockCallN8nWebhook = async () => { throw new Error('n8n webhook returned 500') }
+    mockGenerateCoverLetter = async () => { throw new Error('Anthropic error 500') }
 
     const res = await jobsApp.request(`/${row.id}/generate-cover-letter`, { method: 'POST' })
     expect(res.status).toBe(502)
@@ -188,5 +191,39 @@ describe('GET /:id/cover-letter', () => {
     expect(data).toHaveProperty('error')
     expect(data.error).toBe('Invalid job id')
     expect(data).not.toHaveProperty('message')
+  })
+})
+
+describe('GET /:id/cover-letter/docx', () => {
+  test('returns 200 with docx content-type for existing cover letter', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title) VALUES ('Acme', 'Engineer')`)
+    const jobRow = prodSqlite.query('SELECT id FROM jobs LIMIT 1').get() as { id: number }
+    prodSqlite.run(
+      `INSERT INTO cover_letters (job_id, content, created_at) VALUES (?, ?, ?)`,
+      [jobRow.id, 'Dear Hiring Manager,\n\nGreat role.', '2026-04-15T10:00:00.000Z']
+    )
+    const res = await jobsApp.request(`/${jobRow.id}/cover-letter/docx`, { method: 'GET' })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toContain('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    expect(res.headers.get('content-disposition')).toBe('attachment; filename="Cover Letter - Acme - Engineer.docx"')
+    const buf = Buffer.from(await res.arrayBuffer())
+    expect(buf.length).toBeGreaterThan(0)
+    expect(buf[0]).toBe(0x50)
+    expect(buf[1]).toBe(0x4B)
+  })
+
+  test('returns 404 for non-existent cover letter id', async () => {
+    const res = await jobsApp.request('/999/cover-letter/docx', { method: 'GET' })
+    expect(res.status).toBe(404)
+    const body = await res.json() as { error: string }
+    expect(body).toHaveProperty('error')
+    expect(body).not.toHaveProperty('message')
+  })
+
+  test('returns 400 for non-numeric id', async () => {
+    const res = await jobsApp.request('/abc/cover-letter/docx', { method: 'GET' })
+    expect(res.status).toBe(400)
+    const body = await res.json() as { error: string }
+    expect(body).toHaveProperty('error')
   })
 })

@@ -60,7 +60,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 **TanStack Query**
 - Query key shapes: `['jobs']` for the list, `['jobs', id]` (number) for a single job — no other shapes permitted
-- After `POST /api/sync`: call `queryClient.invalidateQueries({ queryKey: ['jobs'] })` — do not manually set cache
+- After `POST /api/ingest`: call `queryClient.invalidateQueries({ queryKey: ['jobs'] })` — do not manually set cache
 - After `PATCH /api/jobs/:id`: optimistic update on `['jobs']` cache before request; rollback on error
 - `queryClient` singleton from `src/client/lib/query-client.ts` — never instantiate a second one
 - Use TanStack Query `isPending`/`isError`/`isSuccess` directly — no custom loading state wrappers
@@ -97,7 +97,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 **Naming Conventions**
 - React components: `PascalCase.tsx`
 - Server/utility/service files: `kebab-case.ts`
-- Hooks: `camelCase` prefixed with `use` (e.g., `useSyncMutation.ts`)
+- Hooks: `camelCase` prefixed with `use` (e.g., `useWebhookMutation.ts`)
 - Drizzle table objects: `camelCase` (e.g., `jobs`)
 - DB columns: `snake_case`; API JSON fields: `camelCase` — Drizzle's `casing: 'camelCase'` handles the translation
 - Route params: `:id` only — never `:jobId` or `:job_id`
@@ -105,7 +105,6 @@ _This file contains critical rules and patterns that AI agents must follow when 
 **File Organization**
 - Component folders by domain: `components/pipeline/`, `components/tracker/`, `components/detail/`, `components/shared/`
 - Hooks in `src/client/hooks/` — one hook per file
-- Server services in `src/server/services/` — `sheets-sync.ts` is the ONLY file that knows Sheets column names
 - Only `src/shared/schemas.ts` defines shared types — no inline type redefinitions
 
 **Code Style**
@@ -120,16 +119,16 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Prod:** `bun run build` → Vite outputs to `dist/`; `bun start` → runs migrations then serves on `:3000`
 - **Migrations:** `drizzle-kit generate` to create SQL files; migration runner executes automatically at `bun start` boot — always idempotent
 - **DB path:** controlled by `DB_PATH` env var; `data/` directory is gitignored
-- **Required env vars:** `PORT`, `DB_PATH`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_SPREADSHEET_ID` — app exits at startup if any are missing
+- **Required env vars:** `PORT`, `DB_PATH` — app exits at startup if any are missing
 - **`.env.example`** committed with all keys documented; `.env` gitignored — never commit credentials
 - **New migrations:** generate with `bun run db:generate`; commit the SQL file to the repo
 
 ### Critical Don't-Miss Rules
 
 **Data Ownership (highest priority invariant)**
-- Every job column is either Sheets-owned or user-owned — this governs ALL upsert and PATCH logic
-- Sheets-owned: `company`, `jobTitle`, `fitScore`, `recommendation`, `roleFit`, `requirementsMet`, `requirementsMissed`, `redFlags`, `jobDescription`, `sourceUrl`, `dateScraped`
-- User-owned (never overwrite on sync): `applied`, `status`, `statusOverride`, `coverLetterSentAt`, `dateApplied`
+- Every job column is either scraper-owned or user-owned — this governs ALL upsert and PATCH logic
+- Scraper-owned: `company`, `jobTitle`, `fitScore`, `recommendation`, `roleFit`, `requirementsMet`, `requirementsMissed`, `redFlags`, `jobDescription`, `sourceUrl`, `dateScraped`
+- User-owned (never overwrite on ingest): `applied`, `status`, `statusOverride`, `coverLetterSentAt`, `dateApplied`
 - `PATCH /api/jobs/:id` allowlist: user-owned fields only (`applied`, `status`, `statusOverride`)
 
 **API & Type Safety**
@@ -138,14 +137,11 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Error shape must be `{ error: string }` — never `{ message }`, never `{ error: { message } }`, never an envelope
 
 **UI Error Handling**
-- Sync errors: persistent inline `ErrorBanner` above the table — NOT a toast (must stay visible)
 - Job update (PATCH) errors: transient toast only (low stakes)
 - Drawer: no loading state — data must be pre-cached via route loader before drawer opens
 
 **Security**
-- Google OAuth tokens in `.env` only — never logged, never in API responses, never committed
-- Expired token must produce a clear error — no silent failure or retry loop
-- `sheets-sync.ts` is the only file that knows Sheets column names — no Sheets types leak beyond it
+- Credentials in `.env` only — never logged, never in API responses, never committed
 
 **Post-MVP Features (now implemented — do not treat as deferred)**
 - `status_events` table: live with `source` column (`'manual'` | `'email'`); `StatusTimeline` renders events with email indicator

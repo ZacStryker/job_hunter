@@ -265,3 +265,79 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - **Empty string stored via direct API shows blank instead of `—`** [`src/client/routes/profile.tsx`] — `{data?.name ?? '—'}` only guards null/undefined; `""` renders blank. The UI converts empty to null on save, but direct API callers (curl, n8n) can store empty strings. Low priority for single-user localhost app.
 - **`archivedTotal` always 0 when `archivedFilter=active`** [`src/server/routes/api-stats.ts`] — `viewJobs` is pre-filtered to exclude archived, so `viewJobs.filter(j => j.archived).length` is always 0 in the default view. Dashboard "Archives" KPI is misleading at default filter. Pre-existing.
 - **`sheets-sync` new contact field header name assumptions** [`src/server/services/sheets-sync.ts`] — `get('contact_name')`, `get('contact_email')`, `get('contact_phone')` return null if the Google Sheet columns don't use those exact header names. Silent data gap with no warning.
+
+## Deferred from: code review of 13-1-remove-google-sheets-integration (2026-04-14)
+
+- **`ingestJobs()` not awaited in `api-ingest.ts`** [`job-hunt-dashboard/src/server/routes/api-ingest.ts`] — `const result = ingestJobs(parsed.data)` has no `await`. If `ingestJobs` is ever made async, `c.json(result)` would silently serialize a Promise object instead of the resolved value. Pre-existing.
+- **`discoveryMutation.error` / `analysisMutation.error` accessed without null guard in `Layout.tsx`** — `.error.message` accessed inside `isError` effect. TanStack Query types `error` as `Error | null` even when `isError` is true; a reset race could cause a null dereference. Pre-existing.
+- **`useEffect` on `.isError` boolean doesn't re-fire on repeated mutation errors in `Layout.tsx`** — If a webhook mutation errors twice consecutively, `isError` stays `true` (no false→true transition), so the second error never shows an alert. Pre-existing systemic pattern.
+
+## Deferred from: code review of 13-2-schema-analysis-status-and-external-job-id (2026-04-14)
+
+- **`externalJobId: z.string().nullable()` accepts empty string** — Enhancement to add `.min(1)` when non-null. Out of scope for this story's spec. Address when Discovery contract is firmed up. (`src/shared/schemas.ts:25`)
+- **`fitScore`, `recommendation`, `roleFit`, etc. still accepted in `jobInputSchema` but silently discarded on re-ingest conflict** — Pre-existing design; `jobInputSchema` predates the analysis ownership split. Scope removal of analysis-owned fields from the ingest schema in a future story once Discovery/Analysis API contracts are defined.
+- **Unique conflict target is `(company, job_title)` — `externalJobId` not used for deduplication** — Pre-existing architecture decision. If two rows exist for the same external job with different titles, they can't be merged via the upsert path. Revisit when deduplication strategy is defined.
+- **Existing rows get `NULL` for `analysis_status` and `external_job_id` after migration** — Operational concern: at first deploy, all historical rows will have `NULL` analysis status. The Analysis service must treat `NULL` as "not applicable" (manually-ingested) rather than "pending", or it will enqueue all historical rows simultaneously. Document this in the Analysis service contract.
+
+## Deferred from: code review of 13-3-discovery-service-scraper-to-db (2026-04-14)
+
+- **`inserted` count reports `newJobs.length` not actual DB writes** — `onConflictDoNothing` silently suppresses rows that pass `externalJobId` dedup but collide on the `(company, job_title)` unique constraint. Count could overstate actual inserts. Spec says `onConflictDoNothing` is defensive-only and dedup should prevent conflicts; acceptable until conflicts are observed. (`discovery-service.ts`)
+- **No test for network-level fetch error (TypeError vs non-ok Response)** — Tests only mock `new Response(null, { status: 500 })`; a real `fetch` throwing `TypeError` or `DOMException` follows a different code path that isn't exercised. Low value given observable behavior is the same (throws). (`discovery-service.test.ts`)
+- **`AbortSignal.timeout` per-request, no outer handler deadline** — Each of 6 parallel scraper requests has a 60s timeout, but the route handler has no overall deadline. Worst-case wall time is ~60s. No spec requirement for an outer timeout; acceptable for low-frequency Discovery runs. (`api-webhooks.ts`)
+
+## Deferred from: code review of 13-4-analysis-service-db-scraper-anthropic (2026-04-15)
+
+- `analysis-service.ts`: Jobs stuck in `analyzing` state if process crashes mid-loop. `analysisStatus = 'analyzing'` is set before any async call (spec-prescribed). A separate cleanup job that resets old `analyzing` rows back to `pending` (e.g., older than 10 min) would provide crash recovery.
+- `analysis-service.ts`: No overall deadline on `runAnalysis` loop. Per-request `AbortSignal` timeouts are spec-prescribed (60s scraper, 120s Anthropic). Worst-case 30 min per invocation; an outer concurrency limit or aggregate deadline would prevent HTTP handler stalls.
+- `analysis-service.ts`: `AnalysisResult` fields accepted without runtime Zod validation. String `score` → maps to null; `recommended_action` accepts arbitrary strings beyond `apply|investigate|skip`. Consider a Zod schema parse pass before DB writes in a future hardening story.
+- `api-webhooks.ts`: Error message from `runAnalysis` forwarded verbatim in 502 body. Pre-existing pattern across all routes; sanitize or wrap in a future security hardening pass.
+- `api-webhooks.ts` / `discovery-service.ts`: `recordRun` called synchronously (fire-and-forget). If it were async and threw, the error would be silently swallowed. Pre-existing pattern; add try/catch in a future cleanup pass.
+- `analysis-service.test.ts`: Test env var cleanup (`delete process.env.ANTHROPIC_API_KEY`) is inline in test body, not in `afterEach`. If an assertion throws, cleanup is skipped and later tests may see contaminated env state.
+- `analysis-service.ts`: `recommended_action` stored without enum validation. Invalid values (e.g., `"maybe"`) pass through to the DB and may break UI rendering. Addressable with Zod validation on `AnalysisResult` (see point 3 above).
+
+## Deferred from: code review of 13-5-cover-letter-direct-anthropic-and-docx (2026-04-15)
+
+- `build-docx.ts`: `crc32()` rebuilds its 256-entry lookup table on every invocation. Not a correctness issue but wastes ~256 iterations per `buildDocx` call. Extract table construction to module-level constant in a future cleanup pass.
+
+## Deferred from: code review of 14-1-embed-scraper-as-child-process (2026-04-16)
+
+- `restartDelay = 1_000` resets on every `startChild()` call, immediately after spawn, regardless of whether the process has proven stable. Rapid crash loops always restart with a 1s delay; the exponential backoff doesn't accumulate correctly across consecutive crashes. The spec's Implementation Notes §2 explicitly acknowledges this and calls the simple version acceptable. Fix: move the reset into the `exit` handler behind a `> 10s alive` grace-period check.
+
+## Deferred from: code review of 13-6-resume-direct-anthropic-and-playwright-pdf (2026-04-15)
+
+- `api-jobs.ts`: Profile fetched twice — service reads profile for the prompt, route reads it again for the filename. Spec-intended pattern; SQLite local cost is negligible. Eliminate double-read in a future cleanup pass.
+- `resume-service.ts` / `cover-letter-service.ts`: Prompt injection via job description and profile data — `jobDescription` and all profile fields are concatenated raw into Anthropic prompts. Inherent to LLM architecture with external data; acceptable for a personal single-user app. Sanitize or use structured prompts in a future hardening pass.
+- `generate-pdf.ts`: `waitUntil: 'networkidle'` hangable on slow external resources — spec-mandated; current HTML template uses `system-ui` (no external resources). Add an explicit timeout if the template ever references external assets.
+- `api-jobs.ts` / `build-docx.ts`: DOCX XSS/XML injection — `escXml()` only escapes `& < >`; control characters and invalid XML sequences are not sanitized. Pre-existing from story 13-5.
+- `resume-service.ts` / `cover-letter-service.ts`: Anthropic error response body silently discarded — non-ok responses throw `Anthropic error {status}` without reading the body (which contains structured error details). Error status is captured via `recordRun`; add body logging in a future debugging pass.
+
+## Deferred from: code review of 16-1-jobs-matches-page-split (2026-04-17)
+
+- `analysis-service.ts` lines 52–62: Concurrent `runAnalysis()` invocations (e.g., two rapid webhook triggers) can SELECT the same pending jobs before either marks them `analyzing`, resulting in duplicate Anthropic calls and conflicting DB writes. Fix requires atomic SELECT+UPDATE or a per-call advisory lock.
+- `analysis-service.ts` line ~132: Greedy regex `/\{[\s\S]*\}/` used as fallback JSON extraction when direct `JSON.parse` fails. When Anthropic returns multiple JSON-like blocks in its response (e.g. an explanation with an embedded JSON example followed by the actual result), the greedy match merges them into an unparseable string. Fix requires a last-`}` search, a JSON-stream parser, or a stricter prompt contract guaranteeing bare JSON output.
+
+## Deferred from: code review of 15-1-prompt-templates (2026-04-16)
+
+- **Analysis flow ignores stored `systemPrompt`** [`analysis-service.ts:107-119`] — `loadEffectivePrompt('analysis')` returns whatever is in the DB (including a custom non-null `systemPrompt`), but `analysis-service.ts` never passes a `system` field to Anthropic. Any custom system prompt saved for the analysis flow is silently dropped. Only reachable via direct PUT — the UI shows no system-prompt field for analysis since the default is null.
+- **Stale draft state on concurrent external update** [`prompts.tsx:36-38`] — `draftSystem`/`draftUser` are initialised in `handleEdit` only; if the backing React Query cache refreshes while the user is mid-edit, the draft is not re-synced. Single-user app; low probability in practice.
+- **`cover-letter-service.ts` jobDetails uses single-line format** [`cover-letter-service.ts:30-34`] — Fields are space-concatenated with no newlines (`Role: Company: Foo Title: Bar ...`); `resume-service.ts` uses `\n` separators. Minor LLM-parsing inconsistency introduced by spec; address in a future prompt quality pass.
+- **Prompt injection via job description and profile fields** — Raw `jobDescription`, `summary`, `experience` etc. are string-concatenated directly into Anthropic prompts with no injection guard. Pre-existing architecture characteristic shared across all three services; acceptable for single-user personal tool.
+- **`stripCodeFences` incomplete coverage** [`resume-service.ts`] — Only strips a single top-level fence; prose before the fence, uppercase ` ```HTML `, or multiple code blocks are passed through unchanged. System prompt instructs model to return raw HTML; this is a defensive fallback only.
+- **No SQLite `CHECK` constraint on `prompts.flow`** [`schema.ts:92`] — `flow TEXT PRIMARY KEY` accepts arbitrary strings; app-layer `PROMPT_FLOWS.includes()` guard is the only enforcement. Add `CHECK(flow IN ('analysis','cover_letter','resume'))` in a future migration if belt-and-suspenders DB integrity is desired.
+- **UI system-prompt visibility based on current value, not flow type** [`prompts.tsx:92`] — `{prompt.systemPrompt !== null && ...}` shows the system-prompt field only when the current stored value is non-null. If `analysis` somehow gets a non-null DB value via direct API, the UI renders an uneffective textarea with no warning.
+- **`MOCK_JOB` incomplete in service tests** [`cover-letter-service.test.ts:28-40`, `resume-service.test.ts:37-46`] — `resumeGeneratedAt` and `latestStatus` fields are missing from the typed `Job` mock objects. Covered by `as` cast so TypeScript won't flag the drift as the type evolves.
+
+## Deferred from: code review of 13-7-resume-pdf-persistence-and-drawer-preview (2026-04-15)
+
+- `api-jobs.ts`: `Content-Disposition` filename not RFC 6266 compliant — `;` and `0x7F` pass through sanitizer. Pre-existing pattern throughout file.
+- `JobDrawer.tsx`: iframe renders blank if PDF is absent after a swallowed write error — deliberate design per spec (failure is non-fatal).
+- `JobDrawer.tsx`: iframe + `<a download>` both fire `GET /:id/resume` on same render, doubling disk reads. Low impact.
+- `useGenerateResume.ts`: No user feedback (toast/error) on mutation success/failure. Pre-existing behavior, out of story scope.
+- `useGenerateResume.ts`: Object URL 40 s timeout + nav-away leak. Explicit design rationale in code comment.
+- `api-jobs.ts`: `process.cwd()` path resolution unreliable in non-standard deploy configs (systemd, Docker WORKDIR). Intentional per spec; add `DATA_DIR` env var in future hardening pass.
+- `api-jobs.ts`: Profile row re-queried on every `GET /:id/resume` request for filename only. Cosmetic perf concern.
+- `api-jobs.ts`: `resumeGeneratedAt` durability — no fsync before DB update; drawer could show stale state after a process crash. Inherent OS page-cache limitation.
+- `api-jobs.ts`: Orphaned PDF on disk when a job is deleted and re-ingested with a new id. No delete feature exists yet.
+- `schema.ts`: `analysisStatus` stored as raw TEXT with no SQLite CHECK constraint — values from the analysis service bypass Zod validation. Pre-existing from earlier story.
+- `schema.ts`: `uniqueIndex` on `(company, job_title)` not updated to include `externalJobId` as the canonical deduplication key. Pre-existing; `externalJobId` is nullable.
+- `_journal.json`: idx 11 (`0011_wise_doctor_doom`) was added to the journal as part of this story commit — cross-story dependency, informational.

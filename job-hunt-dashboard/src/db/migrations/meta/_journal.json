@@ -78,6 +78,27 @@
       "when": 1776101502251,
       "tag": "0010_yummy_toad_men",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1776183044489,
+      "tag": "0011_wise_doctor_doom",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1776254400000,
+      "tag": "0012_resume_generated_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1776340800000,
+      "tag": "0013_prompt_templates",
+      "breakpoints": true
     }
   ]
 }

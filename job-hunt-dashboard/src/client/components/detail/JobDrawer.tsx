@@ -1,5 +1,5 @@
 import { useState, useEffect, Fragment } from 'react'
-import { ExternalLink, Archive, ArchiveRestore, Wand2, Copy, FileText } from 'lucide-react'
+import { ExternalLink, Archive, ArchiveRestore, Wand2, Copy, FileText, Download } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Separator } from '../ui/separator'
 import type { Job } from '@shared/schemas'
@@ -164,7 +164,7 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FileText size={13} />
-                  {isResumePending ? 'Generating…' : 'Resume'}
+                  {isResumePending ? 'Generating…' : job.resumeGeneratedAt ? 'Regenerate' : 'Resume'}
                 </button>
               ) : (
                 <TooltipProvider>
@@ -241,6 +241,32 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                 <pre className="text-xs text-zinc-300 whitespace-pre-wrap max-h-64 overflow-y-auto font-sans leading-relaxed">
                   {coverLetter.content}
                 </pre>
+              </div>
+            </>
+          )}
+          {job?.resumeGeneratedAt && (
+            <>
+              <Separator className="bg-zinc-800" />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Resume</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-zinc-600">{new Date(job.resumeGeneratedAt).toLocaleDateString()}</p>
+                    <a
+                      href={`/api/jobs/${job.id}/resume`}
+                      download
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                    >
+                      <Download size={11} />
+                      Download
+                    </a>
+                  </div>
+                </div>
+                <iframe
+                  src={`/api/jobs/${job.id}/resume`}
+                  className="w-full h-96 border border-zinc-800 rounded"
+                  title="Resume preview"
+                />
               </div>
             </>
           )}

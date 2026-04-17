@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
 import { recordRun } from './api-webhook-runs'
+import { runDiscovery } from '../services/discovery-service'
+import { runAnalysis } from '../services/analysis-service'
 
 const app = new Hono()
 
@@ -27,21 +29,34 @@ async function fireWebhook(url: string): Promise<{
 }
 
 app.post('/discovery', async (c) => {
-  const url = process.env.DISCOVERY_WEBHOOK_URL
-  if (!url) return c.json({ error: 'DISCOVERY_WEBHOOK_URL not configured' }, 503)
-  const result = await fireWebhook(url)
-  recordRun({ name: 'Discovery', ...result })
-  if (!result.success) return c.json({ error: result.errorMessage ?? 'Discovery webhook failed' }, 502)
-  return c.json({ ok: true })
+  const scraperUrl = process.env.SCRAPER_URL
+  if (!scraperUrl) return c.json({ error: 'SCRAPER_URL not configured' }, 503)
+
+  try {
+    const { inserted } = await runDiscovery()
+    recordRun({ name: 'Discovery', success: true, itemCount: inserted, errorMessage: null })
+    return c.json({ ok: true, inserted })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[discovery] run failed:', message)
+    recordRun({ name: 'Discovery', success: false, itemCount: null, errorMessage: message })
+    return c.json({ error: message }, 502)
+  }
 })
 
 app.post('/analysis', async (c) => {
-  const url = process.env.ANALYSIS_WEBHOOK_URL
-  if (!url) return c.json({ error: 'ANALYSIS_WEBHOOK_URL not configured' }, 503)
-  const result = await fireWebhook(url)
-  recordRun({ name: 'Analysis', ...result })
-  if (!result.success) return c.json({ error: result.errorMessage ?? 'Analysis webhook failed' }, 502)
-  return c.json({ ok: true })
+  if (!process.env.ANTHROPIC_API_KEY) return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 503)
+
+  try {
+    const { processed, failed } = await runAnalysis()
+    recordRun({ name: 'Analysis', success: true, itemCount: processed, errorMessage: null })
+    return c.json({ ok: true, processed, failed })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[analysis] run failed:', message)
+    recordRun({ name: 'Analysis', success: false, itemCount: null, errorMessage: message })
+    return c.json({ error: message }, 502)
+  }
 })
 
 export default app

@@ -46,6 +46,8 @@ const CREATE_JOBS_TABLE = `
     date_scraped TEXT,
     source TEXT,
     location TEXT,
+    external_job_id TEXT,
+    analysis_status TEXT,
     salary TEXT,
     benefits TEXT,
     contact_name TEXT,
@@ -57,6 +59,7 @@ const CREATE_JOBS_TABLE = `
     cover_letter_sent_at TEXT,
     date_applied TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
+    resume_generated_at TEXT,
     UNIQUE(company, job_title)
   )
 `
@@ -96,15 +99,10 @@ function runIngest(db: DbType, rows: JobInput[]): { added: number; updated: numb
         .onConflictDoUpdate({
           target: [jobs.company, jobs.jobTitle],
           set: {
-            fitScore: sql`excluded.fit_score`,
-            recommendation: sql`excluded.recommendation`,
-            roleFit: sql`excluded.role_fit`,
-            requirementsMet: sql`excluded.requirements_met`,
-            requirementsMissed: sql`excluded.requirements_missed`,
-            redFlags: sql`excluded.red_flags`,
-            jobDescription: sql`excluded.job_description`,
             sourceUrl: sql`excluded.source_url`,
             dateScraped: sql`excluded.date_scraped`,
+            source: sql`excluded.source`,
+            location: sql`excluded.location`,
           },
         })
         .run()
@@ -143,6 +141,8 @@ const baseJob: JobInput = {
   contactName: null,
   contactEmail: null,
   contactPhone: null,
+  analysisStatus: null,
+  externalJobId: null,
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ describe('upsert business logic', () => {
     runIngest(testDb, [{ ...baseJob, fitScore: 90 }])
 
     const stored = testDb.select().from(jobs).all()
-    expect(stored[0].fitScore).toBe(90)            // Sheets-owned: updated
+    expect(stored[0].fitScore).toBe(80)            // Analysis-owned: preserved
     expect(stored[0].applied).toBe(true)           // user-owned: preserved
     expect(stored[0].status).toBe('interviewing')  // user-owned: preserved
     expect(stored[0].dateApplied).toBe('2026-03-29T10:00:00.000Z') // user-owned: preserved
@@ -207,6 +207,8 @@ describe('upsert business logic', () => {
       contactName: null,
       contactEmail: null,
       contactPhone: null,
+      analysisStatus: null,
+      externalJobId: null,
     }
 
     expect(runIngest(testDb, [baseJob, job2])).toEqual({ added: 2, updated: 0 })
@@ -218,6 +220,29 @@ describe('upsert business logic', () => {
 
   test('empty payload returns { added: 0, updated: 0 }', () => {
     expect(runIngest(testDb, [])).toEqual({ added: 0, updated: 0 })
+  })
+
+  test('analysisStatus is NOT overwritten on re-ingest conflict', () => {
+    runIngest(testDb, [baseJob])
+
+    testDb
+      .update(jobs)
+      .set({ analysisStatus: 'done' })
+      .where(sql`company = 'Acme Corp' AND job_title = 'Senior Engineer'`)
+      .run()
+
+    runIngest(testDb, [{ ...baseJob, analysisStatus: 'pending' }])
+
+    const stored = testDb.select().from(jobs).all()
+    expect(stored[0].analysisStatus).toBe('done') // preserved — not clobbered by re-ingest
+  })
+
+  test('externalJobId is NOT overwritten on re-ingest conflict', () => {
+    runIngest(testDb, [{ ...baseJob, externalJobId: 'scraper-job-42' }])
+    runIngest(testDb, [{ ...baseJob, externalJobId: 'scraper-job-99' }])
+
+    const stored = testDb.select().from(jobs).all()
+    expect(stored[0].externalJobId).toBe('scraper-job-42') // first value preserved
   })
 
   test('key separator: company with "::" does not collide with adjacent jobTitle split', () => {
@@ -343,7 +368,7 @@ describe('POST /api/ingest HTTP contract (production handler)', () => {
     prodSqlite.run(
       `INSERT INTO jobs (company, job_title, applied, archived) VALUES ('Acme', 'Engineer', 0, 1)`
     )
-    const payload: JobInput[] = [{ company: 'Acme', jobTitle: 'Engineer', fitScore: 80, recommendation: 'apply', roleFit: null, requirementsMet: null, requirementsMissed: null, redFlags: null, jobDescription: null, sourceUrl: null, dateScraped: null, source: null, location: null, salary: null, benefits: null, contactName: null, contactEmail: null, contactPhone: null }]
+    const payload: JobInput[] = [{ company: 'Acme', jobTitle: 'Engineer', fitScore: 80, recommendation: 'apply', roleFit: null, requirementsMet: null, requirementsMissed: null, redFlags: null, jobDescription: null, sourceUrl: null, dateScraped: null, source: null, location: null, salary: null, benefits: null, contactName: null, contactEmail: null, contactPhone: null, analysisStatus: null, externalJobId: null }]
     const res = await ingestApp.request('/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-04-14 # 13-1 story enriched and moved to ready-for-dev
+last_updated: 2026-04-17 # 16-1 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -120,12 +120,25 @@ development_status:
   12-1-profile-view: done
   epic-12-retrospective: optional
 
+  # Epic 14: Embedded Scraper
+  epic-14: in-progress
+  14-1-embed-scraper-as-child-process: done
+
   # Epic 13: Remove n8n & Google Sheets — Self-Contained Pipeline
   epic-13: in-progress
-  13-1-remove-google-sheets-integration: ready-for-dev
-  13-2-schema-analysis-status-and-external-job-id: backlog
-  13-3-discovery-service-scraper-to-db: backlog
-  13-4-analysis-service-db-scraper-anthropic: backlog
-  13-5-cover-letter-direct-anthropic-and-docx: backlog
-  13-6-resume-direct-anthropic-and-playwright-pdf: backlog
+  13-1-remove-google-sheets-integration: done
+  13-2-schema-analysis-status-and-external-job-id: done
+  13-3-discovery-service-scraper-to-db: done
+  13-4-analysis-service-db-scraper-anthropic: done
+  13-5-cover-letter-direct-anthropic-and-docx: done
+  13-6-resume-direct-anthropic-and-playwright-pdf: done
+  13-7-resume-pdf-persistence-and-drawer-preview: done
   epic-13-retrospective: optional
+
+  # Epic 15: Prompt Templates
+  epic-15: in-progress
+  15-1-prompt-templates: done
+
+  # Epic 16: Jobs / Matches Page Split
+  epic-16: in-progress
+  16-1-jobs-matches-page-split: done
