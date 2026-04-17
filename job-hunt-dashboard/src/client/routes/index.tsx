@@ -16,7 +16,7 @@ function SkeletonCard() {
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-zinc-900/80 border-b border-zinc-800">
               <tr>
-                {['Company', 'Job Title', 'Score', 'Action', 'Reqs Met', 'Reqs Missed', 'Notes'].map((col) => (
+                {['Company', 'Job Title', 'Source', 'Date Scraped'].map((col) => (
                   <th key={col} className="px-3 h-9 text-left text-xs font-medium uppercase text-zinc-400">
                     {col}
                   </th>
@@ -28,11 +28,8 @@ function SkeletonCard() {
                 <tr key={i} className="border-b border-zinc-800/50">
                   <td className="px-3 py-1.5"><Skeleton className="h-4 w-24" /></td>
                   <td className="px-3 py-1.5"><Skeleton className="h-4 w-36" /></td>
-                  <td className="px-3 py-1.5"><Skeleton className="h-5 w-10 rounded-full" /></td>
-                  <td className="px-3 py-1.5"><Skeleton className="h-5 w-16 rounded-full" /></td>
-                  <td className="px-3 py-1.5"><Skeleton className="h-4 w-32" /></td>
-                  <td className="px-3 py-1.5"><Skeleton className="h-4 w-32" /></td>
-                  <td className="px-3 py-1.5"><Skeleton className="h-4 w-28" /></td>
+                  <td className="px-3 py-1.5"><Skeleton className="h-4 w-20" /></td>
+                  <td className="px-3 py-1.5"><Skeleton className="h-4 w-24" /></td>
                 </tr>
               ))}
             </tbody>
@@ -86,6 +83,7 @@ export function PipelineRoute() {
             selectedJobId={selectedJobId}
             onBulkArchive={bulkArchiveMutation.mutate}
             isBulkArchiving={bulkArchiveMutation.isPending}
+            fixedColumns={['company', 'jobTitle', 'source', 'date_scraped']}
           />
         </div>
         <JobDrawer

@@ -66,6 +66,17 @@ const staticColumns = [
       )
     },
   }),
+  columnHelper.accessor('source', {
+    header: 'Source',
+    cell: (info) => {
+      const v = info.getValue()
+      return v ? (
+        <span className="text-zinc-300">{v}</span>
+      ) : (
+        <span className="text-zinc-500">—</span>
+      )
+    },
+  }),
   columnHelper.accessor('dateScraped', {
     id: 'date_scraped',
     header: 'Date Scraped',
@@ -99,10 +110,21 @@ interface PipelineTableProps {
   selectedJobId: number | null
   onBulkArchive?: (ids: number[]) => void
   isBulkArchiving?: boolean
+  fixedColumns?: string[]
 }
 
-export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, isBulkArchiving = false }: PipelineTableProps) {
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(loadVisibility)
+export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, isBulkArchiving = false, fixedColumns }: PipelineTableProps) {
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (fixedColumns) {
+      const state: VisibilityState = {}
+      for (const col of staticColumns) {
+        const id = col.id ?? (col as { accessorKey?: string }).accessorKey as string
+        if (id) state[id] = fixedColumns.includes(id)
+      }
+      return state
+    }
+    return loadVisibility()
+  })
   const [sorting, setSorting] = useState<SortingState>([{ id: 'fitScore', desc: true }])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const lastSelectedIndexRef = useRef<number | null>(null)
@@ -110,10 +132,12 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
   function handleVisibilityChange(updater: Updater<VisibilityState>) {
     setColumnVisibility((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater
-      try {
-        localStorage.setItem(VISIBILITY_KEY, JSON.stringify(next))
-      } catch {
-        // ignore storage errors (quota exceeded, private mode)
+      if (!fixedColumns) {
+        try {
+          localStorage.setItem(VISIBILITY_KEY, JSON.stringify(next))
+        } catch {
+          // ignore storage errors (quota exceeded, private mode)
+        }
       }
       return next
     })
@@ -216,7 +240,7 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
             </Button>
           )}
         </div>
-        <ColumnVisibilityToggle table={table} />
+        {!fixedColumns && <ColumnVisibilityToggle table={table} />}
       </div>
       <div className="overflow-auto flex-1">
         <table className="w-full caption-bottom text-sm">
