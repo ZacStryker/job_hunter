@@ -240,7 +240,7 @@ export function DashboardRoute() {
       {data && (
         <>
           {/* Stat cards */}
-          <div className="grid grid-cols-6 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <StatCard label="Scrapes" value={String(data.scraped.total)} />
             <StatCard label="Archives" value={String(data.archived.total)} />
             <StatCard label="Matches" value={String(
@@ -249,11 +249,6 @@ export function DashboardRoute() {
                 .reduce((sum, r) => sum + r.value, 0)
             )} />
             <StatCard label="Applications" value={String(data.applications.total)} />
-            <StatCard
-              label="Response Rate"
-              value={data.applications.responseRate === null ? '—' : `${Math.round(data.applications.responseRate * 100)}%`}
-            />
-            <StatCard label="Messages" value={String(data.emails.total)} />
           </div>
 
           {/* Jobs per day by recommendation */}
