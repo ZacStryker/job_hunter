@@ -6,7 +6,7 @@ import { JobDrawer } from '../components/detail/JobDrawer'
 export function MatchesRoute() {
   const { data: jobs = [] } = useJobsQuery()
   const matchedJobs = jobs.filter(
-    j => !j.archived && j.analysisStatus === 'done' && (j.recommendation === 'apply' || j.recommendation === 'investigate')
+    j => !j.archived && !j.applied && j.analysisStatus === 'done' && (j.recommendation === 'apply' || j.recommendation === 'investigate')
   )
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
 
