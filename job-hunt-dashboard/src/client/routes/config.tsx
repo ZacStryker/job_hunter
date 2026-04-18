@@ -207,12 +207,59 @@ function SearchConfigCard() {
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold text-zinc-100">Discovery Searches</h2>
       </div>
+      <form onSubmit={handleSubmit} className="flex gap-2 items-end flex-wrap mb-4">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="sc-source" className="text-xs text-zinc-400">Source</label>
+          <select
+            id="sc-source"
+            className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100"
+            value={source}
+            onChange={(e) => setSource(e.target.value as ScraperSource)}
+          >
+            {SCRAPER_SOURCES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="sc-query" className="text-xs text-zinc-400">Query</label>
+          <input
+            id="sc-query"
+            className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100"
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="e.g. genai ml python"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="sc-location" className="text-xs text-zinc-400">Location (optional)</label>
+          <input
+            id="sc-location"
+            className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100"
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="e.g. remote"
+          />
+        </div>
+        <button
+          type="submit"
+          className="px-3 py-1 rounded bg-zinc-700 text-zinc-100 text-sm hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!query.trim() || addMutation.isPending}
+        >
+          Add
+        </button>
+      </form>
+      {addMutation.isError && (
+        <p className="text-sm text-red-400 mb-2">Add failed: {(addMutation.error as Error).message}</p>
+      )}
       {isPending && <p className="text-sm text-zinc-400">Loading…</p>}
       {!isPending && configs.length === 0 && (
         <p className="text-sm text-zinc-400">No search targets configured.</p>
       )}
       {!isPending && configs.length > 0 && (
-        <table className="w-full text-sm mb-4">
+        <table className="w-full text-sm">
           <TableHeader>
             <TableRow className="border-zinc-800">
               <TableHead className="text-zinc-400 bg-zinc-900 px-3 py-2">Source</TableHead>
@@ -304,57 +351,10 @@ function SearchConfigCard() {
         </table>
       )}
       {updateMutation.isError && (
-        <p className="text-sm text-red-400 mb-2">Save failed: {(updateMutation.error as Error).message}</p>
+        <p className="text-sm text-red-400 mt-2">Save failed: {(updateMutation.error as Error).message}</p>
       )}
       {deleteMutation.isError && (
-        <p className="text-sm text-red-400 mb-2">Delete failed: {(deleteMutation.error as Error).message}</p>
-      )}
-      <form onSubmit={handleSubmit} className="flex gap-2 items-end flex-wrap">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="sc-source" className="text-xs text-zinc-400">Source</label>
-          <select
-            id="sc-source"
-            className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100"
-            value={source}
-            onChange={(e) => setSource(e.target.value as ScraperSource)}
-          >
-            {SCRAPER_SOURCES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="sc-query" className="text-xs text-zinc-400">Query</label>
-          <input
-            id="sc-query"
-            className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100"
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. genai ml python"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="sc-location" className="text-xs text-zinc-400">Location (optional)</label>
-          <input
-            id="sc-location"
-            className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100"
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. remote"
-          />
-        </div>
-        <button
-          type="submit"
-          className="px-3 py-1 rounded bg-zinc-700 text-zinc-100 text-sm hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!query.trim() || addMutation.isPending}
-        >
-          Add
-        </button>
-      </form>
-      {addMutation.isError && (
-        <p className="text-sm text-red-400 mt-2">Add failed: {(addMutation.error as Error).message}</p>
+        <p className="text-sm text-red-400 mt-2">Delete failed: {(deleteMutation.error as Error).message}</p>
       )}
     </div>
   )
