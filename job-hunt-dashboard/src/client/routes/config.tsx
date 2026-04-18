@@ -7,7 +7,7 @@ import { usePromptsQuery } from '@/hooks/usePromptsQuery'
 import { useSearchConfigsQuery } from '@/hooks/useSearchConfigsQuery'
 import { useAddSearchConfigMutation, useDeleteSearchConfigMutation, useUpdateSearchConfigMutation } from '@/hooks/useSearchConfigMutations'
 import { SCRAPER_SOURCES } from '@shared/schemas'
-import type { ScraperSource } from '@shared/schemas'
+import type { PromptFlow, ScraperSource } from '@shared/schemas'
 
 function parseName(name: string): { workflow: string; job: string } {
   if (name.startsWith('Cover Letter - ')) return { workflow: 'Cover Letter', job: name.slice(15) }
@@ -113,10 +113,15 @@ function ProfilePreviewCard() {
   )
 }
 
-function AnalysisPromptPreviewCard() {
+const PROMPT_FLOW_LABELS: Record<PromptFlow, string> = {
+  analysis: 'Analysis',
+  cover_letter: 'Cover Letter',
+  resume: 'Resume',
+}
+
+function PromptsPreviewCard() {
   const navigate = useNavigate()
-  const { data, isLoading } = usePromptsQuery()
-  const analysisPrompt = data?.find((p) => p.flow === 'analysis')
+  const { data, isPending } = usePromptsQuery()
 
   return (
     <div
@@ -127,14 +132,21 @@ function AnalysisPromptPreviewCard() {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate({ to: '/prompts' }) }}
     >
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base font-semibold text-zinc-100">Analysis Prompt</h2>
-        <span className="text-xs text-zinc-500">Go to full →</span>
+        <h2 className="text-base font-semibold text-zinc-100">Prompts</h2>
+        <span className="text-xs text-zinc-500">View all →</span>
       </div>
-      {isLoading && <p className="text-sm text-zinc-400">Loading…</p>}
-      {!isLoading && (
-        <pre className="whitespace-pre-wrap text-sm text-zinc-100 font-mono bg-zinc-900 border border-zinc-800 rounded p-3 max-h-40 overflow-hidden">
-          {analysisPrompt?.userMessage ?? '—'}
-        </pre>
+      {isPending && <p className="text-sm text-zinc-400">Loading…</p>}
+      {!isPending && (data ?? []).length === 0 && (
+        <p className="text-sm text-zinc-400">No prompts configured.</p>
+      )}
+      {!isPending && (data ?? []).length > 0 && (
+        <div className="grid grid-cols-1 gap-2">
+          {(data ?? []).map((p) => (
+            <div key={p.flow} className="text-sm text-zinc-100 bg-zinc-900 border border-zinc-800 rounded px-3 py-2">
+              {PROMPT_FLOW_LABELS[p.flow]}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -355,7 +367,7 @@ export function ConfigRoute() {
       <SearchConfigCard />
       <div className="grid grid-cols-2 gap-6">
         <ProfilePreviewCard />
-        <AnalysisPromptPreviewCard />
+        <PromptsPreviewCard />
       </div>
       <LogsPreviewCard />
     </div>
