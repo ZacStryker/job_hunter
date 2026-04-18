@@ -352,10 +352,12 @@ export function ConfigRoute() {
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-semibold text-zinc-100">Config</h1>
-      <LogsPreviewCard />
-      <ProfilePreviewCard />
-      <AnalysisPromptPreviewCard />
       <SearchConfigCard />
+      <div className="grid grid-cols-2 gap-6">
+        <ProfilePreviewCard />
+        <AnalysisPromptPreviewCard />
+      </div>
+      <LogsPreviewCard />
     </div>
   )
 }
