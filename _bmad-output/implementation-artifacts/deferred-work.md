@@ -341,3 +341,17 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - `schema.ts`: `analysisStatus` stored as raw TEXT with no SQLite CHECK constraint — values from the analysis service bypass Zod validation. Pre-existing from earlier story.
 - `schema.ts`: `uniqueIndex` on `(company, job_title)` not updated to include `externalJobId` as the canonical deduplication key. Pre-existing; `externalJobId` is nullable.
 - `_journal.json`: idx 11 (`0011_wise_doctor_doom`) was added to the journal as part of this story commit — cross-story dependency, informational.
+
+## Deferred from: code review of 17-1-config-view-and-nav-reorganization (2026-04-18)
+
+- `router.ts`: `configRoute` loader uses `Promise.all` with no error boundary — if any prefetch throws, the Config page goes blank with no recovery UI. Pre-existing pattern; other routes also lack `errorComponent`.
+- `config.tsx` `SearchConfigCard`: delete button not disabled while `deleteMutation.isPending` — concurrent rapid clicks can fire multiple DELETE requests. Story 18-1 scope.
+- `config.tsx` `SearchConfigCard`: no error state rendered on failed add or delete mutations — user sees nothing on 400/404. Story 18-1 scope.
+- `hooks/useSearchConfigsQuery.ts`: `fetchSearchConfigs` uses raw `as SearchConfig[]` cast instead of Zod `.parse()` — malformed API response silently becomes wrong type. Story 18-1 scope.
+- `config.tsx` `SearchConfigCard` delete button: missing `aria-label` — renders only `✕` with no accessible name. Story 18-1 scope.
+
+## Deferred from: code review of edit-existing-searches (2026-04-18)
+
+- `api-search-configs.ts` `GET /`: handler is synchronous (`.all()` without `async/await`). Works with better-sqlite3 but will silently break if migrated to an async Turso/libsql driver. Make the handler `async` and `await` the query.
+- `SearchConfigCard`: no optimistic update — each save/delete triggers a full refetch, causing a brief table flicker. Acceptable for a local single-user tool but worth addressing if latency becomes noticeable.
+- Race condition: if `PUT /:id` is in-flight and another tab deletes the same row, the PUT returns 404 and the client shows "Save failed: Not found" with no context. Acceptable for single-user local app.
