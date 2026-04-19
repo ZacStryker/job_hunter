@@ -1,6 +1,6 @@
-import { isNotNull } from 'drizzle-orm'
+import { eq, isNotNull } from 'drizzle-orm'
 import { db } from '../../db/client'
-import { jobs } from '../../db/schema'
+import { jobs, searchConfigs } from '../../db/schema'
 
 interface ScraperResult {
   id: string
@@ -10,34 +10,31 @@ interface ScraperResult {
   url: string | null
 }
 
-const SEARCHES = [
-  { scraperSource: 'linkedin',  dbSource: 'linkedin', query: 'genai ml',             location: 'The Randstad, Netherlands' },
-  { scraperSource: 'indeed',    dbSource: 'indeed',   query: 'genai ml python',      location: 'remote' },
-  { scraperSource: 'indeed_nl', dbSource: 'indeed',   query: 'genai ml python',      location: 'Randstad' },
-  { scraperSource: 'linkedin',  dbSource: 'linkedin', query: 'Full stack developer', location: 'Remote' },
-  { scraperSource: 'indeed',    dbSource: 'indeed',   query: 'full stack developer', location: 'remote' },
-  { scraperSource: 'indeed_nl', dbSource: 'indeed',   query: 'full stack developer', location: 'Randstad' },
-]
+const DB_SOURCE: Record<string, string> = {
+  linkedin: 'linkedin', indeed: 'indeed', indeed_nl: 'indeed', arc: 'arc',
+}
 
 export async function runDiscovery(): Promise<{ inserted: number }> {
   const scraperUrl = process.env.SCRAPER_URL
   const scraperToken = process.env.SCRAPER_TOKEN
   if (!scraperUrl) throw new Error('SCRAPER_URL not configured')
 
+  const searches = db.select().from(searchConfigs).where(eq(searchConfigs.enabled, true)).all()
+
   const responses = await Promise.all(
-    SEARCHES.map((s) =>
+    searches.map((s) =>
       fetch(`${scraperUrl}/scrape/search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(scraperToken ? { Authorization: `Bearer ${scraperToken}` } : {}),
         },
-        body: JSON.stringify({ source: s.scraperSource, query: s.query, location: s.location }),
+        body: JSON.stringify({ source: s.source, query: s.query, location: s.location }),
         signal: AbortSignal.timeout(60_000),
       }).then(async (res) => {
         if (!res.ok) throw new Error(`Scraper error ${res.status} for "${s.query}"`)
         const data = await res.json() as { results?: ScraperResult[] }
-        return { source: s.dbSource, results: data.results ?? [] }
+        return { source: DB_SOURCE[s.source] ?? s.source, results: data.results ?? [] }
       })
     )
   )

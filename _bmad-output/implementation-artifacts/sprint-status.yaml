@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-04-17 # 16-1 done
+last_updated: 2026-04-18 # 17-1 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -142,3 +142,11 @@ development_status:
   # Epic 16: Jobs / Matches Page Split
   epic-16: in-progress
   16-1-jobs-matches-page-split: done
+
+  # Epic 17: Config View and Nav Reorganization
+  epic-17: in-progress
+  17-1-config-view-and-nav-reorganization: done
+
+  # Epic 18: Search Config UI
+  epic-18: in-progress
+  18-1-search-config-ui: review

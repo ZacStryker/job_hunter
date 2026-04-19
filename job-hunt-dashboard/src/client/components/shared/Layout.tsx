@@ -105,28 +105,12 @@ export function Layout() {
             Archive
           </Link>
           <Link
-            to="/logs"
+            to="/config"
             className="px-3 py-1.5 text-sm transition-colors"
             activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
             inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
           >
-            Logs
-          </Link>
-          <Link
-            to="/profile"
-            className="px-3 py-1.5 text-sm transition-colors"
-            activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
-            inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
-          >
-            Profile
-          </Link>
-          <Link
-            to="/prompts"
-            className="px-3 py-1.5 text-sm transition-colors"
-            activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
-            inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
-          >
-            Prompts
+            Config
           </Link>
         </nav>
 

@@ -89,6 +89,14 @@ export const messages = sqliteTable('messages', {
   jobTitle: text('job_title'),
 })
 
+export const searchConfigs = sqliteTable('search_configs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  source: text('source').notNull(),
+  query: text('query').notNull(),
+  location: text('location'),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+})
+
 export const prompts = sqliteTable('prompts', {
   flow: text('flow').primaryKey(),
   systemPrompt: text('system_prompt'),

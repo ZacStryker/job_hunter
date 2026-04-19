@@ -163,6 +163,24 @@ export type SyncResult = z.infer<typeof syncResultSchema>
 export type StatusEvent = z.infer<typeof statusEventSchema>
 export type Message = z.infer<typeof messageSchema>
 
+export const SCRAPER_SOURCES = ['linkedin', 'indeed', 'indeed_nl', 'arc'] as const
+export const scraperSourceSchema = z.enum(SCRAPER_SOURCES)
+export const searchConfigSchema = z.object({
+  id: z.number().int(),
+  source: scraperSourceSchema,
+  query: z.string(),
+  location: z.string().nullable(),
+  enabled: z.boolean(),
+})
+export const searchConfigInputSchema = z.object({
+  source: scraperSourceSchema,
+  query: z.string().min(1),
+  location: z.string().nullable(),
+})
+export type SearchConfig = z.infer<typeof searchConfigSchema>
+export type SearchConfigInput = z.infer<typeof searchConfigInputSchema>
+export type ScraperSource = z.infer<typeof scraperSourceSchema>
+
 export const PROMPT_FLOWS = ['analysis', 'cover_letter', 'resume'] as const
 export const promptFlowSchema = z.enum(PROMPT_FLOWS)
 export const promptSchema = z.object({

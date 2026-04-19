@@ -13,6 +13,8 @@ import { fetchProfile } from '../hooks/useProfileQuery'
 import { PromptsRoute } from '../routes/prompts'
 import { fetchPrompts } from '../hooks/usePromptsQuery'
 import { MatchesRoute } from '../routes/matches'
+import { ConfigRoute } from '../routes/config'
+import { fetchSearchConfigs } from '../hooks/useSearchConfigsQuery'
 
 const rootRoute = createRootRoute({
   component: Layout,
@@ -79,7 +81,18 @@ const matchesRoute = createRoute({
   loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
 })
 
-const routeTree = rootRoute.addChildren([dashboardRoute, indexRoute, trackerRoute, archivedRoute, messagesRoute, historyRoute, profileRoute, promptsRoute, matchesRoute])
+const configRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/config',
+  component: ConfigRoute,
+  loader: () => Promise.all([
+    queryClient.ensureQueryData({ queryKey: ['profile'], queryFn: fetchProfile }),
+    queryClient.ensureQueryData({ queryKey: ['prompts'], queryFn: fetchPrompts }),
+    queryClient.ensureQueryData({ queryKey: ['search-configs'], queryFn: fetchSearchConfigs }),
+  ]),
+})
+
+const routeTree = rootRoute.addChildren([dashboardRoute, indexRoute, trackerRoute, archivedRoute, messagesRoute, historyRoute, profileRoute, promptsRoute, matchesRoute, configRoute])
 
 export const router = createRouter({ routeTree })
 

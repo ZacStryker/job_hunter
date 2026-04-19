@@ -11,6 +11,7 @@ import webhooksRoute from './server/routes/api-webhooks'
 import statsRoute from './server/routes/api-stats'
 import profileRoute from './server/routes/api-profile'
 import promptsRoute from './server/routes/api-prompts'
+import searchConfigsRoute from './server/routes/api-search-configs'
 import { errorHandler } from './server/middleware/error-handler'
 
 const app = new Hono()
@@ -37,6 +38,7 @@ app.route('/api/webhooks', webhooksRoute)
 app.route('/api/stats', statsRoute)
 app.route('/api/profile', profileRoute)
 app.route('/api/prompts', promptsRoute)
+app.route('/api/search-configs', searchConfigsRoute)
 app.onError(errorHandler)
 
 // Resolve dist/ relative to this file, not CWD — safe for any working directory
