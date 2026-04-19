@@ -152,6 +152,18 @@ function PromptsPreviewCard() {
   )
 }
 
+type SortCol = 'source' | 'query' | 'location'
+type SortDir = 'asc' | 'desc'
+
+const SORT_COL_LABELS: Record<SortCol, string> = {
+  source: 'Source', query: 'Query', location: 'Location',
+}
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <span aria-hidden="true" className="ml-1 text-zinc-600">↕</span>
+  return <span aria-hidden="true" className="ml-1 text-zinc-300">{dir === 'asc' ? '↑' : '↓'}</span>
+}
+
 function SearchConfigCard() {
   const { data: configs = [], isPending } = useSearchConfigsQuery()
   const addMutation = useAddSearchConfigMutation()
@@ -166,6 +178,18 @@ function SearchConfigCard() {
   const [editSource, setEditSource] = useState<ScraperSource>('linkedin')
   const [editQuery, setEditQuery] = useState('')
   const [editLocation, setEditLocation] = useState('')
+
+  const [sortCol, setSortCol] = useState<SortCol>('source')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  function toggleSort(col: SortCol) {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortCol(col)
+      setSortDir('asc')
+    }
+  }
 
   function startEdit(row: { id: number; source: ScraperSource; query: string; location: string | null }) {
     updateMutation.reset()
@@ -201,6 +225,12 @@ function SearchConfigCard() {
   }
 
   const inputCls = 'bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100 w-full'
+
+  const sorted = [...configs].sort((a, b) => {
+    const av = (a[sortCol] ?? '').toLowerCase()
+    const bv = (b[sortCol] ?? '').toLowerCase()
+    return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+  })
 
   return (
     <div className="border border-zinc-800 rounded-lg p-4">
@@ -262,14 +292,22 @@ function SearchConfigCard() {
         <table className="w-full text-sm">
           <TableHeader>
             <TableRow className="border-zinc-800">
-              <TableHead className="text-zinc-400 bg-zinc-900 px-3 py-2">Source</TableHead>
-              <TableHead className="text-zinc-400 bg-zinc-900 px-3 py-2">Query</TableHead>
-              <TableHead className="text-zinc-400 bg-zinc-900 px-3 py-2">Location</TableHead>
-              <TableHead className="text-zinc-400 bg-zinc-900 px-3 py-2"></TableHead>
+              {(['source', 'query', 'location'] as SortCol[]).map((col) => (
+                <TableHead
+                  key={col}
+                  aria-sort={sortCol === col ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className={`text-zinc-400 bg-zinc-900 px-3 py-2 select-none transition-colors ${editingId !== null ? 'cursor-default opacity-50' : 'cursor-pointer hover:text-zinc-200'}`}
+                  onClick={() => editingId === null && toggleSort(col)}
+                >
+                  {SORT_COL_LABELS[col]}
+                  <SortIcon active={sortCol === col} dir={sortDir} />
+                </TableHead>
+              ))}
+              <TableHead aria-label="Actions" className="text-zinc-400 bg-zinc-900 px-3 py-2"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {configs.map((row) =>
+            {sorted.map((row) =>
               editingId === row.id ? (
                 <TableRow key={row.id} className="border-zinc-800">
                   <TableCell className="px-3 py-1">
