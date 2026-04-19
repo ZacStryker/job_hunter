@@ -19,7 +19,19 @@ import type { Job } from '@shared/schemas'
 import { ScoreBadge } from './ScoreBadge'
 import { ActionChip } from './ActionChip'
 import { ColumnVisibilityToggle } from './ColumnVisibilityToggle'
-import { STATUS_OPTIONS, NO_STATUS, APPLIED } from '../detail/StatusDropdown'
+const NO_STATUS = '__none__'
+const APPLIED = 'Applied'
+const STATUS_OPTIONS = [
+  { value: NO_STATUS, label: 'No Status' },
+  { value: APPLIED, label: 'Applied' },
+  { value: 'phone_screen', label: 'Phone Screen' },
+  { value: 'interview', label: 'Interview' },
+  { value: 'technical', label: 'Technical Round' },
+  { value: 'offer', label: 'Offer Received' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'withdrawn', label: 'Withdrawn' },
+  { value: 'ghosted', label: 'Ghosted' },
+]
 
 const VISIBILITY_KEY = 'job-hunt-column-visibility'
 
@@ -45,6 +57,17 @@ const staticColumns = [
   columnHelper.accessor('jobTitle', {
     header: 'Job Title',
     cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor('location', {
+    header: 'Location',
+    cell: (info) => {
+      const v = info.getValue()
+      return v ? (
+        <span className="text-zinc-300">{v}</span>
+      ) : (
+        <span className="text-zinc-500">—</span>
+      )
+    },
   }),
   columnHelper.accessor('fitScore', {
     header: 'Score',
@@ -92,6 +115,18 @@ const staticColumns = [
   columnHelper.accessor('dateScraped', {
     id: 'date_scraped',
     header: 'Date Scraped',
+    cell: (info) => {
+      const v = info.getValue()
+      return v ? (
+        <span className="text-zinc-300">{v.slice(0, 10)}</span>
+      ) : (
+        <span className="text-zinc-500">—</span>
+      )
+    },
+  }),
+  columnHelper.accessor('dateApplied', {
+    id: 'date_applied',
+    header: 'Date Applied',
     cell: (info) => {
       const v = info.getValue()
       return v ? (

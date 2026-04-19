@@ -33,6 +33,7 @@ export function ArchivedRoute() {
           jobs={archivedJobs}
           onRowClick={(job) => setSelectedJobId(job.id === selectedJobId ? null : job.id)}
           selectedJobId={selectedJobId}
+          fixedColumns={['company', 'jobTitle', 'location', 'fitScore', 'recommendation', 'date_analyzed', 'date_applied']}
         />
       </div>
       <JobDrawer

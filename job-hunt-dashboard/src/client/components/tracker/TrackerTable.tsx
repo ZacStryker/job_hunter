@@ -15,6 +15,8 @@ import {
   TableRow,
 } from '../ui/table'
 import type { Job } from '@shared/schemas'
+import { ScoreBadge } from '../pipeline/ScoreBadge'
+import { ActionChip } from '../pipeline/ActionChip'
 
 const columnHelper = createColumnHelper<Job>()
 
@@ -34,6 +36,18 @@ const columns = [
   columnHelper.accessor('jobTitle', {
     header: 'Job Title',
     cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor('location', {
+    header: 'Location',
+    cell: (info) => info.getValue() ?? '—',
+  }),
+  columnHelper.accessor('fitScore', {
+    header: 'Score',
+    cell: (info) => <ScoreBadge score={info.getValue()} />,
+  }),
+  columnHelper.accessor('recommendation', {
+    header: 'Recommendation',
+    cell: (info) => <ActionChip recommendation={info.getValue()} />,
   }),
   columnHelper.accessor('latestStatus', {
     header: 'Status',

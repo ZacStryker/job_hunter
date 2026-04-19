@@ -1,9 +1,18 @@
 import { useState, useEffect } from 'react'
 import { Skeleton } from '../components/ui/skeleton'
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert'
+import { Button } from '../components/ui/button'
+import { Loader2 } from 'lucide-react'
 import { useJobsQuery } from '../hooks/useJobsQuery'
 import { useBulkArchiveMutation } from '../hooks/useBulkArchiveMutation'
+import { useWebhookMutation } from '../hooks/useWebhookMutation'
 import { PipelineTable } from '../components/pipeline/PipelineTable'
 import { JobDrawer } from '../components/detail/JobDrawer'
+
+type ActiveAlert =
+  | { kind: 'webhook-success'; label: string }
+  | { kind: 'error'; label: string; message: string }
+  | null
 
 function SkeletonCard() {
   return (
@@ -59,7 +68,10 @@ function EmptyState() {
 export function PipelineRoute() {
   const { data: jobs, isPending } = useJobsQuery()
   const bulkArchiveMutation = useBulkArchiveMutation()
+  const discoveryMutation = useWebhookMutation('/api/webhooks/discovery')
+  const analysisMutation = useWebhookMutation('/api/webhooks/analysis')
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
+  const [activeAlert, setActiveAlert] = useState<ActiveAlert>(null)
 
   const activeJobs = (jobs ?? []).filter(j => !j.archived && j.fitScore == null)
 
@@ -69,6 +81,91 @@ export function PipelineRoute() {
     }
   }, [activeJobs, selectedJobId])
 
+  useEffect(() => {
+    if (discoveryMutation.isSuccess) {
+      setActiveAlert({ kind: 'webhook-success', label: 'Discovery' })
+      const t = setTimeout(() => setActiveAlert(null), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [discoveryMutation.isSuccess])
+
+  useEffect(() => {
+    if (discoveryMutation.isError) {
+      setActiveAlert({ kind: 'error', label: 'Discovery', message: discoveryMutation.error.message })
+      const t = setTimeout(() => setActiveAlert(null), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [discoveryMutation.isError])
+
+  useEffect(() => {
+    if (analysisMutation.isSuccess) {
+      setActiveAlert({ kind: 'webhook-success', label: 'Analysis' })
+      const t = setTimeout(() => setActiveAlert(null), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [analysisMutation.isSuccess])
+
+  useEffect(() => {
+    if (analysisMutation.isError) {
+      setActiveAlert({ kind: 'error', label: 'Analysis', message: analysisMutation.error.message })
+      const t = setTimeout(() => setActiveAlert(null), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [analysisMutation.isError])
+
+  const actionBar = (
+    <div className="flex items-center justify-between px-4 pt-4">
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={discoveryMutation.isPending || analysisMutation.isPending}
+          onClick={() => discoveryMutation.mutate()}
+        >
+          {discoveryMutation.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Discovery…
+            </>
+          ) : (
+            'Discovery'
+          )}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={analysisMutation.isPending || discoveryMutation.isPending}
+          onClick={() => analysisMutation.mutate()}
+        >
+          {analysisMutation.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Analysis…
+            </>
+          ) : (
+            'Analysis'
+          )}
+        </Button>
+      </div>
+      {activeAlert && (
+        <div className="flex-1 ml-4">
+          {activeAlert.kind === 'webhook-success' && (
+            <Alert className="py-2">
+              <AlertTitle className="text-sm">{activeAlert.label} triggered</AlertTitle>
+              <AlertDescription className="text-xs">Workflow started successfully.</AlertDescription>
+            </Alert>
+          )}
+          {activeAlert.kind === 'error' && (
+            <Alert variant="destructive" className="py-2">
+              <AlertTitle className="text-sm">{activeAlert.label} failed</AlertTitle>
+              <AlertDescription className="text-xs">{activeAlert.message}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
+    </div>
+  )
+
   if (isPending) {
     return <SkeletonCard />
   }
@@ -76,6 +173,7 @@ export function PipelineRoute() {
   if (jobs !== undefined && activeJobs.length > 0) {
     return (
       <>
+        {actionBar}
         <div className="p-4">
           <PipelineTable
             jobs={activeJobs}
@@ -95,5 +193,10 @@ export function PipelineRoute() {
     )
   }
 
-  return <EmptyState />
+  return (
+    <>
+      {actionBar}
+      <EmptyState />
+    </>
+  )
 }

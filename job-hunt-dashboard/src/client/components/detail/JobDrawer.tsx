@@ -1,12 +1,11 @@
 import { useState, useEffect, Fragment } from 'react'
-import { ExternalLink, Archive, ArchiveRestore, Wand2, Copy, FileText, Download } from 'lucide-react'
+import { ExternalLink, Archive, ArchiveRestore, Wand2, Copy, FileText, Download, CheckCircle, Circle } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
-import { Separator } from '../ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import type { Job } from '@shared/schemas'
 import { ScoreBadge } from '../pipeline/ScoreBadge'
 import { ActionChip } from '../pipeline/ActionChip'
 import { AssessmentSection } from './AssessmentSection'
-import { StatusDropdown } from './StatusDropdown'
 import { useJobEvents } from '../../hooks/useJobEvents'
 import { StatusTimeline } from './StatusTimeline'
 import { useGenerateCoverLetter } from '../../hooks/useGenerateCoverLetter'
@@ -120,6 +119,20 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                 </a>
               )}
               <button
+                onClick={() => patchJob({ id: job.id, patch: { applied: !job.applied, statusOverride: null } })}
+                disabled={isArchiving}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  job.applied
+                    ? 'border-emerald-700/60 text-emerald-400 hover:border-zinc-600 hover:text-zinc-400'
+                    : 'border-zinc-700 text-zinc-400 hover:border-emerald-700/60 hover:text-emerald-400'
+                }`}
+              >
+                {job.applied
+                  ? <><CheckCircle size={13} />Applied</>
+                  : <><Circle size={13} />Mark Applied</>
+                }
+              </button>
+              <button
                 onClick={() => patchJob({ id: job.id, patch: { archived: !job.archived } })}
                 disabled={isArchiving}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
@@ -133,143 +146,151 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                   : <><Archive size={13} />{isArchiving ? 'Archiving…' : 'Archive'}</>
                 }
               </button>
-              {job.jobDescription ? (
-                <button
-                  onClick={() => generateCoverLetter()}
-                  disabled={isPending}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Wand2 size={13} />
-                  {isPending ? 'Generating…' : job.coverLetterSentAt ? 'Regenerate' : 'Cover Letter'}
-                </button>
-              ) : (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-600 cursor-not-allowed select-none">
-                        <Wand2 size={13} />
-                        Cover Letter
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>No job description available</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              {job.jobDescription ? (
-                <button
-                  onClick={() => generateResume()}
-                  disabled={isResumePending}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <FileText size={13} />
-                  {isResumePending ? 'Generating…' : job.resumeGeneratedAt ? 'Regenerate' : 'Resume'}
-                </button>
-              ) : (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-600 cursor-not-allowed select-none">
-                        <FileText size={13} />
-                        Resume
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>No job description available</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              {isError && (
-                <p className="w-full text-xs text-red-400">{error?.message ?? 'Generation failed'}</p>
-              )}
-              {isResumeError && (
-                <p className="w-full text-xs text-red-400">{resumeError?.message ?? 'Resume generation failed'}</p>
-              )}
             </div>
           )}
           {job && <JobDetailFields job={job} />}
-          {job && <StatusDropdown job={job} />}
           {job && <StatusTimeline events={events} />}
-          <Separator className="bg-zinc-800" />
-          <div className="grid grid-cols-2 gap-4 items-start">
-            <AssessmentSection label="Role Fit" content={job?.roleFit ?? null} />
-            <AssessmentSection label="Red Flags" content={job?.redFlags ?? null} />
-            <AssessmentSection label="Requirements Met" content={job?.requirementsMet ?? null} />
-            <AssessmentSection label="Requirements Missed" content={job?.requirementsMissed ?? null} />
-          </div>
-          {job?.jobDescription && (
-            <>
-              <Separator className="bg-zinc-800" />
-              <div className="space-y-2">
-                <p className="text-xs text-zinc-500 uppercase tracking-wide">Job Description</p>
-                <p className="text-sm text-zinc-200 leading-relaxed">
-                  {showFullDescription
-                    ? job.jobDescription
-                    : job.jobDescription.slice(0, 300)}
-                  {!showFullDescription && job.jobDescription.length > 300 && '…'}
-                </p>
-                {job.jobDescription.length > 300 && (
+          <Tabs defaultValue="analysis" className="mt-2">
+            <TabsList className="w-full bg-zinc-800 border border-zinc-700">
+              <TabsTrigger value="analysis" className="flex-1">Analysis</TabsTrigger>
+              <TabsTrigger value="description" className="flex-1">Description</TabsTrigger>
+              <TabsTrigger value="documents" className="flex-1">Documents</TabsTrigger>
+            </TabsList>
+            <TabsContent value="analysis" className="pt-4">
+              <div className="grid grid-cols-2 gap-4 items-start">
+                <AssessmentSection label="Role Fit" content={job?.roleFit ?? null} />
+                <AssessmentSection label="Red Flags" content={job?.redFlags ?? null} />
+                <AssessmentSection label="Requirements Met" content={job?.requirementsMet ?? null} />
+                <AssessmentSection label="Requirements Missed" content={job?.requirementsMissed ?? null} />
+              </div>
+            </TabsContent>
+            <TabsContent value="description" className="pt-4">
+              {job?.jobDescription ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-zinc-200 leading-relaxed">
+                    {showFullDescription
+                      ? job.jobDescription
+                      : job.jobDescription.slice(0, 300)}
+                    {!showFullDescription && job.jobDescription.length > 300 && '…'}
+                  </p>
+                  {job.jobDescription.length > 300 && (
+                    <button
+                      className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
+                      onClick={() => setShowFullDescription(!showFullDescription)}
+                    >
+                      {showFullDescription ? 'Show less' : 'Show more'}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-500 italic">No job description available.</p>
+              )}
+            </TabsContent>
+            <TabsContent value="documents" className="pt-4 space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {job?.jobDescription ? (
                   <button
-                    className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
-                    onClick={() => setShowFullDescription(!showFullDescription)}
+                    onClick={() => generateCoverLetter()}
+                    disabled={isPending}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {showFullDescription ? 'Show less' : 'Show more'}
+                    <Wand2 size={13} />
+                    {isPending ? 'Generating…' : job.coverLetterSentAt ? 'Regenerate Cover Letter' : 'Generate Cover Letter'}
                   </button>
+                ) : (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-600 cursor-not-allowed select-none">
+                          <Wand2 size={13} />
+                          Generate Cover Letter
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>No job description available</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {job?.jobDescription ? (
+                  <button
+                    onClick={() => generateResume()}
+                    disabled={isResumePending}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FileText size={13} />
+                    {isResumePending ? 'Generating…' : job.resumeGeneratedAt ? 'Regenerate Resume' : 'Generate Resume'}
+                  </button>
+                ) : (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-600 cursor-not-allowed select-none">
+                          <FileText size={13} />
+                          Generate Resume
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>No job description available</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {isError && (
+                  <p className="w-full text-xs text-red-400">{error?.message ?? 'Generation failed'}</p>
+                )}
+                {isResumeError && (
+                  <p className="w-full text-xs text-red-400">{resumeError?.message ?? 'Resume generation failed'}</p>
                 )}
               </div>
-            </>
-          )}
-          {coverLetter && (
-            <>
-              <Separator className="bg-zinc-800" />
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Cover Letter</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs text-zinc-600">{new Date(coverLetter.createdAt).toLocaleDateString()}</p>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(coverLetter.content)}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-                    >
-                      <Copy size={11} />
-                      Copy
-                    </button>
+              {coverLetter ? (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Cover Letter</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-zinc-600">{new Date(coverLetter.createdAt).toLocaleDateString()}</p>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(coverLetter.content)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                      >
+                        <Copy size={11} />
+                        Copy
+                      </button>
+                    </div>
                   </div>
+                  <pre className="text-xs text-zinc-300 whitespace-pre-wrap max-h-64 overflow-y-auto font-sans leading-relaxed">
+                    {coverLetter.content}
+                  </pre>
                 </div>
-                <pre className="text-xs text-zinc-300 whitespace-pre-wrap max-h-64 overflow-y-auto font-sans leading-relaxed">
-                  {coverLetter.content}
-                </pre>
-              </div>
-            </>
-          )}
-          {job?.resumeGeneratedAt && (
-            <>
-              <Separator className="bg-zinc-800" />
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Resume</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs text-zinc-600">{new Date(job.resumeGeneratedAt).toLocaleDateString()}</p>
-                    <a
-                      href={`/api/jobs/${job.id}/resume`}
-                      download
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-                    >
-                      <Download size={11} />
-                      Download
-                    </a>
+              ) : null}
+              {job?.resumeGeneratedAt ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Resume</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-zinc-600">{new Date(job.resumeGeneratedAt).toLocaleDateString()}</p>
+                      <a
+                        href={`/api/jobs/${job.id}/resume`}
+                        download
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                      >
+                        <Download size={11} />
+                        Download
+                      </a>
+                    </div>
                   </div>
+                  <iframe
+                    src={`/api/jobs/${job.id}/resume`}
+                    className="w-full h-96 border border-zinc-800 rounded"
+                    title="Resume preview"
+                  />
                 </div>
-                <iframe
-                  src={`/api/jobs/${job.id}/resume`}
-                  className="w-full h-96 border border-zinc-800 rounded"
-                  title="Resume preview"
-                />
-              </div>
-            </>
-          )}
+              ) : null}
+              {!coverLetter && !job?.resumeGeneratedAt && (
+                <p className="text-sm text-zinc-500 italic">No documents generated yet.</p>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </SheetContent>
     </Sheet>

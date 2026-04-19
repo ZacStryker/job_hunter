@@ -11,7 +11,7 @@ interface ScraperResult {
 }
 
 const DB_SOURCE: Record<string, string> = {
-  linkedin: 'linkedin', indeed: 'indeed', indeed_nl: 'indeed', arc: 'arc',
+  linkedin: 'linkedin', indeed: 'indeed', indeed_nl: 'indeed_nl', arc: 'arc',
 }
 
 export async function runDiscovery(): Promise<{ inserted: number }> {
