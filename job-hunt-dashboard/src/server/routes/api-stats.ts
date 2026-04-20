@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { db } from '../../db/client'
-import { jobs, webhookRuns } from '../../db/schema'
-import { and, eq, gte } from 'drizzle-orm'
+import { jobs, webhookRuns, messages } from '../../db/schema'
+import { and, eq, gte, isNotNull } from 'drizzle-orm'
 import { STATS_PERIODS } from '../../shared/schemas'
 
 const app = new Hono()
@@ -89,6 +89,15 @@ app.get('/', (c) => {
     { name: 'Investigate', value: investigateCount },
   ]
 
+  const SCORE_BUCKETS = ['0-9', '10-19', '20-29', '30-39', '40-49', '50-59', '60-69', '70-79', '80-89', '90-100'] as const
+  const scoreCounts: Record<string, number> = Object.fromEntries(SCORE_BUCKETS.map(k => [k, 0]))
+  for (const job of viewJobs) {
+    if (job.fitScore === null) continue
+    const bucketIdx = Math.min(Math.floor(job.fitScore / 10), 9)
+    scoreCounts[SCORE_BUCKETS[bucketIdx]]++
+  }
+  const byScore = SCORE_BUCKETS.map(k => ({ score: k, count: scoreCounts[k] }))
+
   // ── Applications section (applied=true, archivedFilter, dateApplied cutoff) ──
   const archivedAppCond =
     archivedFilter === 'active'   ? eq(jobs.archived, false) :
@@ -100,14 +109,36 @@ app.get('/', (c) => {
   )
   const appliedJobs = db.select().from(jobs).where(appWhere).all()
 
+  const allMessages = db.select({
+    company: messages.company,
+    jobTitle: messages.jobTitle,
+    type: messages.type,
+    receivedAt: messages.receivedAt,
+  }).from(messages).where(isNotNull(messages.type)).all()
+
+  const latestMessageByKey = new Map<string, { type: string; receivedAt: string }>()
+  for (const msg of allMessages) {
+    if (!msg.company || !msg.jobTitle) continue
+    const key = `${msg.company.toLowerCase()}|||${msg.jobTitle.toLowerCase()}`
+    const existing = latestMessageByKey.get(key)
+    if (!existing || msg.receivedAt > existing.receivedAt) {
+      latestMessageByKey.set(key, { type: msg.type!, receivedAt: msg.receivedAt })
+    }
+  }
+
   const appTotal = appliedJobs.length
   const appCompanies = new Set(appliedJobs.map(j => j.company)).size
-  const appResponses = appliedJobs.filter(j => j.statusOverride !== null).length
+  const appResponses = appliedJobs.filter(j => {
+    const key = `${j.company.toLowerCase()}|||${j.jobTitle.toLowerCase()}`
+    return latestMessageByKey.has(key)
+  }).length
 
   const STATUS_KEYS = ['No Response', 'Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other'] as const
   const statusCounts: Record<string, number> = Object.fromEntries(STATUS_KEYS.map(k => [k, 0]))
   for (const job of appliedJobs) {
-    const key = job.statusOverride ?? 'No Response'
+    const msgKey = `${job.company.toLowerCase()}|||${job.jobTitle.toLowerCase()}`
+    const status = latestMessageByKey.get(msgKey)?.type ?? null
+    const key = status ?? 'No Response'
     const bucket = (STATUS_KEYS as readonly string[]).includes(key) ? key : 'Other'
     statusCounts[bucket]++
   }
@@ -117,7 +148,9 @@ app.get('/', (c) => {
     if (!job.dateApplied) continue
     const date = job.dateApplied.slice(0, 10)
     if (!appDailyMap[date]) appDailyMap[date] = Object.fromEntries(STATUS_KEYS.map(k => [k, 0]))
-    const key = job.statusOverride ?? 'No Response'
+    const msgKey = `${job.company.toLowerCase()}|||${job.jobTitle.toLowerCase()}`
+    const status = latestMessageByKey.get(msgKey)?.type ?? null
+    const key = status ?? 'No Response'
     const bucket = (STATUS_KEYS as readonly string[]).includes(key) ? key : 'Other'
     appDailyMap[date][bucket]++
   }
@@ -172,7 +205,7 @@ app.get('/', (c) => {
 
   return c.json({
     jobs: { total: scrapedTotal, companies, sources, perDay: jobsPerDay, bySource },
-    matches: { total: applyCount + investigateCount, apply: applyCount, investigate: investigateCount, perDay: matchesPerDay, byRecommendation },
+    matches: { total: applyCount + investigateCount, apply: applyCount, investigate: investigateCount, perDay: matchesPerDay, byRecommendation, byScore },
     applications: { total: appTotal, companies: appCompanies, responses: appResponses, perDay: appPerDay, byStatus },
     automation: { totalRuns, totalTokens, totalCost, perDay: autoPerDay, costByWorkflow },
   })

@@ -36,6 +36,8 @@ const REC_COLOR_MAP: Record<string, string> = {
   Investigate: '#facc15',
 }
 
+const SCORE_COLORS = ['#ef4444', '#f87171', '#fb923c', '#fbbf24', '#facc15', '#a3e635', '#4ade80', '#34d399', '#22d3ee', '#60a5fa']
+
 const STATUS_COLOR_MAP: Record<string, string> = {
   'No Response': '#a1a1aa',
   Submitted: '#60a5fa',
@@ -327,22 +329,22 @@ export function DashboardRoute() {
               </ChartCard>
             )}
             <ChartCard
-              title="Recommendation Breakdown"
-              tableHeaders={['Recommendation', 'Count']}
-              tableData={data.matches.byRecommendation.map(e => [e.name, e.value])}
+              title="Score Breakdown"
+              tableHeaders={['Score', 'Count']}
+              tableData={data.matches.byScore.map(e => [e.score, e.count])}
             >
-              {data.matches.byRecommendation.every(e => e.value === 0) ? <NoData /> : (
+              {data.matches.byScore.every(e => e.count === 0) ? <NoData /> : (
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart layout="vertical" data={data.matches.byRecommendation}>
+                  <BarChart data={data.matches.byScore}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis type="number" {...AXIS_PROPS} />
-                    <YAxis type="category" dataKey="name" width={100} {...AXIS_PROPS} />
+                    <XAxis dataKey="score" {...AXIS_PROPS} />
+                    <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
-                    <Bar dataKey="value">
-                      {data.matches.byRecommendation.map(entry => (
-                        <Cell key={entry.name} fill={REC_COLOR_MAP[entry.name] ?? '#a1a1aa'} />
+                    <Bar dataKey="count">
+                      {data.matches.byScore.map((entry, i) => (
+                        <Cell key={entry.score} fill={SCORE_COLORS[i] ?? '#a1a1aa'} />
                       ))}
-                      <LabelList dataKey="value" content={LabelInsideRight as (props: object) => React.JSX.Element} />
+                      <LabelList dataKey="count" content={LabelInsideTop as (props: object) => React.JSX.Element} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>

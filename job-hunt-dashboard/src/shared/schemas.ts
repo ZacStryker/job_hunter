@@ -120,6 +120,7 @@ export const statsSchema = z.object({
       investigate: z.number(),
     })),
     byRecommendation: z.array(z.object({ name: z.string(), value: z.number() })),
+    byScore: z.array(z.object({ score: z.string(), count: z.number() })),
   }),
   applications: z.object({
     total: z.number(),
