@@ -1,4 +1,4 @@
-import { integer, text, sqliteTable, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { integer, real, text, sqliteTable, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export const jobs = sqliteTable('jobs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -56,10 +56,14 @@ export const statusEvents = sqliteTable('status_events', {
 export const webhookRuns = sqliteTable('webhook_runs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
-  runAt: text('run_at').notNull(),          // ISO 8601 datetime
+  runAt: text('run_at').notNull(),
   success: integer('success', { mode: 'boolean' }).notNull(),
-  itemCount: integer('item_count'),          // nullable — null when unknown
-  errorMessage: text('error_message'),       // nullable — set only on failure
+  itemCount: integer('item_count'),
+  errorMessage: text('error_message'),
+  durationMs: integer('duration_ms'),
+  inputTokens: integer('input_tokens'),
+  outputTokens: integer('output_tokens'),
+  costUsd: real('cost_usd'),
 })
 
 export const profile = sqliteTable('profile', {

@@ -60,7 +60,7 @@ function mockAnthropicSuccess(text = 'Dear Hiring Manager,\n\nI am excited.\n\nS
   globalThis.fetch = mock(() =>
     Promise.resolve(
       new Response(
-        JSON.stringify({ content: [{ type: 'text', text }] }),
+        JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 100, output_tokens: 200 } }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       )
     )
@@ -68,11 +68,13 @@ function mockAnthropicSuccess(text = 'Dear Hiring Manager,\n\nI am excited.\n\nS
 }
 
 describe('generateCoverLetter()', () => {
-  test('happy path: returns cover letter text', async () => {
+  test('happy path: returns cover letter text with token counts', async () => {
     mockAnthropicSuccess('Dear Hiring Manager,\n\nThis is a great role.')
 
     const result = await generateCoverLetter(MOCK_JOB)
-    expect(result).toBe('Dear Hiring Manager,\n\nThis is a great role.')
+    expect(result.content).toBe('Dear Hiring Manager,\n\nThis is a great role.')
+    expect(result.inputTokens).toBe(100)
+    expect(result.outputTokens).toBe(200)
   })
 
   test('missing ANTHROPIC_API_KEY: throws before any fetch', async () => {
@@ -88,7 +90,7 @@ describe('generateCoverLetter()', () => {
     mockAnthropicSuccess('Dear Hiring Manager,\n\nI apply.')
 
     const result = await generateCoverLetter(MOCK_JOB)
-    expect(result).toBe('Dear Hiring Manager,\n\nI apply.')
+    expect(result.content).toBe('Dear Hiring Manager,\n\nI apply.')
   })
 
   test('Anthropic HTTP error: throws with status', async () => {
@@ -103,7 +105,7 @@ describe('generateCoverLetter()', () => {
     globalThis.fetch = mock(() =>
       Promise.resolve(
         new Response(
-          JSON.stringify({ content: [{ type: 'text', text: '   ' }] }),
+          JSON.stringify({ content: [{ type: 'text', text: '   ' }], usage: { input_tokens: 10, output_tokens: 0 } }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         )
       )

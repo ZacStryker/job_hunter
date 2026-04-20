@@ -6,6 +6,7 @@ import type { Job } from '../../shared/schemas'
 
 interface AnthropicResponse {
   content: Array<{ type: string; text: string }>
+  usage: { input_tokens: number; output_tokens: number }
 }
 
 const htmlTemplate = `<!DOCTYPE html>
@@ -318,7 +319,7 @@ function stripCodeFences(text: string): string {
   return html.trim()
 }
 
-export async function generateResume(job: Job): Promise<Buffer> {
+export async function generateResume(job: Job): Promise<{ pdf: Buffer; inputTokens: number; outputTokens: number }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
@@ -372,5 +373,5 @@ export async function generateResume(job: Job): Promise<Buffer> {
 
   const html = stripCodeFences(rawText)
   if (!html) throw new Error('Anthropic returned empty resume')
-  return generatePdf(html)
+  return { pdf: await generatePdf(html), inputTokens: data.usage?.input_tokens ?? 0, outputTokens: data.usage?.output_tokens ?? 0 }
 }

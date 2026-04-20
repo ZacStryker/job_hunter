@@ -117,7 +117,7 @@ function insertPendingJob(overrides: Partial<Record<string, unknown>> = {}) {
   return prodSqlite.prepare('SELECT id FROM jobs ORDER BY id DESC LIMIT 1').get() as { id: number }
 }
 
-function mockFetchSuccess(scraperDescription = 'We are building AI products.'): void {
+function mockFetchSuccess(scraperDescription = 'We are building AI products.', usage = { input_tokens: 50, output_tokens: 30 }): void {
   globalThis.fetch = mock((url: string) => {
     if (String(url).includes('scrape/listing')) {
       return Promise.resolve(
@@ -132,6 +132,7 @@ function mockFetchSuccess(scraperDescription = 'We are building AI products.'): 
       new Response(
         JSON.stringify({
           content: [{ type: 'text', text: JSON.stringify(VALID_ANALYSIS_RESPONSE) }],
+          usage,
         }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       )
@@ -180,7 +181,7 @@ describe('runAnalysis()', () => {
       // Anthropic still called with empty description
       return Promise.resolve(
         new Response(
-          JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(VALID_ANALYSIS_RESPONSE) }] }),
+          JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(VALID_ANALYSIS_RESPONSE) }], usage: { input_tokens: 50, output_tokens: 30 } }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         )
       )
@@ -236,7 +237,7 @@ describe('runAnalysis()', () => {
       // Anthropic returns non-JSON text
       return Promise.resolve(
         new Response(
-          JSON.stringify({ content: [{ type: 'text', text: 'I cannot analyze this job.' }] }),
+          JSON.stringify({ content: [{ type: 'text', text: 'I cannot analyze this job.' }], usage: { input_tokens: 10, output_tokens: 5 } }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         )
       )
@@ -289,6 +290,7 @@ describe('runAnalysis()', () => {
         new Response(
           JSON.stringify({
             content: [{ type: 'text', text: JSON.stringify({ ...VALID_ANALYSIS_RESPONSE, recommended_action: 'skip' }) }],
+            usage: { input_tokens: 50, output_tokens: 30 },
           }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         )
@@ -333,6 +335,56 @@ describe('runAnalysis()', () => {
     expect(messages[0]).toBe('Found 2 jobs to analyze')
     expect(messages[1]).toMatch(/^Analyzing 1 \/ 2: /)
     expect(messages[2]).toMatch(/^Analyzing 2 \/ 2: /)
+  })
+
+  test('returns inputTokens and outputTokens from Anthropic response', async () => {
+    insertPendingJob()
+    mockFetchSuccess('desc', { input_tokens: 150, output_tokens: 75 })
+
+    const result = await runAnalysis()
+
+    expect(result.inputTokens).toBe(150)
+    expect(result.outputTokens).toBe(75)
+  })
+
+  test('accumulates tokens across multiple jobs in batch', async () => {
+    insertPendingJob({ company: 'Company A', job_title: 'Job A', external_job_id: 'ext-a' })
+    insertPendingJob({ company: 'Company B', job_title: 'Job B', external_job_id: 'ext-b' })
+    mockFetchSuccess('desc', { input_tokens: 100, output_tokens: 50 })
+
+    const result = await runAnalysis()
+
+    expect(result.processed).toBe(2)
+    expect(result.inputTokens).toBe(200)
+    expect(result.outputTokens).toBe(100)
+  })
+
+  test('failed jobs contribute 0 tokens', async () => {
+    insertPendingJob({ company: 'Good Co', job_title: 'Good Job', external_job_id: 'ext-good' })
+    insertPendingJob({ company: 'Bad Co', job_title: 'Bad Job', external_job_id: 'ext-bad' })
+
+    let callCount = 0
+    globalThis.fetch = mock((url: string) => {
+      if (String(url).includes('scrape/listing')) {
+        return Promise.resolve(new Response(JSON.stringify({ description: 'desc' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      }
+      callCount++
+      if (callCount === 1) {
+        return Promise.resolve(new Response(JSON.stringify({
+          content: [{ type: 'text', text: JSON.stringify(VALID_ANALYSIS_RESPONSE) }],
+          usage: { input_tokens: 80, output_tokens: 40 },
+        }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      }
+      // Second job Anthropic call fails
+      return Promise.resolve(new Response(null, { status: 500 }))
+    }) as typeof globalThis.fetch
+
+    const result = await runAnalysis()
+
+    expect(result.processed).toBe(1)
+    expect(result.failed).toBe(1)
+    expect(result.inputTokens).toBe(80)
+    expect(result.outputTokens).toBe(40)
   })
 
   test('processes only up to 10 pending jobs per run', async () => {

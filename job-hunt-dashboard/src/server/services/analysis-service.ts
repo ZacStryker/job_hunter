@@ -5,6 +5,7 @@ import { loadEffectivePrompt } from './prompt-defaults'
 
 interface AnthropicMessage {
   content: Array<{ type: string; text: string }>
+  usage: { input_tokens: number; output_tokens: number }
 }
 
 interface AnalysisResult {
@@ -33,7 +34,7 @@ function applyAnalysisTemplate(
     .replaceAll('{{JOB_LISTING_JSON}}', jobJson)
 }
 
-export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{ processed: number; failed: number }> {
+export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{ processed: number; failed: number; inputTokens: number; outputTokens: number }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
@@ -58,6 +59,8 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
 
   let processed = 0
   let failed = 0
+  let totalInputTokens = 0
+  let totalOutputTokens = 0
   let i = 0
 
   for (const job of pendingJobs) {
@@ -127,6 +130,8 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
       if (!anthropicRes.ok) throw new Error(`Anthropic error ${anthropicRes.status}`)
 
       const anthropicData = await anthropicRes.json() as AnthropicMessage
+      totalInputTokens += anthropicData.usage?.input_tokens ?? 0
+      totalOutputTokens += anthropicData.usage?.output_tokens ?? 0
       const text = anthropicData.content.find((b) => b.type === 'text')?.text ?? ''
 
       // Parse JSON — try direct parse first, fall back to regex extraction
@@ -169,5 +174,5 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
     }
   }
 
-  return { processed, failed }
+  return { processed, failed, inputTokens: totalInputTokens, outputTokens: totalOutputTokens }
 }

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-04-19 # 19-1 done
+last_updated: 2026-04-20 # 20-1 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -154,3 +154,7 @@ development_status:
   # Epic 19: Live Pipeline Feedback
   epic-19: in-progress
   19-1-automation-progress-streaming: done
+
+  # Epic 20: Pipeline Run Metrics
+  epic-20: in-progress
+  20-1-pipeline-run-metrics: done

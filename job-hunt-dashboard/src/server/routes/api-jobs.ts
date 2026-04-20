@@ -11,6 +11,10 @@ import { generateResume } from '../services/resume-service'
 import { recordRun } from './api-webhook-runs'
 import type { Job } from '../../shared/schemas'
 
+// USD per token (per-million prices / 1_000_000)
+const SONNET_4_6_INPUT = 3 / 1_000_000
+const SONNET_4_6_OUTPUT = 15 / 1_000_000
+
 const app = new Hono()
 
 const STATUS_OVERRIDE_VALUES = ['phone_screen', 'interview', 'technical', 'offer', 'rejected', 'withdrawn', 'ghosted'] as const
@@ -230,18 +234,21 @@ app.post('/:id/generate-cover-letter', async (c) => {
     return c.json({ error: 'Job has no job description' }, 400)
   }
 
-  let coverLetterText: string
+  const startMs = Date.now()
+  let coverLetterResult: { content: string; inputTokens: number; outputTokens: number }
   try {
-    coverLetterText = await generateCoverLetter(job as Job)
+    coverLetterResult = await generateCoverLetter(job as Job)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (message === 'ANTHROPIC_API_KEY not configured') {
       return c.json({ error: 'Cover letter generation is not configured' }, 503)
     }
-    recordRun({ name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message })
+    recordRun({ name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - startMs })
     return c.json({ error: 'Cover letter generation failed' }, 502)
   }
 
+  const { content: coverLetterText, inputTokens: clInputTokens, outputTokens: clOutputTokens } = coverLetterResult
+  const clCostUsd = clInputTokens * SONNET_4_6_INPUT + clOutputTokens * SONNET_4_6_OUTPUT
   const now = new Date().toISOString()
 
   try {
@@ -261,7 +268,8 @@ app.post('/:id/generate-cover-letter', async (c) => {
     .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.createdAt, now)))
     .get()
 
-  recordRun({ name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1 })
+  recordRun({ name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
+    durationMs: Date.now() - startMs, inputTokens: clInputTokens, outputTokens: clOutputTokens, costUsd: clCostUsd })
   return c.json({ coverLetter: inserted })
 })
 
@@ -283,17 +291,21 @@ app.post('/:id/generate-resume', async (c) => {
     return c.json({ error: 'Job has no job description' }, 400)
   }
 
-  let pdfBuffer: Buffer
+  const resumeStartMs = Date.now()
+  let resumeResult: { pdf: Buffer; inputTokens: number; outputTokens: number }
   try {
-    pdfBuffer = await generateResume(job as Job)
+    resumeResult = await generateResume(job as Job)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (message === 'ANTHROPIC_API_KEY not configured') {
       return c.json({ error: 'Resume generation is not configured' }, 503)
     }
-    recordRun({ name: `Resume - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message })
+    recordRun({ name: `Resume - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - resumeStartMs })
     return c.json({ error: 'Resume generation failed' }, 502)
   }
+
+  const { pdf: pdfBuffer, inputTokens: resumeInputTokens, outputTokens: resumeOutputTokens } = resumeResult
+  const resumeCostUsd = resumeInputTokens * SONNET_4_6_INPUT + resumeOutputTokens * SONNET_4_6_OUTPUT
 
   const profileRow = db.select().from(profile).limit(1).get()
   const candidateName = profileRow?.name ?? 'Resume'
@@ -314,7 +326,8 @@ app.post('/:id/generate-resume', async (c) => {
     // Non-fatal — user still gets their download
   }
 
-  recordRun({ name: `Resume - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1 })
+  recordRun({ name: `Resume - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
+    durationMs: Date.now() - resumeStartMs, inputTokens: resumeInputTokens, outputTokens: resumeOutputTokens, costUsd: resumeCostUsd })
   return new Response(pdfBuffer, {
     headers: {
       'Content-Type': 'application/pdf',

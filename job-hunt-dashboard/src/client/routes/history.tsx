@@ -61,6 +61,34 @@ const columns = [
       return val !== null ? String(val) : '—'
     },
   }),
+  columnHelper.accessor('durationMs', {
+    header: 'Duration',
+    cell: (info) => {
+      const val = info.getValue()
+      return val !== null ? (val / 1000).toFixed(1) + 's' : <span className="text-zinc-600">—</span>
+    },
+  }),
+  columnHelper.accessor('inputTokens', {
+    header: 'Input Tokens',
+    cell: (info) => {
+      const val = info.getValue()
+      return val !== null ? String(val) : <span className="text-zinc-600">—</span>
+    },
+  }),
+  columnHelper.accessor('outputTokens', {
+    header: 'Output Tokens',
+    cell: (info) => {
+      const val = info.getValue()
+      return val !== null ? String(val) : <span className="text-zinc-600">—</span>
+    },
+  }),
+  columnHelper.accessor('costUsd', {
+    header: 'Cost',
+    cell: (info) => {
+      const val = info.getValue()
+      return val !== null ? '$' + Number(val).toFixed(4) : <span className="text-zinc-600">—</span>
+    },
+  }),
 ]
 
 export function HistoryRoute() {

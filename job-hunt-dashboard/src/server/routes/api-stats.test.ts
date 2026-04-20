@@ -63,7 +63,11 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
     run_at TEXT NOT NULL,
     success INTEGER NOT NULL,
     item_count INTEGER,
-    error_message TEXT
+    error_message TEXT,
+    duration_ms INTEGER,
+    input_tokens INTEGER,
+    output_tokens INTEGER,
+    cost_usd REAL
   )
 `
 

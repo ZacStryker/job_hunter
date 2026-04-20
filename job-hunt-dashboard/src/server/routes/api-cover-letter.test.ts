@@ -4,7 +4,8 @@ import { describe, test, expect, mock, beforeAll, beforeEach } from 'bun:test'
 import { Database } from 'bun:sqlite'
 
 // --- Mock cover-letter-service BEFORE dynamic import ---
-let mockGenerateCoverLetter: () => Promise<string> = async () => 'Mock cover letter text'
+let mockGenerateCoverLetter: () => Promise<{ content: string; inputTokens: number; outputTokens: number }> =
+  async () => ({ content: 'Mock cover letter text', inputTokens: 100, outputTokens: 200 })
 
 mock.module('../services/cover-letter-service', () => ({
   generateCoverLetter: () => mockGenerateCoverLetter(),
@@ -56,16 +57,25 @@ const CREATE_COVER_LETTERS_TABLE = `
     created_at TEXT NOT NULL
   )
 `
+const CREATE_WEBHOOK_RUNS_TABLE = `
+  CREATE TABLE IF NOT EXISTS webhook_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL, run_at TEXT NOT NULL,
+    success INTEGER NOT NULL, item_count INTEGER, error_message TEXT,
+    duration_ms INTEGER, input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL
+  )
+`
 
 beforeAll(() => {
   prodSqlite.run(CREATE_JOBS_TABLE)
   prodSqlite.run(CREATE_COVER_LETTERS_TABLE)
+  prodSqlite.run(CREATE_WEBHOOK_RUNS_TABLE)
 })
 
 beforeEach(() => {
   prodSqlite.run('DELETE FROM cover_letters')
   prodSqlite.run('DELETE FROM jobs')
-  mockGenerateCoverLetter = async () => 'Mock cover letter text'
+  mockGenerateCoverLetter = async () => ({ content: 'Mock cover letter text', inputTokens: 100, outputTokens: 200 })
 })
 
 describe('POST /:id/generate-cover-letter', () => {

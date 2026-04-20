@@ -4,7 +4,8 @@ import { describe, test, expect, beforeAll, beforeEach, mock, spyOn } from 'bun:
 import { Database } from 'bun:sqlite'
 
 // Mock resume-service before any imports — prevents real Anthropic + Playwright calls
-let mockGenerateResume: () => Promise<Buffer> = async () => Buffer.from('%PDF-mock')
+let mockGenerateResume: () => Promise<{ pdf: Buffer; inputTokens: number; outputTokens: number }> =
+  async () => ({ pdf: Buffer.from('%PDF-mock'), inputTokens: 100, outputTokens: 200 })
 mock.module('../services/resume-service', () => ({
   generateResume: () => mockGenerateResume(),
 }))
@@ -71,7 +72,8 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
   CREATE TABLE IF NOT EXISTS webhook_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL, run_at TEXT NOT NULL,
-    success INTEGER NOT NULL, item_count INTEGER, error_message TEXT
+    success INTEGER NOT NULL, item_count INTEGER, error_message TEXT,
+    duration_ms INTEGER, input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL
   )
 `
 
@@ -88,7 +90,7 @@ beforeEach(() => {
   prodSqlite.run('DELETE FROM jobs')
   prodSqlite.run('DELETE FROM profile')
   prodSqlite.run('DELETE FROM webhook_runs')
-  mockGenerateResume = async () => Buffer.from('%PDF-mock')
+  mockGenerateResume = async () => ({ pdf: Buffer.from('%PDF-mock'), inputTokens: 100, outputTokens: 200 })
   mockBunWrite.mockResolvedValue(0)
 })
 

@@ -66,7 +66,7 @@ afterEach(() => {
 function mockAnthropicSuccess(text: string): void {
   globalThis.fetch = mock(() =>
     Promise.resolve(new Response(
-      JSON.stringify({ content: [{ type: 'text', text }] }),
+      JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 100, output_tokens: 200 } }),
       { status: 200, headers: { 'content-type': 'application/json' } }
     ))
   ) as typeof globalThis.fetch
@@ -91,11 +91,13 @@ describe('generateResume() — fence stripping', () => {
     expect(capturedHtml).toBe('<html><body>Resume</body></html>')
   })
 
-  test('returns Buffer from generatePdf', async () => {
+  test('returns pdf Buffer with token counts from generatePdf', async () => {
     mockAnthropicSuccess('<html><body>Resume</body></html>')
     const result = await generateResume(MOCK_JOB)
-    expect(result).toBeInstanceOf(Buffer)
-    expect(result.length).toBeGreaterThan(0)
+    expect(result.pdf).toBeInstanceOf(Buffer)
+    expect(result.pdf.length).toBeGreaterThan(0)
+    expect(result.inputTokens).toBe(100)
+    expect(result.outputTokens).toBe(200)
   })
 })
 

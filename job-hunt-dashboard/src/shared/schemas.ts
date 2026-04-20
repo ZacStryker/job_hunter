@@ -86,6 +86,10 @@ export const webhookRunSchema = z.object({
   success: z.boolean(),
   itemCount: z.number().int().nullable(),
   errorMessage: z.string().nullable(),
+  durationMs: z.number().int().nullable(),
+  inputTokens: z.number().int().nullable(),
+  outputTokens: z.number().int().nullable(),
+  costUsd: z.number().nullable(),
 })
 export type WebhookRun = z.infer<typeof webhookRunSchema>
 

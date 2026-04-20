@@ -5,9 +5,10 @@ import type { Job } from '../../shared/schemas'
 
 interface AnthropicResponse {
   content: Array<{ type: string; text: string }>
+  usage: { input_tokens: number; output_tokens: number }
 }
 
-export async function generateCoverLetter(job: Job): Promise<string> {
+export async function generateCoverLetter(job: Job): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
@@ -60,5 +61,5 @@ export async function generateCoverLetter(job: Job): Promise<string> {
   const coverLetter = data.content.find((b) => b.type === 'text')?.text?.trim() ?? ''
   if (!coverLetter) throw new Error('Anthropic returned empty cover letter')
 
-  return coverLetter
+  return { content: coverLetter, inputTokens: data.usage?.input_tokens ?? 0, outputTokens: data.usage?.output_tokens ?? 0 }
 }

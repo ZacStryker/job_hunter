@@ -361,3 +361,13 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - `api-search-configs.ts` `GET /`: handler is synchronous (`.all()` without `async/await`). Works with better-sqlite3 but will silently break if migrated to an async Turso/libsql driver. Make the handler `async` and `await` the query.
 - `SearchConfigCard`: no optimistic update — each save/delete triggers a full refetch, causing a brief table flicker. Acceptable for a local single-user tool but worth addressing if latency becomes noticeable.
 - Race condition: if `PUT /:id` is in-flight and another tab deletes the same row, the PUT returns 404 and the client shows "Save failed: Not found" with no context. Acceptable for single-user local app.
+
+## Deferred from: code review of 20-1-pipeline-run-metrics (2026-04-20)
+
+- Pricing constants hardcoded with no runtime binding to the model actually called — `api-jobs.ts` uses Sonnet 4.6 prices, `api-webhooks.ts` uses Opus 4.7 prices; if the underlying service changes models the cost figures will be silently wrong.
+- `durationMs` timing inconsistent — success path measures after DB insert (inflating duration by ~1ms), error path measures before; negligible in practice.
+- Token test "failed jobs contribute 0" is insertion-order-dependent — mock call count ties to job processing order; low risk with SQLite's stable ordering.
+- `recordRun` is fire-and-forget with internal try/catch — a DB failure silently drops the metrics row; pre-existing pattern.
+- `durationMs` schema column is nullable (`integer('duration_ms')`) but AC1 requires non-null for every run — all call sites populate it, so gap is schema-only.
+- Cell renderers in `history.tsx` mix plain string and JSX return types — cosmetic inconsistency with pre-existing columns.
+- ANTHROPIC_API_KEY not-configured error matched by exact string literal in `api-jobs.ts` — brittle if message ever changes; pre-existing pattern.

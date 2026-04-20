@@ -10,8 +10,8 @@ mock.module('../services/discovery-service', () => ({
   runDiscovery: (onProgress?: (msg: string) => void) => mockRunDiscovery(onProgress),
 }))
 
-let mockRunAnalysis: (onProgress?: (msg: string) => void) => Promise<{ processed: number; failed: number }> =
-  async () => ({ processed: 0, failed: 0 })
+let mockRunAnalysis: (onProgress?: (msg: string) => void) => Promise<{ processed: number; failed: number; inputTokens: number; outputTokens: number }> =
+  async () => ({ processed: 0, failed: 0, inputTokens: 0, outputTokens: 0 })
 mock.module('../services/analysis-service', () => ({
   runAnalysis: (onProgress?: (msg: string) => void) => mockRunAnalysis(onProgress),
 }))
@@ -27,7 +27,11 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
     run_at TEXT NOT NULL,
     success INTEGER NOT NULL,
     item_count INTEGER,
-    error_message TEXT
+    error_message TEXT,
+    duration_ms INTEGER,
+    input_tokens INTEGER,
+    output_tokens INTEGER,
+    cost_usd REAL
   )
 `
 
@@ -46,7 +50,7 @@ beforeEach(() => {
 
 afterEach(() => {
   mockRunDiscovery = async () => ({ inserted: 0 })
-  mockRunAnalysis = async () => ({ processed: 0, failed: 0 })
+  mockRunAnalysis = async () => ({ processed: 0, failed: 0, inputTokens: 0, outputTokens: 0 })
 })
 
 describe('POST /api/webhooks/discovery', () => {
@@ -133,7 +137,7 @@ describe('POST /api/webhooks/analysis', () => {
 
   test('streams done event with processed/failed counts and records run on success', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key'
-    mockRunAnalysis = async () => ({ processed: 7, failed: 1 })
+    mockRunAnalysis = async () => ({ processed: 7, failed: 1, inputTokens: 0, outputTokens: 0 })
 
     const res = await webhooksApp.request('/analysis', { method: 'POST' })
     expect(res.status).toBe(200)
@@ -149,6 +153,26 @@ describe('POST /api/webhooks/analysis', () => {
     }
     expect(row.success).toBe(1)
     expect(row.item_count).toBe(7)
+
+    delete process.env.ANTHROPIC_API_KEY
+  })
+
+  test('records durationMs, inputTokens, outputTokens, costUsd for analysis run', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockRunAnalysis = async () => ({ processed: 2, failed: 0, inputTokens: 1000, outputTokens: 500 })
+
+    const res = await webhooksApp.request('/analysis', { method: 'POST' })
+    expect(res.status).toBe(200)
+    await parseNdjson(res)
+
+    const row = prodSqlite.query('SELECT * FROM webhook_runs WHERE name = ?').get('Analysis') as {
+      duration_ms: number | null; input_tokens: number | null; output_tokens: number | null; cost_usd: number | null
+    }
+    expect(row.duration_ms).not.toBeNull()
+    expect(row.duration_ms).toBeGreaterThanOrEqual(0)
+    expect(row.input_tokens).toBe(1000)
+    expect(row.output_tokens).toBe(500)
+    expect(row.cost_usd).not.toBeNull()
 
     delete process.env.ANTHROPIC_API_KEY
   })
@@ -178,7 +202,7 @@ describe('POST /api/webhooks/analysis', () => {
     mockRunAnalysis = async (onProgress) => {
       onProgress?.('Found 3 jobs to analyze')
       onProgress?.('Analyzing 1 / 3: Acme Corp — Senior Engineer')
-      return { processed: 3, failed: 0 }
+      return { processed: 3, failed: 0, inputTokens: 0, outputTokens: 0 }
     }
 
     const res = await webhooksApp.request('/analysis', { method: 'POST' })

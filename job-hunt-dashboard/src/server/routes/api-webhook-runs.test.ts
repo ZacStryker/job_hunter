@@ -14,7 +14,11 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
     run_at TEXT NOT NULL,
     success INTEGER NOT NULL,
     item_count INTEGER,
-    error_message TEXT
+    error_message TEXT,
+    duration_ms INTEGER,
+    input_tokens INTEGER,
+    output_tokens INTEGER,
+    cost_usd REAL
   )
 `
 
@@ -57,6 +61,28 @@ describe('recordRun utility', () => {
     }
     expect(row.item_count).toBeNull()
     expect(row.error_message).toBeNull()
+  })
+
+  test('persists durationMs, inputTokens, outputTokens, costUsd when provided', () => {
+    recordRun({ name: 'Analysis', success: true, itemCount: 5, durationMs: 1234, inputTokens: 100, outputTokens: 200, costUsd: 0.0042 })
+    const row = prodSqlite.query('SELECT * FROM webhook_runs WHERE name = ?').get('Analysis') as {
+      duration_ms: number | null; input_tokens: number | null; output_tokens: number | null; cost_usd: number | null
+    }
+    expect(row.duration_ms).toBe(1234)
+    expect(row.input_tokens).toBe(100)
+    expect(row.output_tokens).toBe(200)
+    expect(row.cost_usd).toBeCloseTo(0.0042)
+  })
+
+  test('new fields default to null when not provided', () => {
+    recordRun({ name: 'Discovery', success: true, itemCount: 3 })
+    const row = prodSqlite.query('SELECT * FROM webhook_runs WHERE name = ?').get('Discovery') as {
+      duration_ms: number | null; input_tokens: number | null; output_tokens: number | null; cost_usd: number | null
+    }
+    expect(row.duration_ms).toBeNull()
+    expect(row.input_tokens).toBeNull()
+    expect(row.output_tokens).toBeNull()
+    expect(row.cost_usd).toBeNull()
   })
 })
 
