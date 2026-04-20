@@ -15,7 +15,7 @@ import {
 } from 'recharts'
 import type { StatsPeriod } from '@shared/schemas'
 import { STATS_PERIODS } from '@shared/schemas'
-import { useStatsQuery, type AppliedFilter, type ArchivedFilter } from '../hooks/useStatsQuery'
+import { useStatsQuery, type ArchivedFilter } from '../hooks/useStatsQuery'
 
 const PERIOD_LABELS: Record<StatsPeriod, string> = {
   '24h': '24h',
@@ -24,48 +24,33 @@ const PERIOD_LABELS: Record<StatsPeriod, string> = {
   all: 'All time',
 }
 
-const CHART_COLORS = {
-  apply: '#4ade80',
-  investigate: '#facc15',
-  skip: '#f87171',
-  high: '#4ade80',
-  medium: '#facc15',
-  low: '#f87171',
-  success: '#4ade80',
-  failed: '#f87171',
-  default: '#a1a1aa',
-}
-
-const EMAIL_TYPE_COLOR_MAP: Record<string, string> = {
-  Submitted: '#a1a1aa',
-  Screening: '#60a5fa',
-  Rejected: '#f87171',
-  Other: '#facc15',
-  Interview: '#86efac',
-  Offer: '#16a34a',
+const SOURCE_COLOR_MAP: Record<string, string> = {
+  linkedin: '#60a5fa',
+  indeed: '#4ade80',
+  indeed_nl: '#a78bfa',
+  arc: '#fb923c',
 }
 
 const REC_COLOR_MAP: Record<string, string> = {
-  apply: CHART_COLORS.apply,
-  investigate: CHART_COLORS.investigate,
-  skip: CHART_COLORS.skip,
-  None: CHART_COLORS.default,
+  Apply: '#4ade80',
+  Investigate: '#facc15',
 }
 
-const REC_ALL_KEYS = ['apply', 'investigate', 'skip', 'None'] as const
-const EMAIL_TYPE_ALL_KEYS = ['Submitted', 'Rejected', 'Other', 'Screening', 'Interview', 'Offer'] as const
+const STATUS_COLOR_MAP: Record<string, string> = {
+  'No Response': '#a1a1aa',
+  Submitted: '#60a5fa',
+  Rejected: '#f87171',
+  Screening: '#facc15',
+  Interview: '#86efac',
+  Offer: '#16a34a',
+  Other: '#fb923c',
+}
 
-const FIT_COLOR_MAP: Record<string, string> = {
-  '0-9': CHART_COLORS.low,
-  '10-19': CHART_COLORS.low,
-  '20-29': CHART_COLORS.low,
-  '30-39': CHART_COLORS.low,
-  '40-49': CHART_COLORS.low,
-  '50-59': CHART_COLORS.low,
-  '60-69': CHART_COLORS.medium,
-  '70-79': CHART_COLORS.medium,
-  '80-89': CHART_COLORS.high,
-  '90+': CHART_COLORS.high,
+const WORKFLOW_COLOR_MAP: Record<string, string> = {
+  Discovery: '#60a5fa',
+  Analysis: '#4ade80',
+  'Cover Letter': '#facc15',
+  Resume: '#a78bfa',
 }
 
 const DARK_GRID = '#3f3f46'
@@ -169,15 +154,23 @@ function ChartCard({
   )
 }
 
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
+
+const APP_STATUS_KEYS = ['No Response', 'Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other'] as const
+const WORKFLOW_KEYS = ['Discovery', 'Analysis', 'Cover Letter', 'Resume'] as const
+
 export function DashboardRoute() {
   const [period, setPeriod] = useState<StatsPeriod>('all')
   const [archivedFilter, setArchivedFilter] = useState<ArchivedFilter>('active')
-  const [appliedFilter, setAppliedFilter] = useState<AppliedFilter>('applied')
-  const { data, isPending, isError, error } = useStatsQuery(period, archivedFilter, appliedFilter)
+  const { data, isPending, isError, error } = useStatsQuery(period, archivedFilter)
 
   return (
     <div className="p-4 space-y-4">
-      {/* Period selector + filter toggles */}
+      {/* Filter bar: period + archivedFilter only */}
       <div className="flex items-center gap-1">
         {STATS_PERIODS.map((p) => (
           <button
@@ -210,23 +203,6 @@ export function DashboardRoute() {
             {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
-
-        <div className="w-px h-5 bg-zinc-700 mx-2" />
-
-        {(['applied', 'unapplied', 'all'] as AppliedFilter[]).map((f) => (
-          <button
-            key={f}
-            onClick={() => setAppliedFilter(f)}
-            className={[
-              'px-3 py-1.5 text-sm rounded transition-colors',
-              appliedFilter === f
-                ? 'bg-zinc-700 text-zinc-100'
-                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800',
-            ].join(' ')}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
       </div>
 
       {isPending && (
@@ -238,174 +214,263 @@ export function DashboardRoute() {
       )}
 
       {data && (
-        <>
-          {/* Stat cards */}
-          <div className="grid grid-cols-4 gap-3">
-            <StatCard label="Scrapes" value={String(data.scraped.total)} />
-            <StatCard label="Archives" value={String(data.archived.total)} />
-            <StatCard label="Matches" value={String(
-              data.pipeline.byRecommendation
-                .filter(r => r.name === 'apply' || r.name === 'investigate')
-                .reduce((sum, r) => sum + r.value, 0)
-            )} />
-            <StatCard label="Applications" value={String(data.applications.total)} />
-          </div>
+        <div className="space-y-8">
 
-          {/* Jobs per day by recommendation */}
-          {data.scraped.perDay.length > 0 && (
-            <ChartCard
-              title="Jobs per Day by Recommendation"
-              tableHeaders={['Date', 'Apply', 'Investigate', 'Skip', 'None']}
-              tableData={data.scraped.perDay.map((e) => [e.date, e.apply, e.investigate, e.skip, e.none])}
-            >
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={data.scraped.perDay}>
-                  <defs>
-                    <linearGradient id="gradApply" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={CHART_COLORS.apply} stopOpacity={0.6} />
-                      <stop offset="95%" stopColor={CHART_COLORS.apply} stopOpacity={0.1} />
-                    </linearGradient>
-                    <linearGradient id="gradInvestigate" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={CHART_COLORS.investigate} stopOpacity={0.6} />
-                      <stop offset="95%" stopColor={CHART_COLORS.investigate} stopOpacity={0.1} />
-                    </linearGradient>
-                    <linearGradient id="gradSkip" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={CHART_COLORS.skip} stopOpacity={0.6} />
-                      <stop offset="95%" stopColor={CHART_COLORS.skip} stopOpacity={0.1} />
-                    </linearGradient>
-                    <linearGradient id="gradNone" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={CHART_COLORS.default} stopOpacity={0.6} />
-                      <stop offset="95%" stopColor={CHART_COLORS.default} stopOpacity={0.1} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                  <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
-                  <YAxis {...AXIS_PROPS} />
-                  <Tooltip {...TOOLTIP_PROPS} />
-                  <Legend wrapperStyle={{ color: DARK_TICK }} />
-                  <Area type="monotone" dataKey="apply" stackId="1" stroke={CHART_COLORS.apply} fill="url(#gradApply)" />
-                  <Area type="monotone" dataKey="investigate" stackId="1" stroke={CHART_COLORS.investigate} fill="url(#gradInvestigate)" />
-                  <Area type="monotone" dataKey="skip" stackId="1" stroke={CHART_COLORS.skip} fill="url(#gradSkip)" />
-                  <Area type="monotone" dataKey="none" stackId="1" stroke={CHART_COLORS.default} fill="url(#gradNone)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </ChartCard>
-          )}
-
-          {/* Charts grid */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Recommendation Breakdown — horizontal bar */}
-            {(() => {
-              const recIndex = Object.fromEntries(data.pipeline.byRecommendation.map((e) => [e.name, e.value]))
-              const recData = REC_ALL_KEYS.map((key) => ({ name: key, value: recIndex[key] ?? 0 }))
-              return (
-                <ChartCard
-                  title="Recommendation Breakdown"
-                  tableHeaders={['Recommendation', 'Count']}
-                  tableData={recData.map((e) => [e.name, e.value])}
-                >
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart layout="vertical" data={recData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                      <XAxis type="number" {...AXIS_PROPS} />
-                      <YAxis type="category" dataKey="name" width={90} {...AXIS_PROPS} />
-                      <Tooltip {...TOOLTIP_PROPS} />
-                      <Bar dataKey="value">
-                        {recData.map((entry) => (
-                          <Cell key={entry.name} fill={REC_COLOR_MAP[entry.name] ?? CHART_COLORS.default} />
-                        ))}
-                        <LabelList dataKey="value" content={LabelInsideRight as (props: object) => React.JSX.Element} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              )
-            })()}
-
-            {/* Fit Score Distribution */}
-            <ChartCard
-              title="Fit Score Distribution"
-              tableHeaders={['Bucket', 'Count']}
-              tableData={data.pipeline.byFitScore.map((e) => [e.bucket, e.count])}
-            >
-              {data.pipeline.byFitScore.every((b) => b.count === 0) ? (
-                <NoData />
-              ) : (
+          {/* ── Q01 Jobs ── */}
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Jobs</h2>
+            <div className="grid grid-cols-3 gap-3">
+              <StatCard label="Jobs" value={String(data.jobs.total)} />
+              <StatCard label="Companies" value={String(data.jobs.companies)} />
+              <StatCard label="Sources" value={String(data.jobs.sources)} />
+            </div>
+            {data.jobs.perDay.length > 0 && (
+              <ChartCard
+                title="Jobs per Day by Source"
+                tableHeaders={['Date', 'LinkedIn', 'Indeed', 'Indeed NL', 'Arc']}
+                tableData={data.jobs.perDay.map(e => [e.date, e.linkedin, e.indeed, e.indeed_nl, e.arc])}
+              >
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={data.pipeline.byFitScore}>
+                  <AreaChart data={data.jobs.perDay}>
+                    <defs>
+                      <linearGradient id="gradJobsLinkedin" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={SOURCE_COLOR_MAP.linkedin} stopOpacity={0.6} />
+                        <stop offset="95%" stopColor={SOURCE_COLOR_MAP.linkedin} stopOpacity={0.1} />
+                      </linearGradient>
+                      <linearGradient id="gradJobsIndeed" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={SOURCE_COLOR_MAP.indeed} stopOpacity={0.6} />
+                        <stop offset="95%" stopColor={SOURCE_COLOR_MAP.indeed} stopOpacity={0.1} />
+                      </linearGradient>
+                      <linearGradient id="gradJobsIndeedNl" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={SOURCE_COLOR_MAP.indeed_nl} stopOpacity={0.6} />
+                        <stop offset="95%" stopColor={SOURCE_COLOR_MAP.indeed_nl} stopOpacity={0.1} />
+                      </linearGradient>
+                      <linearGradient id="gradJobsArc" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={SOURCE_COLOR_MAP.arc} stopOpacity={0.6} />
+                        <stop offset="95%" stopColor={SOURCE_COLOR_MAP.arc} stopOpacity={0.1} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="bucket" {...AXIS_PROPS} />
-                    <YAxis {...AXIS_PROPS} />
-                    <Tooltip {...TOOLTIP_PROPS} />
-                    <Bar dataKey="count">
-                      {data.pipeline.byFitScore.map((entry) => (
-                        <Cell key={entry.bucket} fill={FIT_COLOR_MAP[entry.bucket] ?? CHART_COLORS.default} />
-                      ))}
-                      <LabelList dataKey="count" content={LabelInsideTop as (props: object) => React.JSX.Element} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </ChartCard>
-
-            {/* Email Types */}
-            {(() => {
-              const typeIndex = Object.fromEntries(
-                data.emails.byType.filter((e) => e.type !== 'Unclassified').map((e) => [e.type, e.count]),
-              )
-              const emailData = EMAIL_TYPE_ALL_KEYS.map((key) => ({ type: key, count: typeIndex[key] ?? 0 }))
-              return (
-                <ChartCard
-                  title="Email Types"
-                  tableHeaders={['Type', 'Count']}
-                  tableData={emailData.map((e) => [e.type, e.count])}
-                >
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={emailData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                      <XAxis dataKey="type" {...AXIS_PROPS} />
-                      <YAxis {...AXIS_PROPS} />
-                      <Tooltip {...TOOLTIP_PROPS} />
-                      <Bar dataKey="count">
-                        {emailData.map((entry) => (
-                          <Cell key={entry.type} fill={EMAIL_TYPE_COLOR_MAP[entry.type] ?? CHART_COLORS.default} />
-                        ))}
-                        <LabelList dataKey="count" content={LabelInsideTop as (props: object) => React.JSX.Element} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              )
-            })()}
-
-            {/* Automation Runs — grouped bar */}
-            <ChartCard
-              title="Automation Runs"
-              tableHeaders={['Workflow', 'Success', 'Failed']}
-              tableData={data.automation.byWorkflow.map((e) => [e.workflow, e.success, e.failed])}
-            >
-              {data.automation.byWorkflow.length === 0 ? (
-                <NoData />
-              ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={data.automation.byWorkflow}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="workflow" {...AXIS_PROPS} />
+                    <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
                     <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
                     <Legend wrapperStyle={{ color: DARK_TICK }} />
-                    <Bar dataKey="success" fill={CHART_COLORS.success}>
-                      <LabelList dataKey="success" content={LabelInsideTop as (props: object) => React.JSX.Element} />
-                    </Bar>
-                    <Bar dataKey="failed" fill={CHART_COLORS.failed}>
-                      <LabelList dataKey="failed" content={LabelInsideTop as (props: object) => React.JSX.Element} />
+                    <Area type="monotone" dataKey="linkedin" stackId="1" stroke={SOURCE_COLOR_MAP.linkedin} fill="url(#gradJobsLinkedin)" />
+                    <Area type="monotone" dataKey="indeed" stackId="1" stroke={SOURCE_COLOR_MAP.indeed} fill="url(#gradJobsIndeed)" />
+                    <Area type="monotone" dataKey="indeed_nl" stackId="1" stroke={SOURCE_COLOR_MAP.indeed_nl} fill="url(#gradJobsIndeedNl)" />
+                    <Area type="monotone" dataKey="arc" stackId="1" stroke={SOURCE_COLOR_MAP.arc} fill="url(#gradJobsArc)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
+            {data.jobs.perDay.length > 0 && (
+            <ChartCard
+              title="Source Breakdown"
+              tableHeaders={['Source', 'Count']}
+              tableData={data.jobs.bySource.map(e => [e.name, e.value])}
+            >
+              {data.jobs.bySource.every(e => e.value === 0) ? <NoData /> : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart layout="vertical" data={data.jobs.bySource}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                    <XAxis type="number" {...AXIS_PROPS} />
+                    <YAxis type="category" dataKey="name" width={100} {...AXIS_PROPS} />
+                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Bar dataKey="value">
+                      {data.jobs.bySource.map(entry => (
+                        <Cell key={entry.name} fill={SOURCE_COLOR_MAP[entry.name] ?? '#a1a1aa'} />
+                      ))}
+                      <LabelList dataKey="value" content={LabelInsideRight as (props: object) => React.JSX.Element} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </ChartCard>
-          </div>
-        </>
+            )}
+          </section>
+
+          {/* ── Q02 Matches ── */}
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Matches</h2>
+            <div className="grid grid-cols-3 gap-3">
+              <StatCard label="Matches" value={String(data.matches.total)} />
+              <StatCard label="Investigate" value={String(data.matches.investigate)} />
+              <StatCard label="Apply" value={String(data.matches.apply)} />
+            </div>
+            {data.matches.perDay.length > 0 && (
+              <ChartCard
+                title="Matches per Day by Recommendation"
+                tableHeaders={['Date', 'Apply', 'Investigate']}
+                tableData={data.matches.perDay.map(e => [e.date, e.apply, e.investigate])}
+              >
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={data.matches.perDay}>
+                    <defs>
+                      <linearGradient id="gradMatchesApply" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={REC_COLOR_MAP.Apply} stopOpacity={0.6} />
+                        <stop offset="95%" stopColor={REC_COLOR_MAP.Apply} stopOpacity={0.1} />
+                      </linearGradient>
+                      <linearGradient id="gradMatchesInvestigate" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={REC_COLOR_MAP.Investigate} stopOpacity={0.6} />
+                        <stop offset="95%" stopColor={REC_COLOR_MAP.Investigate} stopOpacity={0.1} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                    <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
+                    <YAxis {...AXIS_PROPS} />
+                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Legend wrapperStyle={{ color: DARK_TICK }} />
+                    <Area type="monotone" dataKey="apply" stackId="1" stroke={REC_COLOR_MAP.Apply} fill="url(#gradMatchesApply)" />
+                    <Area type="monotone" dataKey="investigate" stackId="1" stroke={REC_COLOR_MAP.Investigate} fill="url(#gradMatchesInvestigate)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
+            <ChartCard
+              title="Recommendation Breakdown"
+              tableHeaders={['Recommendation', 'Count']}
+              tableData={data.matches.byRecommendation.map(e => [e.name, e.value])}
+            >
+              {data.matches.byRecommendation.every(e => e.value === 0) ? <NoData /> : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart layout="vertical" data={data.matches.byRecommendation}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                    <XAxis type="number" {...AXIS_PROPS} />
+                    <YAxis type="category" dataKey="name" width={100} {...AXIS_PROPS} />
+                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Bar dataKey="value">
+                      {data.matches.byRecommendation.map(entry => (
+                        <Cell key={entry.name} fill={REC_COLOR_MAP[entry.name] ?? '#a1a1aa'} />
+                      ))}
+                      <LabelList dataKey="value" content={LabelInsideRight as (props: object) => React.JSX.Element} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
+          </section>
+
+          {/* ── Q03 Applications ── */}
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Applications</h2>
+            <div className="grid grid-cols-3 gap-3">
+              <StatCard label="Applications" value={String(data.applications.total)} />
+              <StatCard label="Companies" value={String(data.applications.companies)} />
+              <StatCard label="Responses" value={String(data.applications.responses)} />
+            </div>
+            {data.applications.perDay.length > 0 && (
+              <ChartCard
+                title="Applications per Day by Response Type"
+                tableHeaders={['Date', 'No Response', 'Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other']}
+                tableData={data.applications.perDay.map(e => [e.date, e['No Response'], e.Submitted, e.Rejected, e.Screening, e.Interview, e.Offer, e.Other])}
+              >
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={data.applications.perDay}>
+                    <defs>
+                      {APP_STATUS_KEYS.map(k => (
+                        <linearGradient key={k} id={`gradApp${k.replace(/ /g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={STATUS_COLOR_MAP[k]} stopOpacity={0.6} />
+                          <stop offset="95%" stopColor={STATUS_COLOR_MAP[k]} stopOpacity={0.1} />
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                    <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
+                    <YAxis {...AXIS_PROPS} />
+                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Legend wrapperStyle={{ color: DARK_TICK }} />
+                    {APP_STATUS_KEYS.map(k => (
+                      <Area key={k} type="monotone" dataKey={k} stackId="1" stroke={STATUS_COLOR_MAP[k]} fill={`url(#gradApp${k.replace(/ /g, '')})`} />
+                    ))}
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
+            <ChartCard
+              title="Status Breakdown"
+              tableHeaders={['Status', 'Count']}
+              tableData={data.applications.byStatus.map(e => [e.status, e.count])}
+            >
+              {data.applications.byStatus.every(e => e.count === 0) ? <NoData /> : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart layout="vertical" data={data.applications.byStatus}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                    <XAxis type="number" {...AXIS_PROPS} />
+                    <YAxis type="category" dataKey="status" width={100} {...AXIS_PROPS} />
+                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Bar dataKey="count">
+                      {data.applications.byStatus.map(entry => (
+                        <Cell key={entry.status} fill={STATUS_COLOR_MAP[entry.status] ?? '#a1a1aa'} />
+                      ))}
+                      <LabelList dataKey="count" content={LabelInsideRight as (props: object) => React.JSX.Element} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
+          </section>
+
+          {/* ── Q04 Automations ── */}
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Automations</h2>
+            <div className="grid grid-cols-3 gap-3">
+              <StatCard label="Workflow Runs" value={String(data.automation.totalRuns)} />
+              <StatCard label="Tokens" value={formatTokens(data.automation.totalTokens)} />
+              <StatCard label="Cost" value={`$${data.automation.totalCost.toFixed(4)}`} />
+            </div>
+            {data.automation.perDay.length > 0 && (
+              <ChartCard
+                title="Workflows per Day by Workflow Type"
+                tableHeaders={['Date', 'Discovery', 'Analysis', 'Cover Letter', 'Resume']}
+                tableData={data.automation.perDay.map(e => [e.date, e.Discovery, e.Analysis, e['Cover Letter'], e.Resume])}
+              >
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={data.automation.perDay}>
+                    <defs>
+                      {WORKFLOW_KEYS.map(k => (
+                        <linearGradient key={k} id={`gradAuto${k.replace(/ /g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={WORKFLOW_COLOR_MAP[k]} stopOpacity={0.6} />
+                          <stop offset="95%" stopColor={WORKFLOW_COLOR_MAP[k]} stopOpacity={0.1} />
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                    <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
+                    <YAxis {...AXIS_PROPS} />
+                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Legend wrapperStyle={{ color: DARK_TICK }} />
+                    {WORKFLOW_KEYS.map(k => (
+                      <Area key={k} type="monotone" dataKey={k} stackId="1" stroke={WORKFLOW_COLOR_MAP[k]} fill={`url(#gradAuto${k.replace(/ /g, '')})`} />
+                    ))}
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
+            <ChartCard
+              title="Cost Breakdown"
+              tableHeaders={['Workflow', 'Cost ($)']}
+              tableData={data.automation.costByWorkflow.map(e => [e.workflow, e.cost.toFixed(4)])}
+            >
+              {data.automation.costByWorkflow.every(e => e.cost === 0) ? <NoData /> : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart layout="vertical" data={data.automation.costByWorkflow}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                    <XAxis type="number" {...AXIS_PROPS} />
+                    <YAxis type="category" dataKey="workflow" width={110} {...AXIS_PROPS} />
+                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Bar dataKey="cost">
+                      {data.automation.costByWorkflow.map(entry => (
+                        <Cell key={entry.workflow} fill={WORKFLOW_COLOR_MAP[entry.workflow] ?? '#a1a1aa'} />
+                      ))}
+                      <LabelList dataKey="cost" content={LabelInsideRight as (props: object) => React.JSX.Element} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
+          </section>
+
+        </div>
       )}
     </div>
   )

@@ -97,38 +97,58 @@ export const STATS_PERIODS = ['24h', '7d', '30d', 'all'] as const
 export type StatsPeriod = typeof STATS_PERIODS[number]
 
 export const statsSchema = z.object({
-  pipeline: z.object({
+  jobs: z.object({
     total: z.number(),
-    byRecommendation: z.array(z.object({ name: z.string(), value: z.number() })),
-    byFitScore: z.array(z.object({ bucket: z.string(), count: z.number() })),
+    companies: z.number(),
+    sources: z.number(),
+    perDay: z.array(z.object({
+      date: z.string(),
+      linkedin: z.number(),
+      indeed: z.number(),
+      indeed_nl: z.number(),
+      arc: z.number(),
+    })),
+    bySource: z.array(z.object({ name: z.string(), value: z.number() })),
   }),
-  scraped: z.object({
+  matches: z.object({
     total: z.number(),
+    apply: z.number(),
+    investigate: z.number(),
     perDay: z.array(z.object({
       date: z.string(),
       apply: z.number(),
       investigate: z.number(),
-      skip: z.number(),
-      none: z.number(),
     })),
-  }),
-  archived: z.object({
-    total: z.number(),
+    byRecommendation: z.array(z.object({ name: z.string(), value: z.number() })),
   }),
   applications: z.object({
     total: z.number(),
+    companies: z.number(),
+    responses: z.number(),
+    perDay: z.array(z.object({
+      date: z.string(),
+      'No Response': z.number(),
+      Submitted: z.number(),
+      Rejected: z.number(),
+      Screening: z.number(),
+      Interview: z.number(),
+      Offer: z.number(),
+      Other: z.number(),
+    })),
     byStatus: z.array(z.object({ status: z.string(), count: z.number() })),
-    responseRate: z.number().nullable(),
-  }),
-  emails: z.object({
-    total: z.number(),
-    byType: z.array(z.object({ type: z.string(), count: z.number() })),
   }),
   automation: z.object({
     totalRuns: z.number(),
-    successRate: z.number().nullable(),
-    byWorkflow: z.array(z.object({ workflow: z.string(), success: z.number(), failed: z.number() })),
-    coverLettersGenerated: z.number(),
+    totalTokens: z.number(),
+    totalCost: z.number(),
+    perDay: z.array(z.object({
+      date: z.string(),
+      Discovery: z.number(),
+      Analysis: z.number(),
+      'Cover Letter': z.number(),
+      Resume: z.number(),
+    })),
+    costByWorkflow: z.array(z.object({ workflow: z.string(), cost: z.number() })),
   }),
 })
 export type Stats = z.infer<typeof statsSchema>

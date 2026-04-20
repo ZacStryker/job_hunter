@@ -371,3 +371,8 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - `durationMs` schema column is nullable (`integer('duration_ms')`) but AC1 requires non-null for every run — all call sites populate it, so gap is schema-only.
 - Cell renderers in `history.tsx` mix plain string and JSX return types — cosmetic inconsistency with pre-existing columns.
 - ANTHROPIC_API_KEY not-configured error matched by exact string literal in `api-jobs.ts` — brittle if message ever changes; pre-existing pattern.
+
+## Deferred from: code review of 21-1-dashboard-redesign (2026-04-20)
+
+- `LabelInsideRight` displays raw unformatted float values for cost breakdown bar labels in Q04 — spec does not require formatted labels in bar charts; visual polish only.
+- Double iteration over `runRows` in `api-stats.ts` Automation section (separate loops for `autoDailyMap` and `costMap`) — minor performance, not a correctness issue; could be merged into one pass.

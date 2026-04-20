@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { db } from '../../db/client'
-import { jobs, messages, webhookRuns, coverLetters } from '../../db/schema'
-import { and, eq, gte, type SQL } from 'drizzle-orm'
+import { jobs, webhookRuns } from '../../db/schema'
+import { and, eq, gte } from 'drizzle-orm'
 import { STATS_PERIODS } from '../../shared/schemas'
 
 const app = new Hono()
@@ -19,18 +19,12 @@ function parseWorkflow(name: string): string {
   return name
 }
 
-type AppliedFilter  = 'applied' | 'unapplied' | 'all'
-type ArchivedFilter = 'active'  | 'archived'  | 'all'
+type ArchivedFilter = 'active' | 'archived' | 'all'
 
-function buildBaseWhere(archivedFilter: ArchivedFilter, appliedFilter: AppliedFilter) {
-  const archivedCond =
-    archivedFilter === 'active'   ? eq(jobs.archived, false) :
-    archivedFilter === 'archived' ? eq(jobs.archived, true)  : undefined
-  const appliedCond =
-    appliedFilter === 'applied'   ? eq(jobs.applied, true)  :
-    appliedFilter === 'unapplied' ? eq(jobs.applied, false) : undefined
-  const conds = [archivedCond, appliedCond].filter((c): c is SQL => c !== undefined)
-  return conds.length > 0 ? and(...conds) : undefined
+function buildBaseWhere(archivedFilter: ArchivedFilter) {
+  if (archivedFilter === 'active') return eq(jobs.archived, false)
+  if (archivedFilter === 'archived') return eq(jobs.archived, true)
+  return undefined
 }
 
 app.get('/', (c) => {
@@ -41,58 +35,61 @@ app.get('/', (c) => {
   const archivedFilter: ArchivedFilter =
     rawArchivedFilter === 'archived' ? 'archived' :
     rawArchivedFilter === 'all'      ? 'all'       : 'active'
-  const rawAppliedFilter = c.req.query('appliedFilter')
-  const appliedFilter: AppliedFilter =
-    rawAppliedFilter === 'unapplied' ? 'unapplied' :
-    rawAppliedFilter === 'all'       ? 'all'        : 'applied'
 
-  const baseWhere = buildBaseWhere(archivedFilter, appliedFilter)
+  const baseWhere = buildBaseWhere(archivedFilter)
 
-  // Load all jobs matching base conditions + dateScraped cutoff
+  // All jobs matching archivedFilter + dateScraped cutoff
   const scrapedWhere = and(baseWhere, dateCutoff ? gte(jobs.dateScraped, dateCutoff) : undefined)
   const viewJobs = db.select().from(jobs).where(scrapedWhere).all()
 
+  // ── Jobs section ──
   const scrapedTotal = viewJobs.length
-  const archivedTotal = viewJobs.filter(j => j.archived).length
+  const companies = new Set(viewJobs.map(j => j.company)).size
+  const sources = new Set(viewJobs.filter(j => j.source).map(j => j.source!)).size
 
-  const pipelineJobs = viewJobs
-  const pipelineTotal = pipelineJobs.length
-
-  const recCounts: Record<string, number> = {}
-  for (const job of pipelineJobs) {
-    const key = job.recommendation ?? 'None'
-    recCounts[key] = (recCounts[key] ?? 0) + 1
-  }
-  const byRecommendation = Object.entries(recCounts).map(([name, value]) => ({ name, value }))
-
-  const fitBuckets: Record<string, number> = {
-    '0-9': 0, '10-19': 0, '20-29': 0, '30-39': 0, '40-49': 0,
-    '50-59': 0, '60-69': 0, '70-79': 0, '80-89': 0, '90+': 0,
-  }
-  for (const job of pipelineJobs) {
-    if (job.fitScore === null) continue
-    const score = job.fitScore
-    const key = score >= 90 ? '90+' : `${Math.floor(score / 10) * 10}-${Math.floor(score / 10) * 10 + 9}`
-    fitBuckets[key]++
-  }
-  const byFitScore = Object.entries(fitBuckets).map(([bucket, count]) => ({ bucket, count }))
-
-  // Jobs per day — built from pipelineJobs (non-archived subset, consistent with recommendation/fit charts)
-  const dailyMap: Record<string, { apply: number; investigate: number; skip: number; none: number }> = {}
-  for (const job of pipelineJobs) {
+  const sourceKeys = ['linkedin', 'indeed', 'indeed_nl', 'arc'] as const
+  const jobsDailyMap: Record<string, Record<string, number>> = {}
+  for (const job of viewJobs) {
     if (!job.dateScraped) continue
     const date = job.dateScraped.slice(0, 10)
-    if (!dailyMap[date]) dailyMap[date] = { apply: 0, investigate: 0, skip: 0, none: 0 }
-    if (job.recommendation === 'apply') dailyMap[date].apply++
-    else if (job.recommendation === 'investigate') dailyMap[date].investigate++
-    else if (job.recommendation === 'skip') dailyMap[date].skip++
-    else dailyMap[date].none++
+    if (!jobsDailyMap[date]) jobsDailyMap[date] = { linkedin: 0, indeed: 0, indeed_nl: 0, arc: 0 }
+    const src = job.source ?? ''
+    if (src in jobsDailyMap[date]) jobsDailyMap[date][src]++
   }
-  const perDay = Object.entries(dailyMap)
+  const jobsPerDay = Object.entries(jobsDailyMap)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, counts]) => ({ date, ...counts }))
+    .map(([date, counts]) => ({ date, linkedin: counts.linkedin, indeed: counts.indeed, indeed_nl: counts.indeed_nl, arc: counts.arc }))
 
-  // Application stats (always applied=true, archivedFilter-aware, dateApplied cutoff)
+  const sourceCountMap: Record<string, number> = { linkedin: 0, indeed: 0, indeed_nl: 0, arc: 0 }
+  for (const job of viewJobs) {
+    const src = job.source ?? ''
+    if (src in sourceCountMap) sourceCountMap[src]++
+  }
+  const bySource = sourceKeys.map(k => ({ name: k, value: sourceCountMap[k] }))
+
+  // ── Matches section ──
+  const applyCount = viewJobs.filter(j => j.recommendation === 'apply').length
+  const investigateCount = viewJobs.filter(j => j.recommendation === 'investigate').length
+
+  const matchesDailyMap: Record<string, { apply: number; investigate: number }> = {}
+  for (const job of viewJobs) {
+    if (job.recommendation !== 'apply' && job.recommendation !== 'investigate') continue
+    if (!job.dateScraped) continue
+    const date = job.dateScraped.slice(0, 10)
+    if (!matchesDailyMap[date]) matchesDailyMap[date] = { apply: 0, investigate: 0 }
+    if (job.recommendation === 'apply') matchesDailyMap[date].apply++
+    else matchesDailyMap[date].investigate++
+  }
+  const matchesPerDay = Object.entries(matchesDailyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, c]) => ({ date, apply: c.apply, investigate: c.investigate }))
+
+  const byRecommendation = [
+    { name: 'Apply', value: applyCount },
+    { name: 'Investigate', value: investigateCount },
+  ]
+
+  // ── Applications section (applied=true, archivedFilter, dateApplied cutoff) ──
   const archivedAppCond =
     archivedFilter === 'active'   ? eq(jobs.archived, false) :
     archivedFilter === 'archived' ? eq(jobs.archived, true)  : undefined
@@ -104,59 +101,80 @@ app.get('/', (c) => {
   const appliedJobs = db.select().from(jobs).where(appWhere).all()
 
   const appTotal = appliedJobs.length
-  const statusCounts: Record<string, number> = {}
-  let withStatus = 0
+  const appCompanies = new Set(appliedJobs.map(j => j.company)).size
+  const appResponses = appliedJobs.filter(j => j.statusOverride !== null).length
+
+  const STATUS_KEYS = ['No Response', 'Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other'] as const
+  const statusCounts: Record<string, number> = Object.fromEntries(STATUS_KEYS.map(k => [k, 0]))
   for (const job of appliedJobs) {
-    const key = job.statusOverride ?? 'Applied (no status)'
-    statusCounts[key] = (statusCounts[key] ?? 0) + 1
-    if (job.statusOverride !== null) withStatus++
+    const key = job.statusOverride ?? 'No Response'
+    const bucket = (STATUS_KEYS as readonly string[]).includes(key) ? key : 'Other'
+    statusCounts[bucket]++
   }
-  const byStatus = Object.entries(statusCounts).map(([status, count]) => ({ status, count }))
-  const responseRate = appTotal === 0 ? null : withStatus / appTotal
 
-  // Email stats — date filter only, no job/archived/applied filtering
-  const relevantEmails = datetimeCutoff
-    ? db.select().from(messages).where(gte(messages.receivedAt, datetimeCutoff)).all()
-    : db.select().from(messages).all()
-
-  const emailTotal = relevantEmails.length
-  const typeCounts: Record<string, number> = {}
-  for (const msg of relevantEmails) {
-    const key = msg.type ?? 'Unclassified'
-    typeCounts[key] = (typeCounts[key] ?? 0) + 1
+  const appDailyMap: Record<string, Record<string, number>> = {}
+  for (const job of appliedJobs) {
+    if (!job.dateApplied) continue
+    const date = job.dateApplied.slice(0, 10)
+    if (!appDailyMap[date]) appDailyMap[date] = Object.fromEntries(STATUS_KEYS.map(k => [k, 0]))
+    const key = job.statusOverride ?? 'No Response'
+    const bucket = (STATUS_KEYS as readonly string[]).includes(key) ? key : 'Other'
+    appDailyMap[date][bucket]++
   }
-  const byType = Object.entries(typeCounts).map(([type, count]) => ({ type, count }))
+  const appPerDay = Object.entries(appDailyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, counts]) => ({
+      date,
+      'No Response': counts['No Response'] ?? 0,
+      Submitted: counts['Submitted'] ?? 0,
+      Rejected: counts['Rejected'] ?? 0,
+      Screening: counts['Screening'] ?? 0,
+      Interview: counts['Interview'] ?? 0,
+      Offer: counts['Offer'] ?? 0,
+      Other: counts['Other'] ?? 0,
+    }))
 
-  // Automation stats — untouched (no filter applied)
+  const byStatus = STATUS_KEYS.map(k => ({ status: k, count: statusCounts[k] }))
+
+  // ── Automation section (period cutoff on runAt, no archivedFilter) ──
   const runRows = datetimeCutoff
     ? db.select().from(webhookRuns).where(gte(webhookRuns.runAt, datetimeCutoff)).all()
     : db.select().from(webhookRuns).all()
 
   const totalRuns = runRows.length
-  const successCount = runRows.filter((r) => r.success).length
-  const successRate = totalRuns === 0 ? null : successCount / totalRuns
+  const totalTokens = runRows.reduce((s, r) => s + (r.inputTokens ?? 0) + (r.outputTokens ?? 0), 0)
+  const totalCost = runRows.reduce((s, r) => s + (r.costUsd ?? 0), 0)
 
-  const workflowMap: Record<string, { success: number; failed: number }> = {}
+  const WORKFLOW_KEYS = ['Discovery', 'Analysis', 'Cover Letter', 'Resume'] as const
+  const autoDailyMap: Record<string, Record<string, number>> = {}
+  for (const run of runRows) {
+    const date = run.runAt.slice(0, 10)
+    if (!autoDailyMap[date]) autoDailyMap[date] = Object.fromEntries(WORKFLOW_KEYS.map(k => [k, 0]))
+    const wf = parseWorkflow(run.name)
+    if ((WORKFLOW_KEYS as readonly string[]).includes(wf)) autoDailyMap[date][wf]++
+  }
+  const autoPerDay = Object.entries(autoDailyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, counts]) => ({
+      date,
+      Discovery: counts['Discovery'] ?? 0,
+      Analysis: counts['Analysis'] ?? 0,
+      'Cover Letter': counts['Cover Letter'] ?? 0,
+      Resume: counts['Resume'] ?? 0,
+    }))
+
+  const costMap: Record<string, number> = Object.fromEntries(WORKFLOW_KEYS.map(k => [k, 0]))
   for (const run of runRows) {
     const wf = parseWorkflow(run.name)
-    if (!workflowMap[wf]) workflowMap[wf] = { success: 0, failed: 0 }
-    if (run.success) workflowMap[wf].success++
-    else workflowMap[wf].failed++
+    if ((WORKFLOW_KEYS as readonly string[]).includes(wf)) costMap[wf] += (run.costUsd ?? 0)
   }
-  const byWorkflow = Object.entries(workflowMap).map(([workflow, counts]) => ({ workflow, ...counts }))
-
-  const clRows = datetimeCutoff
-    ? db.select().from(coverLetters).where(gte(coverLetters.createdAt, datetimeCutoff)).all()
-    : db.select().from(coverLetters).all()
-  const coverLettersGenerated = clRows.length
+  const costByWorkflow = WORKFLOW_KEYS.map(k => ({ workflow: k, cost: costMap[k] }))
 
   return c.json({
-    pipeline: { total: pipelineTotal, byRecommendation, byFitScore },
-    scraped: { total: scrapedTotal, perDay },
-    archived: { total: archivedTotal },
-    applications: { total: appTotal, byStatus, responseRate },
-    emails: { total: emailTotal, byType },
-    automation: { totalRuns, successRate, byWorkflow, coverLettersGenerated },
+    jobs: { total: scrapedTotal, companies, sources, perDay: jobsPerDay, bySource },
+    matches: { total: applyCount + investigateCount, apply: applyCount, investigate: investigateCount, perDay: matchesPerDay, byRecommendation },
+    applications: { total: appTotal, companies: appCompanies, responses: appResponses, perDay: appPerDay, byStatus },
+    automation: { totalRuns, totalTokens, totalCost, perDay: autoPerDay, costByWorkflow },
   })
 })
 
