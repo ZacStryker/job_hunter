@@ -376,3 +376,7 @@ _(No deferred findings — all dismissed findings were false positives or covere
 
 - `LabelInsideRight` displays raw unformatted float values for cost breakdown bar labels in Q04 — spec does not require formatted labels in bar charts; visual polish only.
 - Double iteration over `runRows` in `api-stats.ts` Automation section (separate loops for `autoDailyMap` and `costMap`) — minor performance, not a correctness issue; could be merged into one pass.
+
+## Source Breakdown chart hidden when perDay is empty
+The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs.perDay.length > 0)` (same guard as the perDay area chart above it). If `bySource` has data but `perDay` is empty, the breakdown chart is incorrectly hidden. The Status and Cost Breakdown charts don't have this guard. Consider rendering Source Breakdown independently of the perDay guard.
+

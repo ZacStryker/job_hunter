@@ -68,9 +68,9 @@ function LabelInsideTop({ x = 0, y = 0, width = 0, height = 0, value = 0 }: Labe
   return <text x={x + width / 2} y={y + 20} fill="#ffffff" textAnchor="middle" fontSize={13} fontWeight={600}>{value}</text>
 }
 
-function LabelInsideRight({ x = 0, y = 0, width = 0, height = 0, value = 0 }: LabelContentProps): React.JSX.Element {
-  if (!value || width < 40) return <></>
-  return <text x={x + width - 10} y={y + height / 2 + 5} fill="#ffffff" textAnchor="end" fontSize={13} fontWeight={600}>{value}</text>
+function LabelInsideCostTop({ x = 0, y = 0, width = 0, height = 0, value = 0 }: LabelContentProps): React.JSX.Element {
+  if (!value || height < 30) return <></>
+  return <text x={x + width / 2} y={y + 20} fill="#ffffff" textAnchor="middle" fontSize={13} fontWeight={600}>{(value as number).toFixed(4)}</text>
 }
 
 const AXIS_PROPS = {
@@ -273,16 +273,16 @@ export function DashboardRoute() {
             >
               {data.jobs.bySource.every(e => e.value === 0) ? <NoData /> : (
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart layout="vertical" data={data.jobs.bySource}>
+                  <BarChart data={data.jobs.bySource}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis type="number" {...AXIS_PROPS} />
-                    <YAxis type="category" dataKey="name" width={100} {...AXIS_PROPS} />
+                    <XAxis dataKey="name" {...AXIS_PROPS} />
+                    <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
                     <Bar dataKey="value">
                       {data.jobs.bySource.map(entry => (
                         <Cell key={entry.name} fill={SOURCE_COLOR_MAP[entry.name] ?? '#a1a1aa'} />
                       ))}
-                      <LabelList dataKey="value" content={LabelInsideRight as (props: object) => React.JSX.Element} />
+                      <LabelList dataKey="value" content={LabelInsideTop as (props: object) => React.JSX.Element} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -395,16 +395,16 @@ export function DashboardRoute() {
             >
               {data.applications.byStatus.every(e => e.count === 0) ? <NoData /> : (
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart layout="vertical" data={data.applications.byStatus}>
+                  <BarChart data={data.applications.byStatus}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis type="number" {...AXIS_PROPS} />
-                    <YAxis type="category" dataKey="status" width={100} {...AXIS_PROPS} />
+                    <XAxis dataKey="status" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={55} />
+                    <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
                     <Bar dataKey="count">
                       {data.applications.byStatus.map(entry => (
                         <Cell key={entry.status} fill={STATUS_COLOR_MAP[entry.status] ?? '#a1a1aa'} />
                       ))}
-                      <LabelList dataKey="count" content={LabelInsideRight as (props: object) => React.JSX.Element} />
+                      <LabelList dataKey="count" content={LabelInsideTop as (props: object) => React.JSX.Element} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -455,16 +455,16 @@ export function DashboardRoute() {
             >
               {data.automation.costByWorkflow.every(e => e.cost === 0) ? <NoData /> : (
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart layout="vertical" data={data.automation.costByWorkflow}>
+                  <BarChart data={data.automation.costByWorkflow}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis type="number" {...AXIS_PROPS} />
-                    <YAxis type="category" dataKey="workflow" width={110} {...AXIS_PROPS} />
+                    <XAxis dataKey="workflow" {...AXIS_PROPS} />
+                    <YAxis {...AXIS_PROPS} allowDecimals={true} />
                     <Tooltip {...TOOLTIP_PROPS} />
                     <Bar dataKey="cost">
                       {data.automation.costByWorkflow.map(entry => (
                         <Cell key={entry.workflow} fill={WORKFLOW_COLOR_MAP[entry.workflow] ?? '#a1a1aa'} />
                       ))}
-                      <LabelList dataKey="cost" content={LabelInsideRight as (props: object) => React.JSX.Element} />
+                      <LabelList dataKey="cost" content={LabelInsideCostTop as (props: object) => React.JSX.Element} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
