@@ -33,7 +33,7 @@ function applyAnalysisTemplate(
     .replaceAll('{{JOB_LISTING_JSON}}', jobJson)
 }
 
-export async function runAnalysis(): Promise<{ processed: number; failed: number }> {
+export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{ processed: number; failed: number }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
@@ -54,10 +54,15 @@ export async function runAnalysis(): Promise<{ processed: number; failed: number
     .limit(10)
     .all()
 
+  onProgress?.(`Found ${pendingJobs.length} jobs to analyze`)
+
   let processed = 0
   let failed = 0
+  let i = 0
 
   for (const job of pendingJobs) {
+    i++
+    onProgress?.(`Analyzing ${i} / ${pendingJobs.length}: ${job.company} — ${job.jobTitle}`)
     // Mark as analyzing before any external call
     db.update(jobs).set({ analysisStatus: 'analyzing' }).where(eq(jobs.id, job.id)).run()
 

@@ -14,7 +14,7 @@ const DB_SOURCE: Record<string, string> = {
   linkedin: 'linkedin', indeed: 'indeed', indeed_nl: 'indeed_nl', arc: 'arc',
 }
 
-export async function runDiscovery(): Promise<{ inserted: number }> {
+export async function runDiscovery(onProgress?: (msg: string) => void): Promise<{ inserted: number }> {
   const scraperUrl = process.env.SCRAPER_URL
   const scraperToken = process.env.SCRAPER_TOKEN
   if (!scraperUrl) throw new Error('SCRAPER_URL not configured')
@@ -22,8 +22,9 @@ export async function runDiscovery(): Promise<{ inserted: number }> {
   const searches = db.select().from(searchConfigs).where(eq(searchConfigs.enabled, true)).all()
 
   const responses = await Promise.all(
-    searches.map((s) =>
-      fetch(`${scraperUrl}/scrape/search`, {
+    searches.map((s) => {
+      onProgress?.(`Searching ${s.source}: ${s.query}…`)
+      return fetch(`${scraperUrl}/scrape/search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -36,7 +37,7 @@ export async function runDiscovery(): Promise<{ inserted: number }> {
         const data = await res.json() as { results?: ScraperResult[] }
         return { source: DB_SOURCE[s.source] ?? s.source, results: data.results ?? [] }
       })
-    )
+    })
   )
 
   const allResults = responses.flatMap((r) =>
@@ -58,6 +59,8 @@ export async function runDiscovery(): Promise<{ inserted: number }> {
   })
 
   if (newJobs.length === 0) return { inserted: 0 }
+
+  onProgress?.(`Inserting ${newJobs.length} new jobs…`)
 
   const dateScraped = new Date().toISOString()
 

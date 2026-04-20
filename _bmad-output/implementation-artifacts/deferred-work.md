@@ -350,6 +350,12 @@ _(No deferred findings — all dismissed findings were false positives or covere
 - `hooks/useSearchConfigsQuery.ts`: `fetchSearchConfigs` uses raw `as SearchConfig[]` cast instead of Zod `.parse()` — malformed API response silently becomes wrong type. Story 18-1 scope.
 - `config.tsx` `SearchConfigCard` delete button: missing `aria-label` — renders only `✕` with no accessible name. Story 18-1 scope.
 
+## Deferred from: code review of 19-1-automation-progress-streaming (2026-04-19)
+
+- `runDiscovery` silently discards per-source fetch errors — `.catch()` returns `{source, results:[]}` with no progress message or counter; user sees "Inserting 0 jobs…" or nothing with no indication a scraper call failed [`discovery-service.ts`]
+- No client-side stream timeout — `isPending` can hang indefinitely if the server becomes unresponsive after sending HTTP 200 headers; no AbortSignal timeout or Promise.race escape [`useWebhookStream.ts`]
+- `recordRun` throw inside stream callback — if `recordRun` throws (e.g. DB not initialized), the stream callback exits; client hits "Stream ended unexpectedly" with no useful message [`api-webhooks.ts`]
+
 ## Deferred from: code review of edit-existing-searches (2026-04-18)
 
 - `api-search-configs.ts` `GET /`: handler is synchronous (`.all()` without `async/await`). Works with better-sqlite3 but will silently break if migrated to an async Turso/libsql driver. Make the handler `async` and `await` the query.

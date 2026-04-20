@@ -322,6 +322,19 @@ describe('runAnalysis()', () => {
     expect(row.archived).toBe(0)
   })
 
+  test('onProgress: emits found message and per-job messages', async () => {
+    insertPendingJob({ company: 'Acme Corp', job_title: 'Senior Engineer', external_job_id: 'ext-prog-1' })
+    insertPendingJob({ company: 'Beta Inc', job_title: 'Dev Lead', external_job_id: 'ext-prog-2' })
+    mockFetchSuccess()
+
+    const messages: string[] = []
+    await runAnalysis((msg) => messages.push(msg))
+
+    expect(messages[0]).toBe('Found 2 jobs to analyze')
+    expect(messages[1]).toMatch(/^Analyzing 1 \/ 2: /)
+    expect(messages[2]).toMatch(/^Analyzing 2 \/ 2: /)
+  })
+
   test('processes only up to 10 pending jobs per run', async () => {
     for (let i = 1; i <= 12; i++) {
       prodSqlite.run(

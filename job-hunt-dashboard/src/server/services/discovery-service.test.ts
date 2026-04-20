@@ -1,6 +1,6 @@
 process.env.DB_PATH = ':memory:'
 
-import { describe, test, expect, beforeAll, beforeEach, afterEach, mock } from 'bun:test'
+import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach, mock } from 'bun:test'
 import { Database } from 'bun:sqlite'
 
 const originalFetch = globalThis.fetch
@@ -43,10 +43,26 @@ const CREATE_JOBS_TABLE = `
   )
 `
 
+const CREATE_SEARCH_CONFIGS_TABLE = `
+  CREATE TABLE IF NOT EXISTS search_configs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    query TEXT NOT NULL,
+    location TEXT,
+    enabled INTEGER NOT NULL DEFAULT 1
+  )
+`
+
 beforeAll(() => {
   prodSqlite.run(CREATE_JOBS_TABLE)
+  prodSqlite.run(CREATE_SEARCH_CONFIGS_TABLE)
+  prodSqlite.run(`INSERT INTO search_configs (source, query, enabled) VALUES ('linkedin', 'genai python', 1)`)
   process.env.SCRAPER_URL = 'http://test-scraper.invalid'
   process.env.SCRAPER_TOKEN = 'test-token'
+})
+
+afterAll(() => {
+  prodSqlite.run('DELETE FROM search_configs')
 })
 
 beforeEach(() => {
@@ -111,6 +127,41 @@ describe('runDiscovery()', () => {
     delete process.env.SCRAPER_URL
     await expect(runDiscovery()).rejects.toThrow('SCRAPER_URL not configured')
     process.env.SCRAPER_URL = original
+  })
+
+  test('onProgress: emits search messages before fetches and insert message before transaction', async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(new Response(
+        JSON.stringify({ results: [{ id: 'job-p1', title: 'Dev', company: 'ProgressCo', location: null, url: null }] }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      ))
+    )
+
+    const messages: string[] = []
+    await runDiscovery((msg) => messages.push(msg))
+
+    const searchMessages = messages.filter((m) => m.startsWith('Searching '))
+    expect(searchMessages.length).toBeGreaterThan(0)
+    const insertMessage = messages.find((m) => m.startsWith('Inserting '))
+    expect(insertMessage).toBeDefined()
+  })
+
+  test('onProgress: no insert message when no new jobs found', async () => {
+    prodSqlite.run(
+      `INSERT INTO jobs (company, job_title, external_job_id, analysis_status) VALUES ('Acme', 'SWE', 'job-existing', 'done')`
+    )
+    globalThis.fetch = mock(() =>
+      Promise.resolve(new Response(
+        JSON.stringify({ results: [{ id: 'job-existing', title: 'SWE', company: 'Acme', location: null, url: null }] }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      ))
+    )
+
+    const messages: string[] = []
+    await runDiscovery((msg) => messages.push(msg))
+
+    const insertMessage = messages.find((m) => m.startsWith('Inserting '))
+    expect(insertMessage).toBeUndefined()
   })
 
   test('sets analysisStatus to pending on insert', async () => {

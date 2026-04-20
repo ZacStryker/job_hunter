@@ -5,12 +5,12 @@ import { Button } from '../components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { useJobsQuery } from '../hooks/useJobsQuery'
 import { useBulkArchiveMutation } from '../hooks/useBulkArchiveMutation'
-import { useWebhookMutation } from '../hooks/useWebhookMutation'
+import { useWebhookStream } from '../hooks/useWebhookStream'
 import { PipelineTable } from '../components/pipeline/PipelineTable'
 import { JobDrawer } from '../components/detail/JobDrawer'
 
 type ActiveAlert =
-  | { kind: 'webhook-success'; label: string }
+  | { kind: 'webhook-success'; label: string; message: string | null }
   | { kind: 'error'; label: string; message: string }
   | null
 
@@ -68,8 +68,8 @@ function EmptyState() {
 export function PipelineRoute() {
   const { data: jobs, isPending } = useJobsQuery()
   const bulkArchiveMutation = useBulkArchiveMutation()
-  const discoveryMutation = useWebhookMutation('/api/webhooks/discovery')
-  const analysisMutation = useWebhookMutation('/api/webhooks/analysis')
+  const discoveryStream = useWebhookStream('/api/webhooks/discovery')
+  const analysisStream = useWebhookStream('/api/webhooks/analysis')
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
   const [activeAlert, setActiveAlert] = useState<ActiveAlert>(null)
 
@@ -82,36 +82,41 @@ export function PipelineRoute() {
   }, [activeJobs, selectedJobId])
 
   useEffect(() => {
-    if (discoveryMutation.isSuccess) {
-      setActiveAlert({ kind: 'webhook-success', label: 'Discovery' })
+    if (discoveryStream.isSuccess) {
+      setActiveAlert({ kind: 'webhook-success', label: 'Discovery', message: discoveryStream.statusMessage })
       const t = setTimeout(() => setActiveAlert(null), 4000)
       return () => clearTimeout(t)
     }
-  }, [discoveryMutation.isSuccess])
+  }, [discoveryStream.isSuccess])
 
   useEffect(() => {
-    if (discoveryMutation.isError) {
-      setActiveAlert({ kind: 'error', label: 'Discovery', message: discoveryMutation.error.message })
+    if (discoveryStream.isError) {
+      setActiveAlert({ kind: 'error', label: 'Discovery', message: discoveryStream.error ?? 'Unknown error' })
       const t = setTimeout(() => setActiveAlert(null), 4000)
       return () => clearTimeout(t)
     }
-  }, [discoveryMutation.isError])
+  }, [discoveryStream.isError])
 
   useEffect(() => {
-    if (analysisMutation.isSuccess) {
-      setActiveAlert({ kind: 'webhook-success', label: 'Analysis' })
+    if (analysisStream.isSuccess) {
+      setActiveAlert({ kind: 'webhook-success', label: 'Analysis', message: analysisStream.statusMessage })
       const t = setTimeout(() => setActiveAlert(null), 4000)
       return () => clearTimeout(t)
     }
-  }, [analysisMutation.isSuccess])
+  }, [analysisStream.isSuccess])
 
   useEffect(() => {
-    if (analysisMutation.isError) {
-      setActiveAlert({ kind: 'error', label: 'Analysis', message: analysisMutation.error.message })
+    if (analysisStream.isError) {
+      setActiveAlert({ kind: 'error', label: 'Analysis', message: analysisStream.error ?? 'Unknown error' })
       const t = setTimeout(() => setActiveAlert(null), 4000)
       return () => clearTimeout(t)
     }
-  }, [analysisMutation.isError])
+  }, [analysisStream.isError])
+
+  const pendingStatusMessage =
+    discoveryStream.isPending ? discoveryStream.statusMessage :
+    analysisStream.isPending ? analysisStream.statusMessage :
+    null
 
   const actionBar = (
     <div className="flex items-center justify-between px-4 pt-4">
@@ -119,10 +124,10 @@ export function PipelineRoute() {
         <Button
           variant="outline"
           size="sm"
-          disabled={discoveryMutation.isPending || analysisMutation.isPending}
-          onClick={() => discoveryMutation.mutate()}
+          disabled={discoveryStream.isPending || analysisStream.isPending}
+          onClick={() => discoveryStream.trigger()}
         >
-          {discoveryMutation.isPending ? (
+          {discoveryStream.isPending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Discovery…
@@ -134,10 +139,10 @@ export function PipelineRoute() {
         <Button
           variant="outline"
           size="sm"
-          disabled={analysisMutation.isPending || discoveryMutation.isPending}
-          onClick={() => analysisMutation.mutate()}
+          disabled={analysisStream.isPending || discoveryStream.isPending}
+          onClick={() => analysisStream.trigger()}
         >
-          {analysisMutation.isPending ? (
+          {analysisStream.isPending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Analysis…
@@ -147,15 +152,25 @@ export function PipelineRoute() {
           )}
         </Button>
       </div>
-      {activeAlert && (
+      {(activeAlert || pendingStatusMessage) && (
         <div className="flex-1 ml-4">
-          {activeAlert.kind === 'webhook-success' && (
+          {(discoveryStream.isPending || analysisStream.isPending) && pendingStatusMessage && (
             <Alert className="py-2">
-              <AlertTitle className="text-sm">{activeAlert.label} triggered</AlertTitle>
-              <AlertDescription className="text-xs">Workflow started successfully.</AlertDescription>
+              <AlertTitle className="text-sm">
+                {discoveryStream.isPending ? 'Discovery running…' : 'Analysis running…'}
+              </AlertTitle>
+              <AlertDescription className="text-xs">{pendingStatusMessage}</AlertDescription>
             </Alert>
           )}
-          {activeAlert.kind === 'error' && (
+          {activeAlert?.kind === 'webhook-success' && (
+            <Alert className="py-2">
+              <AlertTitle className="text-sm">{activeAlert.label} complete</AlertTitle>
+              <AlertDescription className="text-xs">
+                {activeAlert.message ?? 'Workflow started successfully.'}
+              </AlertDescription>
+            </Alert>
+          )}
+          {activeAlert?.kind === 'error' && (
             <Alert variant="destructive" className="py-2">
               <AlertTitle className="text-sm">{activeAlert.label} failed</AlertTitle>
               <AlertDescription className="text-xs">{activeAlert.message}</AlertDescription>
