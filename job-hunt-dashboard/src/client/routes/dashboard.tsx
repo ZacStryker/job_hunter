@@ -214,10 +214,10 @@ export function DashboardRoute() {
       )}
 
       {data && (
-        <div className="space-y-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
           {/* ── Q01 Jobs ── */}
-          <section className="space-y-3">
+          <section className="space-y-3 min-w-0">
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Jobs</h2>
             <div className="grid grid-cols-3 gap-3">
               <StatCard label="Jobs" value={String(data.jobs.total)} />
@@ -290,7 +290,7 @@ export function DashboardRoute() {
           </section>
 
           {/* ── Q02 Matches ── */}
-          <section className="space-y-3">
+          <section className="space-y-3 min-w-0">
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Matches</h2>
             <div className="grid grid-cols-3 gap-3">
               <StatCard label="Matches" value={String(data.matches.total)} />
@@ -351,7 +351,7 @@ export function DashboardRoute() {
           </section>
 
           {/* ── Q03 Applications ── */}
-          <section className="space-y-3">
+          <section className="space-y-3 min-w-0">
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Applications</h2>
             <div className="grid grid-cols-3 gap-3">
               <StatCard label="Applications" value={String(data.applications.total)} />
@@ -411,7 +411,7 @@ export function DashboardRoute() {
           </section>
 
           {/* ── Q04 Automations ── */}
-          <section className="space-y-3">
+          <section className="space-y-3 min-w-0">
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Automations</h2>
             <div className="grid grid-cols-3 gap-3">
               <StatCard label="Workflow Runs" value={String(data.automation.totalRuns)} />
