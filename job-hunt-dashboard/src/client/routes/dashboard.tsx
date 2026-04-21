@@ -92,7 +92,7 @@ function formatPerDayDate(d: unknown): string {
 
 function NoData() {
   return (
-    <div className="flex items-center justify-center h-[160px] text-sm text-zinc-500">
+    <div className="flex items-center justify-center h-[120px] text-sm text-zinc-500">
       No data for this period
     </div>
   )
@@ -100,9 +100,9 @@ function NoData() {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-2">
       <div className="text-xs text-zinc-500 uppercase tracking-wide mb-1">{label}</div>
-      <div className="text-xl font-semibold text-zinc-100">{value}</div>
+      <div className="text-lg font-semibold text-zinc-100">{value}</div>
     </div>
   )
 }
@@ -120,18 +120,18 @@ function ChartCard({
 }) {
   const [showTable, setShowTable] = useState(false)
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-      <div className="flex items-center justify-between mb-2">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-2">
+      <div className="flex items-center justify-between mb-1.5">
         <div className="text-sm font-medium text-zinc-400">{title}</div>
         <button
           onClick={() => setShowTable((s) => !s)}
-          className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded hover:bg-zinc-800 transition-colors"
+          className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-0.5 rounded hover:bg-zinc-800 transition-colors"
         >
           {showTable ? 'Chart' : 'Data'}
         </button>
       </div>
       {showTable ? (
-        <div className="overflow-auto h-[160px]">
+        <div className="overflow-auto h-[120px]">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-zinc-900">
               <tr className="border-b border-zinc-700">
@@ -171,7 +171,7 @@ export function DashboardRoute() {
   const { data, isPending, isError, error } = useStatsQuery(period, archivedFilter)
 
   return (
-    <div className="p-3 space-y-3">
+    <div className="p-2 space-y-2">
       {/* Filter bar: period + archivedFilter only */}
       <div className="flex items-center gap-1">
         {STATS_PERIODS.map((p) => (
@@ -179,7 +179,7 @@ export function DashboardRoute() {
             key={p}
             onClick={() => setPeriod(p)}
             className={[
-              'px-3 py-1.5 text-sm rounded transition-colors',
+              'px-2.5 py-1 text-xs rounded transition-colors',
               period === p
                 ? 'bg-zinc-700 text-zinc-100'
                 : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800',
@@ -189,14 +189,14 @@ export function DashboardRoute() {
           </button>
         ))}
 
-        <div className="w-px h-5 bg-zinc-700 mx-2" />
+        <div className="w-px h-4 bg-zinc-700 mx-1.5" />
 
         {(['active', 'archived', 'all'] as ArchivedFilter[]).map((f) => (
           <button
             key={f}
             onClick={() => setArchivedFilter(f)}
             className={[
-              'px-3 py-1.5 text-sm rounded transition-colors',
+              'px-2.5 py-1 text-xs rounded transition-colors',
               archivedFilter === f
                 ? 'bg-zinc-700 text-zinc-100'
                 : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800',
@@ -216,12 +216,12 @@ export function DashboardRoute() {
       )}
 
       {data && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 items-start">
 
           {/* ── Q01 Automations ── */}
-          <section className="space-y-2 min-w-0">
+          <section className="space-y-1.5 min-w-0">
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Automations</h2>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <StatCard label="Workflow Runs" value={String(data.automation.totalRuns)} />
               <StatCard label="Tokens" value={formatTokens(data.automation.totalTokens)} />
               <StatCard label="Cost" value={`$${data.automation.totalCost.toFixed(2)}`} />
@@ -232,7 +232,7 @@ export function DashboardRoute() {
                 tableHeaders={['Date', 'Discovery', 'Analysis', 'Cover Letter', 'Resume']}
                 tableData={data.automation.perDay.map(e => [e.date, e.Discovery, e.Analysis, e['Cover Letter'], e.Resume])}
               >
-                <ResponsiveContainer width="100%" height={160}>
+                <ResponsiveContainer width="100%" height={120}>
                   <AreaChart data={data.automation.perDay}>
                     <defs>
                       {WORKFLOW_KEYS.map(k => (
@@ -260,7 +260,7 @@ export function DashboardRoute() {
               tableData={data.automation.costByWorkflow.map(e => [e.workflow, e.cost.toFixed(2)])}
             >
               {data.automation.costByWorkflow.every(e => e.cost === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={160}>
+                <ResponsiveContainer width="100%" height={120}>
                   <BarChart data={data.automation.costByWorkflow}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="workflow" {...AXIS_PROPS} />
@@ -279,9 +279,9 @@ export function DashboardRoute() {
           </section>
 
           {/* ── Q02 Jobs ── */}
-          <section className="space-y-2 min-w-0">
+          <section className="space-y-1.5 min-w-0">
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Jobs</h2>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <StatCard label="Jobs" value={String(data.jobs.total)} />
               <StatCard label="Companies" value={String(data.jobs.companies)} />
               <StatCard label="Sources" value={String(data.jobs.sources)} />
@@ -292,7 +292,7 @@ export function DashboardRoute() {
                 tableHeaders={['Date', 'LinkedIn', 'Indeed', 'Indeed NL', 'Arc']}
                 tableData={data.jobs.perDay.map(e => [e.date, e.linkedin, e.indeed, e.indeed_nl, e.arc])}
               >
-                <ResponsiveContainer width="100%" height={160}>
+                <ResponsiveContainer width="100%" height={120}>
                   <AreaChart data={data.jobs.perDay}>
                     <defs>
                       <linearGradient id="gradJobsLinkedin" x1="0" y1="0" x2="0" y2="1">
@@ -332,7 +332,7 @@ export function DashboardRoute() {
               tableData={data.jobs.bySource.map(e => [e.name, e.value])}
             >
               {data.jobs.bySource.every(e => e.value === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={160}>
+                <ResponsiveContainer width="100%" height={120}>
                   <BarChart data={data.jobs.bySource}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="name" {...AXIS_PROPS} />
@@ -352,9 +352,9 @@ export function DashboardRoute() {
           </section>
 
           {/* ── Q03 Matches ── */}
-          <section className="space-y-2 min-w-0">
+          <section className="space-y-1.5 min-w-0">
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Matches</h2>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <StatCard label="Matches" value={String(data.matches.total)} />
               <StatCard label="Investigate" value={String(data.matches.investigate)} />
               <StatCard label="Apply" value={String(data.matches.apply)} />
@@ -365,7 +365,7 @@ export function DashboardRoute() {
                 tableHeaders={['Date', 'Apply', 'Investigate']}
                 tableData={data.matches.perDay.map(e => [e.date, e.apply, e.investigate])}
               >
-                <ResponsiveContainer width="100%" height={160}>
+                <ResponsiveContainer width="100%" height={120}>
                   <AreaChart data={data.matches.perDay}>
                     <defs>
                       <linearGradient id="gradMatchesApply" x1="0" y1="0" x2="0" y2="1">
@@ -394,10 +394,10 @@ export function DashboardRoute() {
               tableData={data.matches.byScore.map(e => [e.score, e.count])}
             >
               {data.matches.byScore.every(e => e.count === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={160}>
+                <ResponsiveContainer width="100%" height={120}>
                   <BarChart data={data.matches.byScore}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="score" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={45} />
+                    <XAxis dataKey="score" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={38} />
                     <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
                     <Bar dataKey="count">
@@ -413,9 +413,9 @@ export function DashboardRoute() {
           </section>
 
           {/* ── Q04 Applications ── */}
-          <section className="space-y-2 min-w-0">
+          <section className="space-y-1.5 min-w-0">
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Applications</h2>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <StatCard label="Applications" value={String(data.applications.total)} />
               <StatCard label="Companies" value={String(data.applications.companies)} />
               <StatCard label="Responses" value={String(data.applications.responses)} />
@@ -426,7 +426,7 @@ export function DashboardRoute() {
                 tableHeaders={['Date', 'No Response', 'Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other']}
                 tableData={data.applications.perDay.map(e => [e.date, e['No Response'], e.Submitted, e.Rejected, e.Screening, e.Interview, e.Offer, e.Other])}
               >
-                <ResponsiveContainer width="100%" height={160}>
+                <ResponsiveContainer width="100%" height={120}>
                   <AreaChart data={data.applications.perDay}>
                     <defs>
                       {APP_STATUS_KEYS.map(k => (
@@ -454,10 +454,10 @@ export function DashboardRoute() {
               tableData={data.applications.byStatus.map(e => [e.status, e.count])}
             >
               {data.applications.byStatus.every(e => e.count === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={160}>
+                <ResponsiveContainer width="100%" height={120}>
                   <BarChart data={data.applications.byStatus}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="status" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={55} />
+                    <XAxis dataKey="status" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={50} />
                     <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
                     <Bar dataKey="count">
