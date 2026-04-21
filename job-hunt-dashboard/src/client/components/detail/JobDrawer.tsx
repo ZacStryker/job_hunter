@@ -1,5 +1,5 @@
 import { useState, useEffect, Fragment } from 'react'
-import { ExternalLink, Archive, ArchiveRestore, Wand2, Copy, FileText, Download, CheckCircle, Circle } from 'lucide-react'
+import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, CheckCircle, Circle } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import type { Job } from '@shared/schemas'
@@ -10,7 +10,6 @@ import { useJobEvents } from '../../hooks/useJobEvents'
 import { StatusTimeline } from './StatusTimeline'
 import { useGenerateCoverLetter } from '../../hooks/useGenerateCoverLetter'
 import { useGenerateResume } from '../../hooks/useGenerateResume'
-import { useCoverLetterQuery } from '../../hooks/useCoverLetterQuery'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { useJobMutation } from '../../hooks/useJobMutation'
 
@@ -72,10 +71,6 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   const { mutate: generateCoverLetter, isPending, isError, error } = useGenerateCoverLetter(job?.id ?? 0)
   const { mutate: generateResume, isPending: isResumePending, isError: isResumeError, error: resumeError } = useGenerateResume(job?.id ?? 0)
   const { mutate: patchJob, isPending: isArchiving } = useJobMutation(job?.id ?? 0)
-  const { data: coverLetter } = useCoverLetterQuery(
-    job?.id ?? 0,
-    !!job?.coverLetterSentAt
-  )
 
   useEffect(() => {
     setShowFullDescription(false)
@@ -186,109 +181,122 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                 <p className="text-sm text-zinc-500 italic">No job description available.</p>
               )}
             </TabsContent>
-            <TabsContent value="documents" className="pt-4 space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {job?.jobDescription ? (
-                  <button
-                    onClick={() => generateCoverLetter()}
-                    disabled={isPending}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Wand2 size={13} />
-                    {isPending ? 'Generating…' : job.coverLetterSentAt ? 'Regenerate Cover Letter' : 'Generate Cover Letter'}
-                  </button>
-                ) : (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-600 cursor-not-allowed select-none">
-                          <Wand2 size={13} />
-                          Generate Cover Letter
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>No job description available</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {job?.jobDescription ? (
-                  <button
-                    onClick={() => generateResume()}
-                    disabled={isResumePending}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <FileText size={13} />
-                    {isResumePending ? 'Generating…' : job.resumeGeneratedAt ? 'Regenerate Resume' : 'Generate Resume'}
-                  </button>
-                ) : (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-600 cursor-not-allowed select-none">
-                          <FileText size={13} />
-                          Generate Resume
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>No job description available</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {isError && (
-                  <p className="w-full text-xs text-red-400">{error?.message ?? 'Generation failed'}</p>
-                )}
-                {isResumeError && (
-                  <p className="w-full text-xs text-red-400">{resumeError?.message ?? 'Resume generation failed'}</p>
-                )}
-              </div>
-              {coverLetter ? (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Cover Letter</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-zinc-600">{new Date(coverLetter.createdAt).toLocaleDateString()}</p>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(coverLetter.content)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-                      >
-                        <Copy size={11} />
-                        Copy
-                      </button>
-                    </div>
-                  </div>
-                  <pre className="text-xs text-zinc-300 whitespace-pre-wrap max-h-64 overflow-y-auto font-sans leading-relaxed">
-                    {coverLetter.content}
-                  </pre>
-                </div>
-              ) : null}
-              {job?.resumeGeneratedAt ? (
+            <TabsContent value="documents" className="pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                {/* Cover Letter */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Resume</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-zinc-600">{new Date(job.resumeGeneratedAt).toLocaleDateString()}</p>
-                      <a
-                        href={`/api/jobs/${job.id}/resume`}
-                        download
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-                      >
-                        <Download size={11} />
-                        Download
-                      </a>
-                    </div>
+                  <div className="flex items-center justify-between min-h-[20px]">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Cover Letter</p>
+                    {job?.coverLetterSentAt && (
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-zinc-600">{new Date(job.coverLetterSentAt).toLocaleDateString()}</p>
+                        <a
+                          href={`/api/jobs/${job.id}/cover-letter/pdf?t=${job.coverLetterSentAt}`}
+                          download
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                        >
+                          <Download size={11} /> Download
+                        </a>
+                      </div>
+                    )}
                   </div>
-                  <iframe
-                    src={`/api/jobs/${job.id}/resume`}
-                    className="w-full h-96 border border-zinc-800 rounded"
-                    title="Resume preview"
-                  />
+                  {job?.jobDescription ? (
+                    <button
+                      onClick={() => generateCoverLetter()}
+                      disabled={isPending}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Wand2 size={13} />
+                      {isPending ? 'Generating…' : job?.coverLetterSentAt ? 'Regenerate' : 'Generate Cover Letter'}
+                    </button>
+                  ) : (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-600 cursor-not-allowed select-none">
+                            <Wand2 size={13} />
+                            Generate Cover Letter
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>No job description available</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  {isError && (
+                    <p className="text-xs text-red-400">{error?.message ?? 'Generation failed'}</p>
+                  )}
+                  {job?.coverLetterSentAt ? (
+                    <iframe
+                      src={`/api/jobs/${job.id}/cover-letter/pdf?t=${job.coverLetterSentAt}`}
+                      className="w-full aspect-[210/297] border border-zinc-800 rounded"
+                      title="Cover letter preview"
+                    />
+                  ) : (
+                    <div className="w-full aspect-[210/297] border border-zinc-800 rounded flex items-center justify-center bg-zinc-900">
+                      <p className="text-xs text-zinc-600 text-center px-4">Generate a cover letter to see a preview</p>
+                    </div>
+                  )}
                 </div>
-              ) : null}
-              {!coverLetter && !job?.resumeGeneratedAt && (
-                <p className="text-sm text-zinc-500 italic">No documents generated yet.</p>
-              )}
+
+                {/* Resume */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between min-h-[20px]">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Resume</p>
+                    {job?.resumeGeneratedAt && (
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-zinc-600">{new Date(job.resumeGeneratedAt).toLocaleDateString()}</p>
+                        <a
+                          href={`/api/jobs/${job.id}/resume`}
+                          download
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                        >
+                          <Download size={11} /> Download
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                  {job?.jobDescription ? (
+                    <button
+                      onClick={() => generateResume()}
+                      disabled={isResumePending}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FileText size={13} />
+                      {isResumePending ? 'Generating…' : job?.resumeGeneratedAt ? 'Regenerate' : 'Generate Resume'}
+                    </button>
+                  ) : (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-600 cursor-not-allowed select-none">
+                            <FileText size={13} />
+                            Generate Resume
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>No job description available</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  {isResumeError && (
+                    <p className="text-xs text-red-400">{resumeError?.message ?? 'Resume generation failed'}</p>
+                  )}
+                  {job?.resumeGeneratedAt ? (
+                    <iframe
+                      src={`/api/jobs/${job.id}/resume`}
+                      className="w-full aspect-[210/297] border border-zinc-800 rounded"
+                      title="Resume preview"
+                    />
+                  ) : (
+                    <div className="w-full aspect-[210/297] border border-zinc-800 rounded flex items-center justify-center bg-zinc-900">
+                      <p className="text-xs text-zinc-600 text-center px-4">Generate a resume to see a preview</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
