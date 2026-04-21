@@ -57,14 +57,30 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
   )
 `
 
+const CREATE_MESSAGES_TABLE = `
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uid TEXT NOT NULL UNIQUE,
+    message_id TEXT UNIQUE,
+    received_at TEXT NOT NULL,
+    from_address TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    type TEXT,
+    company TEXT,
+    job_title TEXT
+  )
+`
+
 beforeAll(() => {
   prodSqlite.run(CREATE_JOBS_TABLE)
   prodSqlite.run(CREATE_WEBHOOK_RUNS_TABLE)
+  prodSqlite.run(CREATE_MESSAGES_TABLE)
 })
 
 beforeEach(() => {
   prodSqlite.run('DELETE FROM webhook_runs')
   prodSqlite.run('DELETE FROM jobs')
+  prodSqlite.run('DELETE FROM messages')
 })
 
 describe('GET /api/stats - response shape', () => {
@@ -142,15 +158,25 @@ describe('GET /api/stats - jobs section', () => {
     prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, source, date_scraped) VALUES ('B', 'Dev', 0, 'indeed', '2026-04-01')`)
     prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, source, date_scraped) VALUES ('C', 'Dev', 0, 'linkedin', '2026-04-02')`)
     const res = await statsApp.request('/', { method: 'GET' })
-    const data = await res.json() as { jobs: { perDay: { date: string; linkedin: number; indeed: number; indeed_nl: number; arc: number }[] } }
+    const data = await res.json() as { jobs: { perDay: { date: string; linkedin: number; indeed: number; indeed_nl: number; arc: number; manual: number }[] } }
     expect(data.jobs.perDay.length).toBe(2)
     const day1 = data.jobs.perDay.find(d => d.date === '2026-04-01')
     expect(day1?.linkedin).toBe(1)
     expect(day1?.indeed).toBe(1)
     expect(day1?.indeed_nl).toBe(0)
     expect(day1?.arc).toBe(0)
+    expect(day1?.manual).toBe(0)
     const day2 = data.jobs.perDay.find(d => d.date === '2026-04-02')
     expect(day2?.linkedin).toBe(1)
+  })
+
+  test('jobs.perDay counts manual source (case-insensitive)', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, source, date_scraped) VALUES ('A', 'Dev', 0, 'manual', '2026-04-01')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, source, date_scraped) VALUES ('B', 'Dev', 0, 'Manual', '2026-04-01')`)
+    const res = await statsApp.request('/', { method: 'GET' })
+    const data = await res.json() as { jobs: { perDay: { date: string; manual: number }[] } }
+    const day1 = data.jobs.perDay.find(d => d.date === '2026-04-01')
+    expect(day1?.manual).toBe(2)
   })
 
   test('jobs.bySource totals per known source key', async () => {
@@ -162,9 +188,20 @@ describe('GET /api/stats - jobs section', () => {
     const arc = data.jobs.bySource.find(s => s.name === 'arc')
     const indeed = data.jobs.bySource.find(s => s.name === 'indeed')
     const linkedin = data.jobs.bySource.find(s => s.name === 'linkedin')
+    const manual = data.jobs.bySource.find(s => s.name === 'manual')
     expect(arc?.value).toBe(2)
     expect(indeed?.value).toBe(1)
     expect(linkedin?.value).toBe(0)
+    expect(manual?.value).toBe(0)
+  })
+
+  test('jobs.bySource counts manual source (case-insensitive)', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, source) VALUES ('A', 'Dev', 0, 'manual')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, source) VALUES ('B', 'Dev', 0, 'Manual')`)
+    const res = await statsApp.request('/', { method: 'GET' })
+    const data = await res.json() as { jobs: { bySource: { name: string; value: number }[] } }
+    const manual = data.jobs.bySource.find(s => s.name === 'manual')
+    expect(manual?.value).toBe(2)
   })
 })
 
@@ -223,19 +260,23 @@ describe('GET /api/stats - applications section', () => {
     expect(data.applications.companies).toBe(2)
   })
 
-  test('applications.responses counts jobs with non-null statusOverride', async () => {
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied, status_override) VALUES ('A', 'Dev', 0, 1, 'Rejected')`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied, status_override) VALUES ('B', 'Dev', 0, 1, NULL)`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied, status_override) VALUES ('C', 'Dev', 0, 1, 'Interview')`)
+  test('applications.responses counts jobs with a matched message', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('A', 'Dev', 0, 1)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('B', 'Dev2', 0, 1)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('C', 'Dev3', 0, 1)`)
+    prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, type, company, job_title) VALUES ('m1', '2026-04-01T10:00:00.000Z', 'hr@a.com', 'Re: A', 'Rejected', 'A', 'Dev')`)
+    prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, type, company, job_title) VALUES ('m2', '2026-04-01T11:00:00.000Z', 'hr@c.com', 'Re: C', 'Interview', 'C', 'Dev3')`)
     const res = await statsApp.request('/', { method: 'GET' })
     const data = await res.json() as { applications: { responses: number } }
     expect(data.applications.responses).toBe(2)
   })
 
-  test('applications.perDay groups by dateApplied and status', async () => {
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied, date_applied, status_override) VALUES ('A', 'Dev', 0, 1, '2026-04-01', 'Rejected')`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied, date_applied, status_override) VALUES ('B', 'Dev', 0, 1, '2026-04-01', NULL)`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied, date_applied, status_override) VALUES ('C', 'Dev', 0, 1, '2026-04-02', 'Interview')`)
+  test('applications.perDay groups by dateApplied and status from messages', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied, date_applied) VALUES ('A', 'Dev', 0, 1, '2026-04-01')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied, date_applied) VALUES ('B', 'Dev2', 0, 1, '2026-04-01')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied, date_applied) VALUES ('C', 'Dev3', 0, 1, '2026-04-02')`)
+    prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, type, company, job_title) VALUES ('m1', '2026-04-01T10:00:00.000Z', 'hr@a.com', 'Re: A', 'Rejected', 'A', 'Dev')`)
+    prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, type, company, job_title) VALUES ('m2', '2026-04-02T10:00:00.000Z', 'hr@c.com', 'Re: C', 'Interview', 'C', 'Dev3')`)
     const res = await statsApp.request('/', { method: 'GET' })
     const data = await res.json() as { applications: { perDay: { date: string; 'No Response': number; Rejected: number; Interview: number }[] } }
     expect(data.applications.perDay.length).toBe(2)
@@ -259,8 +300,9 @@ describe('GET /api/stats - applications section', () => {
     expect(keys).toContain('Other')
   })
 
-  test('unknown statusOverride bucketed as Other', async () => {
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied, status_override) VALUES ('A', 'Dev', 0, 1, 'SomeUnknown')`)
+  test('unknown message type bucketed as Other', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, archived, applied) VALUES ('A', 'Dev', 0, 1)`)
+    prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, type, company, job_title) VALUES ('m1', '2026-04-01T10:00:00.000Z', 'hr@a.com', 'Sub', 'SomeUnknown', 'A', 'Dev')`)
     const res = await statsApp.request('/', { method: 'GET' })
     const data = await res.json() as { applications: { byStatus: { status: string; count: number }[] } }
     const other = data.applications.byStatus.find(s => s.status === 'Other')
@@ -308,7 +350,7 @@ describe('GET /api/stats - automation section', () => {
     expect(day2?.Analysis).toBe(1)
   })
 
-  test('automation.costByWorkflow sums cost per workflow type', async () => {
+  test('automation.costByWorkflow sums cost per workflow type (excludes Discovery)', async () => {
     prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Discovery', '2026-04-01T10:00:00.000Z', 1, 0.0050)`)
     prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Discovery', '2026-04-01T11:00:00.000Z', 1, 0.0030)`)
     prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Resume - Jane', '2026-04-01T12:00:00.000Z', 1, 0.0200)`)
@@ -317,7 +359,7 @@ describe('GET /api/stats - automation section', () => {
     const discovery = data.automation.costByWorkflow.find(w => w.workflow === 'Discovery')
     const resume = data.automation.costByWorkflow.find(w => w.workflow === 'Resume')
     const analysis = data.automation.costByWorkflow.find(w => w.workflow === 'Analysis')
-    expect(discovery?.cost).toBeCloseTo(0.008)
+    expect(discovery).toBeUndefined()
     expect(resume?.cost).toBeCloseTo(0.02)
     expect(analysis?.cost).toBe(0)
   })

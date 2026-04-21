@@ -29,6 +29,7 @@ const SOURCE_COLOR_MAP: Record<string, string> = {
   indeed: '#4ade80',
   indeed_nl: '#a78bfa',
   arc: '#fb923c',
+  manual: '#f472b6',
 }
 
 const REC_COLOR_MAP: Record<string, string> = {
@@ -289,8 +290,8 @@ export function DashboardRoute() {
             {data.jobs.perDay.length > 0 && (
               <ChartCard
                 title="Jobs per Day by Source"
-                tableHeaders={['Date', 'LinkedIn', 'Indeed', 'Indeed NL', 'Arc']}
-                tableData={data.jobs.perDay.map(e => [e.date, e.linkedin, e.indeed, e.indeed_nl, e.arc])}
+                tableHeaders={['Date', 'LinkedIn', 'Indeed', 'Indeed NL', 'Arc', 'Manual']}
+                tableData={data.jobs.perDay.map(e => [e.date, e.linkedin, e.indeed, e.indeed_nl, e.arc, e.manual])}
               >
                 <ResponsiveContainer width="100%" height={120}>
                   <AreaChart data={data.jobs.perDay}>
@@ -311,6 +312,10 @@ export function DashboardRoute() {
                         <stop offset="5%" stopColor={SOURCE_COLOR_MAP.arc} stopOpacity={0.6} />
                         <stop offset="95%" stopColor={SOURCE_COLOR_MAP.arc} stopOpacity={0.1} />
                       </linearGradient>
+                      <linearGradient id="gradJobsManual" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={SOURCE_COLOR_MAP.manual} stopOpacity={0.6} />
+                        <stop offset="95%" stopColor={SOURCE_COLOR_MAP.manual} stopOpacity={0.1} />
+                      </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
@@ -321,6 +326,7 @@ export function DashboardRoute() {
                     <Area type="monotone" dataKey="indeed" stackId="1" stroke={SOURCE_COLOR_MAP.indeed} fill="url(#gradJobsIndeed)" />
                     <Area type="monotone" dataKey="indeed_nl" stackId="1" stroke={SOURCE_COLOR_MAP.indeed_nl} fill="url(#gradJobsIndeedNl)" />
                     <Area type="monotone" dataKey="arc" stackId="1" stroke={SOURCE_COLOR_MAP.arc} fill="url(#gradJobsArc)" />
+                    <Area type="monotone" dataKey="manual" stackId="1" stroke={SOURCE_COLOR_MAP.manual} fill="url(#gradJobsManual)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </ChartCard>
@@ -329,17 +335,17 @@ export function DashboardRoute() {
             <ChartCard
               title="Source Breakdown"
               tableHeaders={['Source', 'Count']}
-              tableData={data.jobs.bySource.map(e => [e.name, e.value])}
+              tableData={data.jobs.bySource.filter(e => e.value > 0).map(e => [e.name, e.value])}
             >
               {data.jobs.bySource.every(e => e.value === 0) ? <NoData /> : (
                 <ResponsiveContainer width="100%" height={120}>
-                  <BarChart data={data.jobs.bySource}>
+                  <BarChart data={data.jobs.bySource.filter(e => e.value > 0)}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="name" {...AXIS_PROPS} />
                     <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
                     <Bar dataKey="value">
-                      {data.jobs.bySource.map(entry => (
+                      {data.jobs.bySource.filter(e => e.value > 0).map(entry => (
                         <Cell key={entry.name} fill={SOURCE_COLOR_MAP[entry.name] ?? '#a1a1aa'} />
                       ))}
                       <LabelList dataKey="value" content={LabelInsideTop as (props: object) => React.JSX.Element} />

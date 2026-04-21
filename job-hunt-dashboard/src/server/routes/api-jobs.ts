@@ -132,6 +132,86 @@ const bulkArchiveSchema = z.object({
   ids: z.array(z.number().int().positive()).min(1, 'No ids provided'),
 })
 
+const scrapeUrlSchema = z.object({ url: z.string().url() })
+
+function detectSource(rawUrl: string): 'linkedin' | 'indeed' | 'indeed_nl' | null {
+  try {
+    const hostname = new URL(rawUrl).hostname.replace(/^www\./, '')
+    if (hostname === 'linkedin.com' || hostname.endsWith('.linkedin.com')) return 'linkedin'
+    if (hostname === 'nl.indeed.com') return 'indeed_nl'
+    if (hostname === 'indeed.com' || hostname.endsWith('.indeed.com')) return 'indeed'
+    return null
+  } catch { return null }
+}
+
+app.post('/scrape-url', async (c) => {
+  let body: unknown
+  try { body = await c.req.json() } catch { return c.json({ error: 'Invalid JSON body' }, 400) }
+  const parsed = scrapeUrlSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: 'Invalid URL' }, 400)
+
+  const { url } = parsed.data
+
+  const scraperUrl = process.env.SCRAPER_URL
+  if (!scraperUrl) return c.json({ error: 'Scraper not available' }, 503)
+
+  const source = detectSource(url)
+  if (!source) return c.json({ error: 'Unsupported URL source' }, 422)
+
+  try {
+    const res = await fetch(`${scraperUrl}/scrape/job-details`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source, url }),
+      signal: AbortSignal.timeout(40_000),
+    })
+    if (!res.ok) return c.json({ error: 'Scrape failed' }, 502)
+
+    const data = await res.json() as { company: string | null; jobTitle: string | null; location: string | null }
+    if (!data.company || !data.jobTitle) return c.json({ error: 'Could not extract job details' }, 422)
+
+    return c.json({ company: data.company, jobTitle: data.jobTitle, location: data.location ?? null })
+  } catch {
+    return c.json({ error: 'Scrape failed' }, 502)
+  }
+})
+
+const manualJobSchema = z.object({
+  company: z.string().min(1),
+  jobTitle: z.string().min(1),
+  location: z.string().optional(),
+  sourceUrl: z.string().url(),
+})
+
+app.post('/', async (c) => {
+  let body: unknown
+  try { body = await c.req.json() } catch { return c.json({ error: 'Invalid JSON body' }, 400) }
+  const parsed = manualJobSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, 400)
+
+  const { company, jobTitle, location, sourceUrl } = parsed.data
+  const locationValue = location?.trim() || null
+
+  const existing = db.select({ id: jobs.id }).from(jobs)
+    .where(and(eq(jobs.company, company), eq(jobs.jobTitle, jobTitle))).get()
+  if (existing) return c.json({ error: 'Job already exists' }, 409)
+
+  const dateScraped = new Date().toISOString()
+  db.insert(jobs).values({
+    company, jobTitle,
+    location: locationValue,
+    sourceUrl,
+    source: 'manual',
+    analysisStatus: 'pending',
+    dateScraped,
+  }).run()
+
+  const created = db.select().from(jobs)
+    .where(and(eq(jobs.company, company), eq(jobs.jobTitle, jobTitle))).get()
+  if (!created) return c.json({ error: 'Failed to retrieve created job' }, 500)
+  return c.json({ job: created }, 201)
+})
+
 app.post('/bulk-archive', async (c) => {
   let body: unknown
   try {

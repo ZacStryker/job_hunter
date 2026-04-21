@@ -47,22 +47,22 @@ app.get('/', (c) => {
   const companies = new Set(viewJobs.map(j => j.company)).size
   const sources = new Set(viewJobs.filter(j => j.source).map(j => j.source!)).size
 
-  const sourceKeys = ['linkedin', 'indeed', 'indeed_nl', 'arc'] as const
+  const sourceKeys = ['linkedin', 'indeed', 'indeed_nl', 'arc', 'manual'] as const
   const jobsDailyMap: Record<string, Record<string, number>> = {}
   for (const job of viewJobs) {
     if (!job.dateScraped) continue
     const date = job.dateScraped.slice(0, 10)
-    if (!jobsDailyMap[date]) jobsDailyMap[date] = { linkedin: 0, indeed: 0, indeed_nl: 0, arc: 0 }
-    const src = job.source ?? ''
+    if (!jobsDailyMap[date]) jobsDailyMap[date] = { linkedin: 0, indeed: 0, indeed_nl: 0, arc: 0, manual: 0 }
+    const src = (job.source ?? '').toLowerCase()
     if (src in jobsDailyMap[date]) jobsDailyMap[date][src]++
   }
   const jobsPerDay = Object.entries(jobsDailyMap)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, counts]) => ({ date, linkedin: counts.linkedin, indeed: counts.indeed, indeed_nl: counts.indeed_nl, arc: counts.arc }))
+    .map(([date, counts]) => ({ date, linkedin: counts.linkedin, indeed: counts.indeed, indeed_nl: counts.indeed_nl, arc: counts.arc, manual: counts.manual }))
 
-  const sourceCountMap: Record<string, number> = { linkedin: 0, indeed: 0, indeed_nl: 0, arc: 0 }
+  const sourceCountMap: Record<string, number> = { linkedin: 0, indeed: 0, indeed_nl: 0, arc: 0, manual: 0 }
   for (const job of viewJobs) {
-    const src = job.source ?? ''
+    const src = (job.source ?? '').toLowerCase()
     if (src in sourceCountMap) sourceCountMap[src]++
   }
   const bySource = sourceKeys.map(k => ({ name: k, value: sourceCountMap[k] }))

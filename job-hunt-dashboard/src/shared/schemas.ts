@@ -107,6 +107,7 @@ export const statsSchema = z.object({
       indeed: z.number(),
       indeed_nl: z.number(),
       arc: z.number(),
+      manual: z.number(),
     })),
     bySource: z.array(z.object({ name: z.string(), value: z.number() })),
   }),
