@@ -394,8 +394,8 @@ export function DashboardRoute() {
               tableData={data.matches.byScore.map(e => [e.score, e.count])}
             >
               {data.matches.byScore.every(e => e.count === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={140}>
-                  <BarChart data={data.matches.byScore}>
+                <ResponsiveContainer width="100%" height={140} style={{ overflow: 'visible' }}>
+                  <BarChart data={data.matches.byScore} style={{ overflow: 'visible' }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="score" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={45} />
                     <YAxis {...AXIS_PROPS} />
@@ -454,8 +454,8 @@ export function DashboardRoute() {
               tableData={data.applications.byStatus.map(e => [e.status, e.count])}
             >
               {data.applications.byStatus.every(e => e.count === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={140}>
-                  <BarChart data={data.applications.byStatus}>
+                <ResponsiveContainer width="100%" height={140} style={{ overflow: 'visible' }}>
+                  <BarChart data={data.applications.byStatus} style={{ overflow: 'visible' }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="status" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={55} />
                     <YAxis {...AXIS_PROPS} />
