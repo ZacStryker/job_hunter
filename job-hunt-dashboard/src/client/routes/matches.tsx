@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useJobsQuery } from '../hooks/useJobsQuery'
+import { useBulkArchiveMutation } from '../hooks/useBulkArchiveMutation'
 import { PipelineTable } from '../components/pipeline/PipelineTable'
 import { JobDrawer } from '../components/detail/JobDrawer'
 
 export function MatchesRoute() {
   const { data: jobs = [] } = useJobsQuery()
+  const bulkArchiveMutation = useBulkArchiveMutation()
   const matchedJobs = jobs.filter(
     j => !j.archived && !j.applied && j.analysisStatus === 'done' && (j.recommendation === 'apply' || j.recommendation === 'investigate')
   )
@@ -35,6 +37,8 @@ export function MatchesRoute() {
           jobs={matchedJobs}
           onRowClick={(job) => setSelectedJobId(job.id === selectedJobId ? null : job.id)}
           selectedJobId={selectedJobId}
+          onBulkArchive={bulkArchiveMutation.mutate}
+          isBulkArchiving={bulkArchiveMutation.isPending}
           fixedColumns={['company', 'jobTitle', 'location', 'fitScore', 'recommendation', 'date_analyzed']}
         />
       </div>
