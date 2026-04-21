@@ -92,6 +92,7 @@ app.get('/', (c) => {
   const SCORE_BUCKETS = ['0-9', '10-19', '20-29', '30-39', '40-49', '50-59', '60-69', '70-79', '80-89', '90-100'] as const
   const scoreCounts: Record<string, number> = Object.fromEntries(SCORE_BUCKETS.map(k => [k, 0]))
   for (const job of viewJobs) {
+    if (job.recommendation !== 'apply' && job.recommendation !== 'investigate') continue
     if (job.fitScore === null) continue
     const bucketIdx = Math.min(Math.floor(job.fitScore / 10), 9)
     scoreCounts[SCORE_BUCKETS[bucketIdx]]++
