@@ -451,17 +451,17 @@ export function DashboardRoute() {
             <ChartCard
               title="Status Breakdown"
               tableHeaders={['Status', 'Count']}
-              tableData={data.applications.byStatus.map(e => [e.status, e.count])}
+              tableData={data.applications.byStatus.filter(e => e.status !== 'No Response').map(e => [e.status, e.count])}
             >
-              {data.applications.byStatus.every(e => e.count === 0) ? <NoData /> : (
+              {data.applications.byStatus.filter(e => e.status !== 'No Response').every(e => e.count === 0) ? <NoData /> : (
                 <ResponsiveContainer width="100%" height={140} style={{ overflow: 'visible' }}>
-                  <BarChart data={data.applications.byStatus} style={{ overflow: 'visible' }}>
+                  <BarChart data={data.applications.byStatus.filter(e => e.status !== 'No Response')} style={{ overflow: 'visible' }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="status" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={55} />
                     <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
                     <Bar dataKey="count">
-                      {data.applications.byStatus.map(entry => (
+                      {data.applications.byStatus.filter(e => e.status !== 'No Response').map(entry => (
                         <Cell key={entry.status} fill={STATUS_COLOR_MAP[entry.status] ?? '#a1a1aa'} />
                       ))}
                       <LabelList dataKey="count" content={LabelInsideTop as (props: object) => React.JSX.Element} />
