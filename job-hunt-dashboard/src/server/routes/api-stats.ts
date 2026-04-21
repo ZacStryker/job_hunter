@@ -201,7 +201,7 @@ app.get('/', (c) => {
     const wf = parseWorkflow(run.name)
     if ((WORKFLOW_KEYS as readonly string[]).includes(wf)) costMap[wf] += (run.costUsd ?? 0)
   }
-  const costByWorkflow = WORKFLOW_KEYS.map(k => ({ workflow: k, cost: costMap[k] }))
+  const costByWorkflow = WORKFLOW_KEYS.filter(k => k !== 'Discovery').map(k => ({ workflow: k, cost: costMap[k] }))
 
   return c.json({
     jobs: { total: scrapedTotal, companies, sources, perDay: jobsPerDay, bySource },
