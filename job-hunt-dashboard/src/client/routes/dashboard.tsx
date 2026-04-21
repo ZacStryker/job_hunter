@@ -246,7 +246,7 @@ export function DashboardRoute() {
                     <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
                     <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
-                    <Legend wrapperStyle={{ color: DARK_TICK }} />
+                    <Legend wrapperStyle={{ color: DARK_TICK, fontSize: 11 }} />
                     {WORKFLOW_KEYS.map(k => (
                       <Area key={k} type="monotone" dataKey={k} stackId="1" stroke={WORKFLOW_COLOR_MAP[k]} fill={`url(#gradAuto${k.replace(/ /g, '')})`} />
                     ))}
@@ -316,7 +316,7 @@ export function DashboardRoute() {
                     <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
                     <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
-                    <Legend wrapperStyle={{ color: DARK_TICK }} />
+                    <Legend wrapperStyle={{ color: DARK_TICK, fontSize: 11 }} />
                     <Area type="monotone" dataKey="linkedin" stackId="1" stroke={SOURCE_COLOR_MAP.linkedin} fill="url(#gradJobsLinkedin)" />
                     <Area type="monotone" dataKey="indeed" stackId="1" stroke={SOURCE_COLOR_MAP.indeed} fill="url(#gradJobsIndeed)" />
                     <Area type="monotone" dataKey="indeed_nl" stackId="1" stroke={SOURCE_COLOR_MAP.indeed_nl} fill="url(#gradJobsIndeedNl)" />
@@ -381,7 +381,7 @@ export function DashboardRoute() {
                     <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
                     <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
-                    <Legend wrapperStyle={{ color: DARK_TICK }} />
+                    <Legend wrapperStyle={{ color: DARK_TICK, fontSize: 11 }} />
                     <Area type="monotone" dataKey="apply" stackId="1" stroke={REC_COLOR_MAP.Apply} fill="url(#gradMatchesApply)" />
                     <Area type="monotone" dataKey="investigate" stackId="1" stroke={REC_COLOR_MAP.Investigate} fill="url(#gradMatchesInvestigate)" />
                   </AreaChart>
@@ -440,7 +440,7 @@ export function DashboardRoute() {
                     <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
                     <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
-                    <Legend wrapperStyle={{ color: DARK_TICK }} />
+                    <Legend wrapperStyle={{ color: DARK_TICK, fontSize: 11 }} />
                     {APP_STATUS_KEYS.map(k => (
                       <Area key={k} type="monotone" dataKey={k} stackId="1" stroke={STATUS_COLOR_MAP[k]} fill={`url(#gradApp${k.replace(/ /g, '')})`} />
                     ))}
