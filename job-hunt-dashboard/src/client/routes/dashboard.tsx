@@ -70,7 +70,7 @@ function LabelInsideTop({ x = 0, y = 0, width = 0, height = 0, value = 0 }: Labe
 
 function LabelInsideCostTop({ x = 0, y = 0, width = 0, height = 0, value = 0 }: LabelContentProps): React.JSX.Element {
   if (!value || height < 30) return <></>
-  return <text x={x + width / 2} y={y + 20} fill="#ffffff" textAnchor="middle" fontSize={13} fontWeight={600}>{(value as number).toFixed(4)}</text>
+  return <text x={x + width / 2} y={y + 20} fill="#ffffff" textAnchor="middle" fontSize={13} fontWeight={600}>{(value as number).toFixed(2)}</text>
 }
 
 const AXIS_PROPS = {
@@ -418,7 +418,7 @@ export function DashboardRoute() {
             <div className="grid grid-cols-3 gap-3">
               <StatCard label="Workflow Runs" value={String(data.automation.totalRuns)} />
               <StatCard label="Tokens" value={formatTokens(data.automation.totalTokens)} />
-              <StatCard label="Cost" value={`$${data.automation.totalCost.toFixed(4)}`} />
+              <StatCard label="Cost" value={`$${data.automation.totalCost.toFixed(2)}`} />
             </div>
             {data.automation.perDay.length > 0 && (
               <ChartCard
@@ -451,7 +451,7 @@ export function DashboardRoute() {
             <ChartCard
               title="Cost Breakdown"
               tableHeaders={['Workflow', 'Cost ($)']}
-              tableData={data.automation.costByWorkflow.map(e => [e.workflow, e.cost.toFixed(4)])}
+              tableData={data.automation.costByWorkflow.map(e => [e.workflow, e.cost.toFixed(2)])}
             >
               {data.automation.costByWorkflow.every(e => e.cost === 0) ? <NoData /> : (
                 <ResponsiveContainer width="100%" height={220}>
