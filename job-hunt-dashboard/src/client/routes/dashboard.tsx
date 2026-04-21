@@ -171,7 +171,7 @@ export function DashboardRoute() {
   const { data, isPending, isError, error } = useStatsQuery(period, archivedFilter)
 
   return (
-    <div className="p-2 space-y-2">
+    <div className="p-2 space-y-4">
       {/* Filter bar: period + archivedFilter only */}
       <div className="flex items-center gap-1">
         {STATS_PERIODS.map((p) => (
@@ -216,7 +216,7 @@ export function DashboardRoute() {
       )}
 
       {data && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
           {/* ── Q01 Automations ── */}
           <section className="space-y-1.5 min-w-0">
