@@ -74,13 +74,20 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
       let description = ''
       if (scraperUrl && job.sourceUrl) {
         try {
+          const hostname = (() => { try { return new URL(job.sourceUrl).hostname.replace(/^www\./, '') } catch { return '' } })()
+          const scraperSource =
+            hostname === 'linkedin.com' || hostname.endsWith('.linkedin.com') ? 'linkedin' :
+            hostname === 'nl.indeed.com' ? 'indeed_nl' :
+            hostname === 'indeed.com' || hostname.endsWith('.indeed.com') ? 'indeed' :
+            null
+          if (!scraperSource) throw new Error(`No scraper for host: ${hostname}`)
           const scraperRes = await fetch(`${scraperUrl}/scrape/listing`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               ...(scraperToken ? { Authorization: `Bearer ${scraperToken}` } : {}),
             },
-            body: JSON.stringify({ source: job.source, url: job.sourceUrl }),
+            body: JSON.stringify({ source: scraperSource, url: job.sourceUrl }),
             signal: AbortSignal.timeout(60_000),
           })
           if (!scraperRes.ok) throw new Error(`Scraper HTTP ${scraperRes.status}`)

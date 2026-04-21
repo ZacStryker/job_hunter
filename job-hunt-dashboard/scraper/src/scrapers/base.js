@@ -46,10 +46,10 @@ export async function withPage(storageStatePath, fn) {
   }
 }
 
-export async function scrapeWithRetry(source, fn) {
+export async function scrapeWithRetry(source, fn, retries = 3) {
   return queues[source].add(() =>
     retry(fn, {
-      retries: 3,
+      retries,
       minTimeout: 2000,
       onFailedAttempt: err =>
         console.warn(`[${source}] attempt ${err.attemptNumber} failed: ${err.message}`)

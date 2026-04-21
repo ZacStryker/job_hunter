@@ -41,3 +41,30 @@ export async function fetchLinkedInListing(url) {
     })
   );
 }
+
+export async function fetchLinkedInJobDetails(url) {
+  return scrapeWithRetry('linkedin', () =>
+    withPage(AUTH_PATH, async (page) => {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForSelector(
+        '.job-details-jobs-unified-top-card__job-title, h1.topcard__title',
+        { timeout: 20000 }
+      );
+      return page.evaluate(() => {
+        const jobTitle =
+          document.querySelector('.job-details-jobs-unified-top-card__job-title h1')?.innerText?.trim()
+          ?? document.querySelector('h1.topcard__title')?.innerText?.trim()
+          ?? null;
+        const company =
+          document.querySelector('.job-details-jobs-unified-top-card__company-name a')?.innerText?.trim()
+          ?? document.querySelector('.job-details-jobs-unified-top-card__company-name')?.innerText?.trim()
+          ?? document.querySelector('a.topcard__org-name-link')?.innerText?.trim()
+          ?? null;
+        const location =
+          document.querySelector('.job-details-jobs-unified-top-card__bullet')?.innerText?.trim()
+          ?? document.querySelector('.topcard__flavor--bullet')?.innerText?.trim()
+          ?? null;
+        return { jobTitle, company, location };
+      });
+    }), 0);
+}

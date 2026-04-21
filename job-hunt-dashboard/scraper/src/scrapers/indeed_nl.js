@@ -45,3 +45,25 @@ export async function fetchIndeedNlListing(url) {
     })
   );
 }
+
+export async function fetchIndeedNlJobDetails(url) {
+  return scrapeWithRetry('indeed_nl', () =>
+    withPage(null, async (page) => {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForSelector('h1', { timeout: 15000 });
+      return page.evaluate(() => {
+        const jobTitle =
+          document.querySelector('h1[data-testid="jobTitle"]')?.innerText?.trim()
+          ?? document.querySelector('h1')?.innerText?.trim()
+          ?? null;
+        const company =
+          document.querySelector('[data-testid="inlineHeader-companyName"] a')?.innerText?.trim()
+          ?? document.querySelector('[data-testid="inlineHeader-companyName"]')?.innerText?.trim()
+          ?? null;
+        const location =
+          document.querySelector('[data-testid="inlineHeader-companyLocation"]')?.innerText?.trim()
+          ?? null;
+        return { jobTitle, company, location };
+      });
+    }), 0);
+}
