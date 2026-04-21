@@ -92,7 +92,7 @@ function formatPerDayDate(d: unknown): string {
 
 function NoData() {
   return (
-    <div className="flex items-center justify-center h-[180px] text-sm text-zinc-500">
+    <div className="flex items-center justify-center h-[160px] text-sm text-zinc-500">
       No data for this period
     </div>
   )
@@ -100,9 +100,9 @@ function NoData() {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
       <div className="text-xs text-zinc-500 uppercase tracking-wide mb-1">{label}</div>
-      <div className="text-2xl font-semibold text-zinc-100">{value}</div>
+      <div className="text-xl font-semibold text-zinc-100">{value}</div>
     </div>
   )
 }
@@ -120,8 +120,8 @@ function ChartCard({
 }) {
   const [showTable, setShowTable] = useState(false)
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-      <div className="flex items-center justify-between mb-3">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
+      <div className="flex items-center justify-between mb-2">
         <div className="text-sm font-medium text-zinc-400">{title}</div>
         <button
           onClick={() => setShowTable((s) => !s)}
@@ -131,7 +131,7 @@ function ChartCard({
         </button>
       </div>
       {showTable ? (
-        <div className="overflow-auto h-[220px]">
+        <div className="overflow-auto h-[160px]">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-zinc-900">
               <tr className="border-b border-zinc-700">
@@ -171,7 +171,7 @@ export function DashboardRoute() {
   const { data, isPending, isError, error } = useStatsQuery(period, archivedFilter)
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-3 space-y-3">
       {/* Filter bar: period + archivedFilter only */}
       <div className="flex items-center gap-1">
         {STATS_PERIODS.map((p) => (
@@ -216,10 +216,70 @@ export function DashboardRoute() {
       )}
 
       {data && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
 
-          {/* ── Q01 Jobs ── */}
-          <section className="space-y-3 min-w-0">
+          {/* ── Q01 Automations ── */}
+          <section className="space-y-2 min-w-0">
+            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Automations</h2>
+            <div className="grid grid-cols-3 gap-3">
+              <StatCard label="Workflow Runs" value={String(data.automation.totalRuns)} />
+              <StatCard label="Tokens" value={formatTokens(data.automation.totalTokens)} />
+              <StatCard label="Cost" value={`$${data.automation.totalCost.toFixed(2)}`} />
+            </div>
+            {data.automation.perDay.length > 0 && (
+              <ChartCard
+                title="Workflows per Day by Workflow Type"
+                tableHeaders={['Date', 'Discovery', 'Analysis', 'Cover Letter', 'Resume']}
+                tableData={data.automation.perDay.map(e => [e.date, e.Discovery, e.Analysis, e['Cover Letter'], e.Resume])}
+              >
+                <ResponsiveContainer width="100%" height={160}>
+                  <AreaChart data={data.automation.perDay}>
+                    <defs>
+                      {WORKFLOW_KEYS.map(k => (
+                        <linearGradient key={k} id={`gradAuto${k.replace(/ /g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={WORKFLOW_COLOR_MAP[k]} stopOpacity={0.6} />
+                          <stop offset="95%" stopColor={WORKFLOW_COLOR_MAP[k]} stopOpacity={0.1} />
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                    <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
+                    <YAxis {...AXIS_PROPS} />
+                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Legend wrapperStyle={{ color: DARK_TICK }} />
+                    {WORKFLOW_KEYS.map(k => (
+                      <Area key={k} type="monotone" dataKey={k} stackId="1" stroke={WORKFLOW_COLOR_MAP[k]} fill={`url(#gradAuto${k.replace(/ /g, '')})`} />
+                    ))}
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
+            <ChartCard
+              title="Cost Breakdown"
+              tableHeaders={['Workflow', 'Cost ($)']}
+              tableData={data.automation.costByWorkflow.map(e => [e.workflow, e.cost.toFixed(2)])}
+            >
+              {data.automation.costByWorkflow.every(e => e.cost === 0) ? <NoData /> : (
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={data.automation.costByWorkflow}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
+                    <XAxis dataKey="workflow" {...AXIS_PROPS} />
+                    <YAxis {...AXIS_PROPS} allowDecimals={true} />
+                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Bar dataKey="cost">
+                      {data.automation.costByWorkflow.map(entry => (
+                        <Cell key={entry.workflow} fill={WORKFLOW_COLOR_MAP[entry.workflow] ?? '#a1a1aa'} />
+                      ))}
+                      <LabelList dataKey="cost" content={LabelInsideCostTop as (props: object) => React.JSX.Element} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
+          </section>
+
+          {/* ── Q02 Jobs ── */}
+          <section className="space-y-2 min-w-0">
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Jobs</h2>
             <div className="grid grid-cols-3 gap-3">
               <StatCard label="Jobs" value={String(data.jobs.total)} />
@@ -232,7 +292,7 @@ export function DashboardRoute() {
                 tableHeaders={['Date', 'LinkedIn', 'Indeed', 'Indeed NL', 'Arc']}
                 tableData={data.jobs.perDay.map(e => [e.date, e.linkedin, e.indeed, e.indeed_nl, e.arc])}
               >
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={160}>
                   <AreaChart data={data.jobs.perDay}>
                     <defs>
                       <linearGradient id="gradJobsLinkedin" x1="0" y1="0" x2="0" y2="1">
@@ -272,7 +332,7 @@ export function DashboardRoute() {
               tableData={data.jobs.bySource.map(e => [e.name, e.value])}
             >
               {data.jobs.bySource.every(e => e.value === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={160}>
                   <BarChart data={data.jobs.bySource}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="name" {...AXIS_PROPS} />
@@ -291,8 +351,8 @@ export function DashboardRoute() {
             )}
           </section>
 
-          {/* ── Q02 Matches ── */}
-          <section className="space-y-3 min-w-0">
+          {/* ── Q03 Matches ── */}
+          <section className="space-y-2 min-w-0">
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Matches</h2>
             <div className="grid grid-cols-3 gap-3">
               <StatCard label="Matches" value={String(data.matches.total)} />
@@ -305,7 +365,7 @@ export function DashboardRoute() {
                 tableHeaders={['Date', 'Apply', 'Investigate']}
                 tableData={data.matches.perDay.map(e => [e.date, e.apply, e.investigate])}
               >
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={160}>
                   <AreaChart data={data.matches.perDay}>
                     <defs>
                       <linearGradient id="gradMatchesApply" x1="0" y1="0" x2="0" y2="1">
@@ -334,10 +394,10 @@ export function DashboardRoute() {
               tableData={data.matches.byScore.map(e => [e.score, e.count])}
             >
               {data.matches.byScore.every(e => e.count === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={160}>
                   <BarChart data={data.matches.byScore}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="score" {...AXIS_PROPS} />
+                    <XAxis dataKey="score" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={45} />
                     <YAxis {...AXIS_PROPS} />
                     <Tooltip {...TOOLTIP_PROPS} />
                     <Bar dataKey="count">
@@ -352,8 +412,8 @@ export function DashboardRoute() {
             </ChartCard>
           </section>
 
-          {/* ── Q03 Applications ── */}
-          <section className="space-y-3 min-w-0">
+          {/* ── Q04 Applications ── */}
+          <section className="space-y-2 min-w-0">
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Applications</h2>
             <div className="grid grid-cols-3 gap-3">
               <StatCard label="Applications" value={String(data.applications.total)} />
@@ -366,7 +426,7 @@ export function DashboardRoute() {
                 tableHeaders={['Date', 'No Response', 'Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other']}
                 tableData={data.applications.perDay.map(e => [e.date, e['No Response'], e.Submitted, e.Rejected, e.Screening, e.Interview, e.Offer, e.Other])}
               >
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={160}>
                   <AreaChart data={data.applications.perDay}>
                     <defs>
                       {APP_STATUS_KEYS.map(k => (
@@ -394,7 +454,7 @@ export function DashboardRoute() {
               tableData={data.applications.byStatus.map(e => [e.status, e.count])}
             >
               {data.applications.byStatus.every(e => e.count === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={160}>
                   <BarChart data={data.applications.byStatus}>
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="status" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={55} />
@@ -405,66 +465,6 @@ export function DashboardRoute() {
                         <Cell key={entry.status} fill={STATUS_COLOR_MAP[entry.status] ?? '#a1a1aa'} />
                       ))}
                       <LabelList dataKey="count" content={LabelInsideTop as (props: object) => React.JSX.Element} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </ChartCard>
-          </section>
-
-          {/* ── Q04 Automations ── */}
-          <section className="space-y-3 min-w-0">
-            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Automations</h2>
-            <div className="grid grid-cols-3 gap-3">
-              <StatCard label="Workflow Runs" value={String(data.automation.totalRuns)} />
-              <StatCard label="Tokens" value={formatTokens(data.automation.totalTokens)} />
-              <StatCard label="Cost" value={`$${data.automation.totalCost.toFixed(2)}`} />
-            </div>
-            {data.automation.perDay.length > 0 && (
-              <ChartCard
-                title="Workflows per Day by Workflow Type"
-                tableHeaders={['Date', 'Discovery', 'Analysis', 'Cover Letter', 'Resume']}
-                tableData={data.automation.perDay.map(e => [e.date, e.Discovery, e.Analysis, e['Cover Letter'], e.Resume])}
-              >
-                <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={data.automation.perDay}>
-                    <defs>
-                      {WORKFLOW_KEYS.map(k => (
-                        <linearGradient key={k} id={`gradAuto${k.replace(/ /g, '')}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={WORKFLOW_COLOR_MAP[k]} stopOpacity={0.6} />
-                          <stop offset="95%" stopColor={WORKFLOW_COLOR_MAP[k]} stopOpacity={0.1} />
-                        </linearGradient>
-                      ))}
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
-                    <YAxis {...AXIS_PROPS} />
-                    <Tooltip {...TOOLTIP_PROPS} />
-                    <Legend wrapperStyle={{ color: DARK_TICK }} />
-                    {WORKFLOW_KEYS.map(k => (
-                      <Area key={k} type="monotone" dataKey={k} stackId="1" stroke={WORKFLOW_COLOR_MAP[k]} fill={`url(#gradAuto${k.replace(/ /g, '')})`} />
-                    ))}
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            )}
-            <ChartCard
-              title="Cost Breakdown"
-              tableHeaders={['Workflow', 'Cost ($)']}
-              tableData={data.automation.costByWorkflow.map(e => [e.workflow, e.cost.toFixed(2)])}
-            >
-              {data.automation.costByWorkflow.every(e => e.cost === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={data.automation.costByWorkflow}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="workflow" {...AXIS_PROPS} />
-                    <YAxis {...AXIS_PROPS} allowDecimals={true} />
-                    <Tooltip {...TOOLTIP_PROPS} />
-                    <Bar dataKey="cost">
-                      {data.automation.costByWorkflow.map(entry => (
-                        <Cell key={entry.workflow} fill={WORKFLOW_COLOR_MAP[entry.workflow] ?? '#a1a1aa'} />
-                      ))}
-                      <LabelList dataKey="cost" content={LabelInsideCostTop as (props: object) => React.JSX.Element} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
