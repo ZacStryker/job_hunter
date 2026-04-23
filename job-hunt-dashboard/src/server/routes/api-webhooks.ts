@@ -38,7 +38,7 @@ app.post('/analysis', (c) => {
       const costUsd = inputTokens * OPUS_4_7_INPUT + outputTokens * OPUS_4_7_OUTPUT
       recordRun({ name: 'Analysis', success: true, itemCount: processed, errorMessage: null,
         durationMs: Date.now() - startMs, inputTokens, outputTokens, costUsd, matchedCount: matched, archivedCount: archived })
-      write({ done: true, processed, failed })
+      write({ done: true, processed, failed, matched, archived })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       console.error('[analysis] run failed:', message)

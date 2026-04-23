@@ -155,6 +155,10 @@ function buildDoneSummary(ev: Record<string, unknown>): string {
   if (typeof ev.inserted === 'number') {
     return `Done — ${ev.inserted} new job${ev.inserted === 1 ? '' : 's'} inserted`
   }
+  if (typeof ev.processed === 'number' && typeof ev.matched === 'number' && typeof ev.archived === 'number') {
+    const base = `${ev.processed} analyzed, ${ev.matched} matched, ${ev.archived} archived`
+    return typeof ev.failed === 'number' && ev.failed > 0 ? `${base} (${ev.failed} failed)` : base
+  }
   if (typeof ev.processed === 'number' && typeof ev.failed === 'number') {
     return `Done — ${ev.processed} analyzed, ${ev.failed} failed`
   }
