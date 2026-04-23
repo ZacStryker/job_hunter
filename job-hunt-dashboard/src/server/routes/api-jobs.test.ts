@@ -1,6 +1,6 @@
 process.env.DB_PATH = ':memory:'
 
-import { describe, test, expect, beforeAll, beforeEach } from 'bun:test'
+import { describe, test, expect, beforeAll, beforeEach, afterEach } from 'bun:test'
 import { Database } from 'bun:sqlite'
 
 const { default: jobsApp } = await import('./api-jobs')
@@ -25,6 +25,7 @@ const CREATE_JOBS_TABLE = `
     location TEXT,
     external_job_id TEXT,
     analysis_status TEXT,
+    date_analyzed TEXT,
     salary TEXT,
     benefits TEXT,
     contact_name TEXT,
@@ -507,6 +508,181 @@ describe('GET /api/jobs', () => {
     const res = await jobsApp.request('/', { method: 'GET' })
     const data = await res.json() as { jobs: Record<string, unknown>[] }
     expect(data.jobs[0].latestStatus).toBeNull()
+  })
+})
+
+describe('POST /api/jobs', () => {
+  test('creates job with source=Manual, analysisStatus=pending → 201', async () => {
+    const res = await jobsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: 'Acme', jobTitle: 'Engineer', sourceUrl: 'https://example.com/job/1' }),
+    })
+    expect(res.status).toBe(201)
+    const data = await res.json() as { job: Record<string, unknown> }
+    expect(data).toHaveProperty('job')
+    expect(data.job.company).toBe('Acme')
+    expect(data.job.jobTitle).toBe('Engineer')
+    expect(data.job.source).toBe('Manual')
+    expect(data.job.analysisStatus).toBe('pending')
+    expect(data.job.archived).toBe(false)
+    expect(data.job.fitScore).toBeNull()
+  })
+
+  test('returns 409 if same company+jobTitle already exists', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Dupe', 'Dev', 0)`)
+    const res = await jobsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: 'Dupe', jobTitle: 'Dev', sourceUrl: 'https://example.com/job/2' }),
+    })
+    expect(res.status).toBe(409)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    expect(data).not.toHaveProperty('message')
+  })
+
+  test('returns 400 for missing company', async () => {
+    const res = await jobsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobTitle: 'Dev', sourceUrl: 'https://example.com/job/3' }),
+    })
+    expect(res.status).toBe(400)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+  })
+
+  test('returns 400 for missing jobTitle', async () => {
+    const res = await jobsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: 'Acme', sourceUrl: 'https://example.com/job/4' }),
+    })
+    expect(res.status).toBe(400)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+  })
+
+  test('returns 400 for non-URL sourceUrl', async () => {
+    const res = await jobsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: 'Acme', jobTitle: 'Dev', sourceUrl: 'not-a-url' }),
+    })
+    expect(res.status).toBe(400)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+  })
+
+  test('stores null location when location omitted', async () => {
+    const res = await jobsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: 'NullLoc', jobTitle: 'Dev', sourceUrl: 'https://example.com/job/5' }),
+    })
+    expect(res.status).toBe(201)
+    const data = await res.json() as { job: Record<string, unknown> }
+    expect(data.job.location).toBeNull()
+  })
+})
+
+describe('POST /api/jobs/scrape-url', () => {
+  const originalFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  test('returns 400 for invalid (non-URL) input', async () => {
+    const res = await jobsApp.request('/scrape-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'not-a-url' }),
+    })
+    expect(res.status).toBe(400)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+  })
+
+  test('returns 503 when SCRAPER_URL env var is not set', async () => {
+    const saved = process.env.SCRAPER_URL
+    delete process.env.SCRAPER_URL
+    const res = await jobsApp.request('/scrape-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'https://www.linkedin.com/jobs/view/123' }),
+    })
+    expect(res.status).toBe(503)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    process.env.SCRAPER_URL = saved
+  })
+
+  test('returns 422 for an unrecognized URL hostname', async () => {
+    process.env.SCRAPER_URL = 'http://localhost:9999'
+    const res = await jobsApp.request('/scrape-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'https://greenhouse.io/jobs/123' }),
+    })
+    expect(res.status).toBe(422)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    delete process.env.SCRAPER_URL
+  })
+
+  test('returns { company, jobTitle, location } on successful scraper response', async () => {
+    process.env.SCRAPER_URL = 'http://localhost:9999'
+    globalThis.fetch = (async () => new Response(
+      JSON.stringify({ company: 'Acme', jobTitle: 'Engineer', location: 'Remote' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    )) as unknown as typeof fetch
+    const res = await jobsApp.request('/scrape-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'https://www.linkedin.com/jobs/view/123' }),
+    })
+    expect(res.status).toBe(200)
+    const data = await res.json() as Record<string, unknown>
+    expect(data.company).toBe('Acme')
+    expect(data.jobTitle).toBe('Engineer')
+    expect(data.location).toBe('Remote')
+    delete process.env.SCRAPER_URL
+  })
+
+  test('returns 502 when the scraper endpoint returns non-2xx', async () => {
+    process.env.SCRAPER_URL = 'http://localhost:9999'
+    globalThis.fetch = (async () => new Response(
+      JSON.stringify({ error: 'Scrape error' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )) as unknown as typeof fetch
+    const res = await jobsApp.request('/scrape-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'https://www.linkedin.com/jobs/view/123' }),
+    })
+    expect(res.status).toBe(502)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    delete process.env.SCRAPER_URL
+  })
+
+  test('returns 422 when scraper returns null company or jobTitle', async () => {
+    process.env.SCRAPER_URL = 'http://localhost:9999'
+    globalThis.fetch = (async () => new Response(
+      JSON.stringify({ company: null, jobTitle: null, location: null }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    )) as unknown as typeof fetch
+    const res = await jobsApp.request('/scrape-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'https://www.linkedin.com/jobs/view/123' }),
+    })
+    expect(res.status).toBe(422)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    delete process.env.SCRAPER_URL
   })
 })
 

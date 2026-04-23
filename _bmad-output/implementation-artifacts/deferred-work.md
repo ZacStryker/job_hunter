@@ -380,3 +380,15 @@ _(No deferred findings — all dismissed findings were false positives or covere
 ## Source Breakdown chart hidden when perDay is empty
 The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs.perDay.length > 0)` (same guard as the perDay area chart above it). If `bySource` has data but `perDay` is empty, the breakdown chart is incorrectly hidden. The Status and Cost Breakdown charts don't have this guard. Consider rendering Source Breakdown independently of the perDay guard.
 
+
+## Deferred from: code review of 23-1-cover-letter-pdf-generation (2026-04-21)
+
+- Concurrent cover letter generation for the same job races on `${rawId}.pdf.tmp` — two simultaneous POST `/:id/generate-cover-letter` requests write to the same fixed temp path; second `renameSync` wins, DB gets two rows but one PDF. Pre-existing pattern shared with resume generation [`api-jobs.ts`].
+- `inserted` query matches by `createdAt: now` timestamp — two concurrent generations completing within the same millisecond could match the wrong row or null. Pre-existing pattern across all generation routes [`api-jobs.ts`].
+
+## Deferred from: code review of 22-1-add-job-by-url (2026-04-21)
+
+- `detectSource` in `api-jobs.ts` maps all `*.indeed.com` subdomains (ca, uk, de, etc.) to the `indeed` scraper. Country-specific Indeed domains have different page structures; the wrong scraper will silently return null fields → 422 → manual form. Acceptable for now given graceful-degradation path, but should add supported-domain list if coverage expands.
+- `POST /scrape/job-details` in `scraper/src/routes/scrape.js` does not catch errors thrown by `fetchers[source](url)` — scrapeWithRetry exhausting all retries propagates as an unhandled exception, returning a generic Fastify 500 with no structured error. Pre-existing pattern in scraper codebase.
+- `AUTH_DIR`/`AUTH_PATH` in `scraper/src/scrapers/linkedin.js` — `fetchLinkedInJobDetails` inherits the same module-level path resolution. If `AUTH_DIR` env var is missing, the path resolves unexpectedly. Pre-existing issue in the scraper.
+- `page.evaluate` in scrapers (linkedin.js, indeed.js, indeed_nl.js) uses `innerText` (layout-dependent, returns empty string for hidden elements) rather than `textContent`. Pre-existing pattern throughout scraper codebase.

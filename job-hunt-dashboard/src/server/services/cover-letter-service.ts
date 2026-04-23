@@ -1,6 +1,7 @@
 import { db } from '../../db/client'
 import { profile } from '../../db/schema'
 import { loadEffectivePrompt } from './prompt-defaults'
+import { generatePdf } from './generate-pdf'
 import type { Job } from '../../shared/schemas'
 
 interface AnthropicResponse {
@@ -8,7 +9,39 @@ interface AnthropicResponse {
   usage: { input_tokens: number; output_tokens: number }
 }
 
-export async function generateCoverLetter(job: Job): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function buildCoverLetterHtml(content: string, p: typeof profile.$inferSelect | null): string {
+  const name = p?.name ?? ''
+  const contacts = [p?.email, p?.phone, p?.location].filter(Boolean).join(' · ')
+  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; font-size: 11pt; color: #1a1a1a; padding: 48px 56px; line-height: 1.6; max-width: 760px; }
+  .name { font-size: 15pt; font-weight: 700; letter-spacing: 0.3px; }
+  .contact { font-size: 9.5pt; color: #555; margin-top: 3px; }
+  hr { border: none; border-top: 1.5px solid #1a1a1a; margin: 14px 0 20px; }
+  .date { font-size: 10pt; color: #444; margin-bottom: 24px; }
+  .body { font-size: 11pt; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+  <div class="name">${escHtml(name)}</div>
+  <div class="contact">${escHtml(contacts)}</div>
+  <hr />
+  <div class="date">${date}</div>
+  <div class="body">${escHtml(content)}</div>
+</body>
+</html>`
+}
+
+export async function generateCoverLetter(job: Job): Promise<{ content: string; pdf: Buffer; inputTokens: number; outputTokens: number }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
@@ -61,5 +94,6 @@ export async function generateCoverLetter(job: Job): Promise<{ content: string; 
   const coverLetter = data.content.find((b) => b.type === 'text')?.text?.trim() ?? ''
   if (!coverLetter) throw new Error('Anthropic returned empty cover letter')
 
-  return { content: coverLetter, inputTokens: data.usage?.input_tokens ?? 0, outputTokens: data.usage?.output_tokens ?? 0 }
+  const pdf = await generatePdf(buildCoverLetterHtml(coverLetter, profileRow))
+  return { content: coverLetter, pdf, inputTokens: data.usage?.input_tokens ?? 0, outputTokens: data.usage?.output_tokens ?? 0 }
 }

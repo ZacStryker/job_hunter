@@ -26,7 +26,6 @@ export function useGenerateCoverLetter(jobId: number) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
-      queryClient.invalidateQueries({ queryKey: ['coverLetter', jobId] })
     },
   })
 }

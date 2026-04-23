@@ -6,7 +6,6 @@ import { join } from 'node:path'
 import { db } from '../../db/client'
 import { jobs, statusEvents, coverLetters, messages, profile } from '../../db/schema'
 import { generateCoverLetter } from '../services/cover-letter-service'
-import { buildDocx } from '../utils/build-docx'
 import { generateResume } from '../services/resume-service'
 import { recordRun } from './api-webhook-runs'
 import type { Job } from '../../shared/schemas'
@@ -315,7 +314,7 @@ app.post('/:id/generate-cover-letter', async (c) => {
   }
 
   const startMs = Date.now()
-  let coverLetterResult: { content: string; inputTokens: number; outputTokens: number }
+  let coverLetterResult: { content: string; pdf: Buffer; inputTokens: number; outputTokens: number }
   try {
     coverLetterResult = await generateCoverLetter(job as Job)
   } catch (err) {
@@ -327,9 +326,21 @@ app.post('/:id/generate-cover-letter', async (c) => {
     return c.json({ error: 'Cover letter generation failed' }, 502)
   }
 
-  const { content: coverLetterText, inputTokens: clInputTokens, outputTokens: clOutputTokens } = coverLetterResult
+  const { content: coverLetterText, pdf: coverLetterPdf, inputTokens: clInputTokens, outputTokens: clOutputTokens } = coverLetterResult
   const clCostUsd = clInputTokens * SONNET_4_6_INPUT + clOutputTokens * SONNET_4_6_OUTPUT
   const now = new Date().toISOString()
+
+  const clDir = join(process.cwd(), 'data', 'cover-letters')
+  const finalPath = join(clDir, `${rawId}.pdf`)
+  const tmpPath = join(clDir, `${rawId}.pdf.tmp`)
+  try {
+    mkdirSync(clDir, { recursive: true })
+    await Bun.write(tmpPath, coverLetterPdf)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    recordRun({ name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - startMs })
+    return c.json({ error: 'Cover letter generation failed' }, 502)
+  }
 
   try {
     db.transaction((tx) => {
@@ -342,6 +353,12 @@ app.post('/:id/generate-cover-letter', async (c) => {
     })
   } catch {
     return c.json({ error: 'Failed to store cover letter' }, 500)
+  }
+
+  try {
+    renameSync(tmpPath, finalPath)
+  } catch (err) {
+    console.error('Failed to finalize cover letter PDF:', err)
   }
 
   const inserted = db.select().from(coverLetters)
@@ -473,7 +490,7 @@ app.get('/:id/cover-letter', async (c) => {
   return c.json({ coverLetter: letter })
 })
 
-app.get('/:id/cover-letter/docx', async (c) => {
+app.get('/:id/cover-letter/pdf', async (c) => {
   const idParam = c.req.param('id')
   if (!/^\d+$/.test(idParam)) {
     return c.json({ error: 'Invalid job id' }, 400)
@@ -483,25 +500,28 @@ app.get('/:id/cover-letter/docx', async (c) => {
     return c.json({ error: 'Invalid job id' }, 400)
   }
 
-  const letter = db.select().from(coverLetters)
-    .where(eq(coverLetters.jobId, rawId))
-    .orderBy(desc(coverLetters.createdAt))
-    .get()
-  if (!letter) {
-    return c.json({ error: 'No cover letter found' }, 404)
+  const job = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
   }
 
-  const job = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
-  const company = job?.company ?? 'Unknown'
-  const jobTitle = job?.jobTitle ?? 'Unknown'
-  const fileName = `Cover Letter - ${company} - ${jobTitle}.docx`
+  const pdfPath = join(process.cwd(), 'data', 'cover-letters', `${rawId}.pdf`)
+  let pdfBuffer: ArrayBuffer
+  try {
+    pdfBuffer = await Bun.file(pdfPath).arrayBuffer()
+  } catch {
+    return c.json({ error: 'Cover letter PDF not found' }, 404)
+  }
+
+  const profileRow = db.select().from(profile).limit(1).get()
+  const candidateName = profileRow?.name ?? 'Cover Letter'
+  const fileName = `${candidateName} - Cover Letter - ${job.company} - ${job.jobTitle}.pdf`
     .replace(/[–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/"/g, "'")
 
-  const docx = buildDocx(letter.content)
-  return new Response(docx, {
+  return new Response(pdfBuffer, {
     headers: {
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'Content-Disposition': `attachment; filename="${fileName}"`,
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${fileName}"`,
     },
   })
 })

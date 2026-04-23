@@ -5,7 +5,7 @@ import { tmpdir } from 'os';
 import { execSync } from 'child_process';
 
 const FIREFOX_COOKIES = '/home/zac/snap/firefox/common/.mozilla/firefox/gis9hy19.default/cookies.sqlite';
-const SESSION_PATH = resolve(process.cwd(), 'sessions/indeed_nl.json');
+const SESSION_PATH = resolve(process.cwd(), process.argv[2] ?? 'sessions/indeed_nl.json');
 
 // Build Firefox UA from installed version so cf_clearance stays valid
 const ffVersion = execSync('firefox --version 2>/dev/null || /snap/bin/firefox --version').toString().match(/(\d+\.\d+[\.\d]*)/)?.[1] ?? '149.0';

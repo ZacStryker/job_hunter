@@ -3,6 +3,14 @@ process.env.DB_PATH = ':memory:'
 import { describe, test, expect, beforeAll, beforeEach, afterEach, mock } from 'bun:test'
 import { Database } from 'bun:sqlite'
 
+let capturedHtml = ''
+mock.module('../services/generate-pdf', () => ({
+  generatePdf: async (html: string) => {
+    capturedHtml = html
+    return Buffer.from('%PDF-mock')
+  },
+}))
+
 const { generateCoverLetter } = await import('./cover-letter-service')
 const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
@@ -50,6 +58,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   prodSqlite.run('DELETE FROM profile')
+  capturedHtml = ''
 })
 
 afterEach(() => {
@@ -99,6 +108,20 @@ describe('generateCoverLetter()', () => {
     ) as typeof globalThis.fetch
 
     await expect(generateCoverLetter(MOCK_JOB)).rejects.toThrow('Anthropic error 500')
+  })
+
+  test('passes HTML to generatePdf containing the cover letter content', async () => {
+    mockAnthropicSuccess('Dear Hiring Manager,\n\nI am excited about this role.')
+    await generateCoverLetter(MOCK_JOB)
+    expect(capturedHtml).toContain('Dear Hiring Manager')
+    expect(capturedHtml).toContain('<!DOCTYPE html')
+  })
+
+  test('returns pdf Buffer from generatePdf', async () => {
+    mockAnthropicSuccess('Dear Hiring Manager,\n\nGreat role.')
+    const result = await generateCoverLetter(MOCK_JOB)
+    expect(result.pdf).toBeInstanceOf(Buffer)
+    expect(result.pdf.length).toBeGreaterThan(0)
   })
 
   test('Anthropic returns empty text: throws', async () => {

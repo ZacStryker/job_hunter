@@ -1,15 +1,28 @@
 process.env.DB_PATH = ':memory:'
 
-import { describe, test, expect, mock, beforeAll, beforeEach } from 'bun:test'
+import { describe, test, expect, mock, spyOn, beforeAll, beforeEach } from 'bun:test'
 import { Database } from 'bun:sqlite'
 
 // --- Mock cover-letter-service BEFORE dynamic import ---
-let mockGenerateCoverLetter: () => Promise<{ content: string; inputTokens: number; outputTokens: number }> =
-  async () => ({ content: 'Mock cover letter text', inputTokens: 100, outputTokens: 200 })
+let mockGenerateCoverLetter: () => Promise<{ content: string; pdf: Buffer; inputTokens: number; outputTokens: number }> =
+  async () => ({ content: 'Mock cover letter text', pdf: Buffer.from('%PDF-mock'), inputTokens: 100, outputTokens: 200 })
 
 mock.module('../services/cover-letter-service', () => ({
   generateCoverLetter: () => mockGenerateCoverLetter(),
 }))
+
+// Prevent real Playwright PDF launch from cover-letter-service
+mock.module('../services/generate-pdf', () => ({
+  generatePdf: async () => Buffer.from('%PDF-mock'),
+}))
+
+// Prevent real file system writes from route handler
+mock.module('node:fs', () => ({
+  mkdirSync: () => {},
+  renameSync: () => {},
+}))
+
+spyOn(Bun, 'write').mockResolvedValue(0)
 
 // --- Import AFTER mock ---
 const { default: jobsApp } = await import('./api-jobs')
@@ -65,17 +78,26 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
     duration_ms INTEGER, input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL
   )
 `
+const CREATE_PROFILE_TABLE = `
+  CREATE TABLE IF NOT EXISTS profile (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT, email TEXT, phone TEXT, location TEXT,
+    linkedin_url TEXT, github_url TEXT, summary TEXT,
+    experience TEXT, skills TEXT, education TEXT
+  )
+`
 
 beforeAll(() => {
   prodSqlite.run(CREATE_JOBS_TABLE)
   prodSqlite.run(CREATE_COVER_LETTERS_TABLE)
   prodSqlite.run(CREATE_WEBHOOK_RUNS_TABLE)
+  prodSqlite.run(CREATE_PROFILE_TABLE)
 })
 
 beforeEach(() => {
   prodSqlite.run('DELETE FROM cover_letters')
   prodSqlite.run('DELETE FROM jobs')
-  mockGenerateCoverLetter = async () => ({ content: 'Mock cover letter text', inputTokens: 100, outputTokens: 200 })
+  mockGenerateCoverLetter = async () => ({ content: 'Mock cover letter text', pdf: Buffer.from('%PDF-mock'), inputTokens: 100, outputTokens: 200 })
 })
 
 describe('POST /:id/generate-cover-letter', () => {
@@ -204,36 +226,53 @@ describe('GET /:id/cover-letter', () => {
   })
 })
 
-describe('GET /:id/cover-letter/docx', () => {
-  test('returns 200 with docx content-type for existing cover letter', async () => {
-    prodSqlite.run(`INSERT INTO jobs (company, job_title) VALUES ('Acme', 'Engineer')`)
-    const jobRow = prodSqlite.query('SELECT id FROM jobs LIMIT 1').get() as { id: number }
-    prodSqlite.run(
-      `INSERT INTO cover_letters (job_id, content, created_at) VALUES (?, ?, ?)`,
-      [jobRow.id, 'Dear Hiring Manager,\n\nGreat role.', '2026-04-15T10:00:00.000Z']
-    )
-    const res = await jobsApp.request(`/${jobRow.id}/cover-letter/docx`, { method: 'GET' })
-    expect(res.status).toBe(200)
-    expect(res.headers.get('content-type')).toContain('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    expect(res.headers.get('content-disposition')).toBe('attachment; filename="Cover Letter - Acme - Engineer.docx"')
-    const buf = Buffer.from(await res.arrayBuffer())
-    expect(buf.length).toBeGreaterThan(0)
-    expect(buf[0]).toBe(0x50)
-    expect(buf[1]).toBe(0x4B)
+describe('GET /:id/cover-letter/pdf', () => {
+  test('returns 400 for non-numeric id', async () => {
+    const res = await jobsApp.request('/abc/cover-letter/pdf', { method: 'GET' })
+    expect(res.status).toBe(400)
+    const body = await res.json() as { error: string }
+    expect(body).toHaveProperty('error')
   })
 
-  test('returns 404 for non-existent cover letter id', async () => {
-    const res = await jobsApp.request('/999/cover-letter/docx', { method: 'GET' })
+  test('returns 404 when job does not exist', async () => {
+    const res = await jobsApp.request('/999/cover-letter/pdf', { method: 'GET' })
     expect(res.status).toBe(404)
     const body = await res.json() as { error: string }
     expect(body).toHaveProperty('error')
     expect(body).not.toHaveProperty('message')
   })
 
-  test('returns 400 for non-numeric id', async () => {
-    const res = await jobsApp.request('/abc/cover-letter/docx', { method: 'GET' })
-    expect(res.status).toBe(400)
+  test('returns 404 when cover letter PDF file does not exist on disk', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title) VALUES ('FileMiss Co', 'Engineer')`)
+    const row = prodSqlite.query("SELECT id FROM jobs WHERE company = 'FileMiss Co' LIMIT 1").get() as { id: number }
+    const res = await jobsApp.request(`/${row.id}/cover-letter/pdf`, { method: 'GET' })
+    expect(res.status).toBe(404)
     const body = await res.json() as { error: string }
-    expect(body).toHaveProperty('error')
+    expect(body.error).toBe('Cover letter PDF not found')
+    expect(body).not.toHaveProperty('message')
+  })
+
+  test('returns 200 with application/pdf and inline content-disposition when file exists', async () => {
+    const { join } = await import('node:path')
+    const { mkdir, writeFile, unlink } = await import('node:fs/promises')
+    const clDir = join(process.cwd(), 'data', 'cover-letters')
+    await mkdir(clDir, { recursive: true })
+
+    prodSqlite.run(`INSERT INTO jobs (company, job_title) VALUES ('Inline CL Co', 'Viewer')`)
+    const row = prodSqlite.query("SELECT id FROM jobs WHERE company = 'Inline CL Co' LIMIT 1").get() as { id: number }
+    const filePath = join(clDir, `${row.id}.pdf`)
+    await writeFile(filePath, Buffer.from('%PDF-1.4 cover-letter-test'))
+
+    try {
+      const res = await jobsApp.request(`/${row.id}/cover-letter/pdf`, { method: 'GET' })
+      expect(res.status).toBe(200)
+      expect(res.headers.get('content-type')).toContain('application/pdf')
+      const cd = res.headers.get('content-disposition') ?? ''
+      expect(cd).toContain('inline')
+      expect(cd).toContain('.pdf')
+      expect(cd).toContain('Cover Letter')
+    } finally {
+      await unlink(filePath).catch(() => {})
+    }
   })
 })

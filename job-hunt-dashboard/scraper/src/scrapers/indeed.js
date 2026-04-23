@@ -1,10 +1,22 @@
-import { withPage, scrapeWithRetry, parseRelativeDate } from './base.js';
+import { withFirefoxPage, scrapeWithRetry, parseRelativeDate } from './base.js';
+import { existsSync } from 'fs';
+import { resolve } from 'path';
+
+const SESSION_PATH = resolve(process.cwd(), 'sessions/indeed.json');
+const sessionPath = () => (existsSync(SESSION_PATH) ? SESSION_PATH : null);
 
 export async function searchIndeed({ query, location = 'remote', maxResults = 25 }) {
   return scrapeWithRetry('indeed', async () => {
     const url = `https://www.indeed.com/jobs?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}&sort=date&fromage=3`;
-    return withPage(null, async (page) => {
+    return withFirefoxPage(sessionPath(), async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+      // Cloudflare challenge — wait for it to resolve before looking for results
+      await page.waitForFunction(
+        () => !document.title.includes('Just a moment'),
+        { timeout: 20000 }
+      ).catch(() => {});
+
       const hasResults = await page.waitForSelector('a[data-jk]', { timeout: 15000 }).catch(() => null);
       if (!hasResults) return [];
       await page.waitForTimeout(1000 + Math.random() * 1500);
@@ -36,7 +48,7 @@ export async function searchIndeed({ query, location = 'remote', maxResults = 25
 
 export async function fetchIndeedListing(url) {
   return scrapeWithRetry('indeed', () =>
-    withPage(null, async (page) => {
+    withFirefoxPage(sessionPath(), async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('#jobDescriptionText', { timeout: 15000 });
       return page.evaluate(() =>
@@ -48,7 +60,7 @@ export async function fetchIndeedListing(url) {
 
 export async function fetchIndeedJobDetails(url) {
   return scrapeWithRetry('indeed', () =>
-    withPage(null, async (page) => {
+    withFirefoxPage(sessionPath(), async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('h1', { timeout: 15000 });
       return page.evaluate(() => {
