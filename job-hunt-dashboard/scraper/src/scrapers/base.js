@@ -1,4 +1,4 @@
-import { getPage, releasePage } from '../browser/pool.js';
+import { getPage, getFirefoxPage, releasePage } from '../browser/pool.js';
 import PQueue from 'p-queue';
 import retry from 'p-retry';
 
@@ -31,8 +31,17 @@ export const queues = {
   arc:       new PQueue({ concurrency: 1, interval: 3000, intervalCap: 1 }),
 };
 
-export async function withPage(storageStatePath, fn) {
-  const { page, context } = await getPage(storageStatePath);
+export async function withFirefoxPage(storageStatePath, fn, contextOverrides = {}) {
+  const { page, context } = await getFirefoxPage(storageStatePath, contextOverrides);
+  try {
+    return await fn(page);
+  } finally {
+    await releasePage(context);
+  }
+}
+
+export async function withPage(storageStatePath, fn, contextOverrides = {}) {
+  const { page, context } = await getPage(storageStatePath, contextOverrides);
   try {
     // Simulate human: random scroll + wait before extracting
     page.on('load', async () => {

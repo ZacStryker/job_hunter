@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "save-session:indeed_nl": "bun src/browser/save-session.js"
   },
   "keywords": [],
   "author": "",

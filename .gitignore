@@ -1,2 +1,5 @@
 # Claude Code config
 .claude/
+
+# Scraper session cookies (contain auth tokens)
+job-hunt-dashboard/scraper/sessions/

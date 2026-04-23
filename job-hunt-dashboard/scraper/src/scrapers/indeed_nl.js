@@ -1,12 +1,28 @@
-import { withPage, scrapeWithRetry, parseRelativeDate } from './base.js';
+import { withFirefoxPage, scrapeWithRetry, parseRelativeDate } from './base.js';
+import { existsSync } from 'fs';
+import { resolve } from 'path';
+
+const SESSION_PATH = resolve(process.cwd(), 'sessions/indeed_nl.json');
+const sessionPath = () => (existsSync(SESSION_PATH) ? SESSION_PATH : null);
 
 export async function searchIndeedNl({ query, location = '', maxResults = 25 }) {
   return scrapeWithRetry('indeed_nl', async () => {
-    const url = `https://nl.indeed.com/jobs?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}&sort=date&fromage=1`;
-    return withPage(null, async (page) => {
+    const url = `https://nl.indeed.com/jobs?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}&sort=date&fromage=3`;
+    return withFirefoxPage(sessionPath(), async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+      // Cloudflare challenge — wait for it to resolve before looking for results
+      await page.waitForFunction(
+        () => !document.title.includes('Even geduld') && !document.title.includes('Just a moment'),
+        { timeout: 20000 }
+      ).catch(() => {});
+
       const hasResults = await page.waitForSelector('a[data-jk]', { timeout: 15000 }).catch(() => null);
-      if (!hasResults) return [];
+      if (!hasResults) {
+        const title = await page.title();
+        console.warn(`[indeed_nl] no a[data-jk] found — page title: "${title}" url: ${url}`);
+        return [];
+      }
       await page.waitForTimeout(1000 + Math.random() * 1500);
 
       const jobs = await page.evaluate((max) => {
@@ -36,7 +52,7 @@ export async function searchIndeedNl({ query, location = '', maxResults = 25 }) 
 
 export async function fetchIndeedNlListing(url) {
   return scrapeWithRetry('indeed_nl', () =>
-    withPage(null, async (page) => {
+    withFirefoxPage(sessionPath(), async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('#jobDescriptionText', { timeout: 15000 });
       return page.evaluate(() =>
@@ -48,7 +64,7 @@ export async function fetchIndeedNlListing(url) {
 
 export async function fetchIndeedNlJobDetails(url) {
   return scrapeWithRetry('indeed_nl', () =>
-    withPage(null, async (page) => {
+    withFirefoxPage(sessionPath(), async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('h1', { timeout: 15000 });
       return page.evaluate(() => {

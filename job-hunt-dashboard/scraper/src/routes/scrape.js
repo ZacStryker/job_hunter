@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { searchIndeed, fetchIndeedListing } from '../scrapers/indeed.js';
-import { searchIndeedNl, fetchIndeedNlListing } from '../scrapers/indeed_nl.js';
-import { searchLinkedIn, fetchLinkedInListing } from '../scrapers/linkedin.js';
+import { searchIndeed, fetchIndeedListing, fetchIndeedJobDetails } from '../scrapers/indeed.js';
+import { searchIndeedNl, fetchIndeedNlListing, fetchIndeedNlJobDetails } from '../scrapers/indeed_nl.js';
+import { searchLinkedIn, fetchLinkedInListing, fetchLinkedInJobDetails } from '../scrapers/linkedin.js';
 import { searchArc } from '../scrapers/arc.js';
 
 const SearchSchema = z.object({
@@ -13,6 +13,11 @@ const SearchSchema = z.object({
 
 const ListingSchema = z.object({
   source: z.enum(['indeed', 'indeed_nl', 'linkedin']),
+  url: z.string().url(),
+});
+
+const JobDetailsSchema = z.object({
+  source: z.enum(['linkedin', 'indeed', 'indeed_nl']),
   url: z.string().url(),
 });
 
@@ -35,5 +40,19 @@ export async function scrapeRoutes(fastify) {
     const fetchers = { indeed: fetchIndeedListing, indeed_nl: fetchIndeedNlListing, linkedin: fetchLinkedInListing };
     const description = await fetchers[source](url);
     return { source, url, description, extractedAt: new Date().toISOString() };
+  });
+
+  fastify.post('/scrape/job-details', async (request, reply) => {
+    const body = JobDetailsSchema.safeParse(request.body);
+    if (!body.success) return reply.status(400).send(body.error);
+
+    const { source, url } = body.data;
+    const fetchers = {
+      linkedin: fetchLinkedInJobDetails,
+      indeed: fetchIndeedJobDetails,
+      indeed_nl: fetchIndeedNlJobDetails,
+    };
+    const result = await fetchers[source](url);
+    return { source, url, ...result, extractedAt: new Date().toISOString() };
   });
 }
