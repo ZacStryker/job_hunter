@@ -2,7 +2,7 @@ import { withPage, scrapeWithRetry, parseRelativeDate } from './base.js';
 
 export async function searchIndeed({ query, location = 'remote', maxResults = 25 }) {
   return scrapeWithRetry('indeed', async () => {
-    const url = `https://www.indeed.com/jobs?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}&sort=date&fromage=1`;
+    const url = `https://www.indeed.com/jobs?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}&sort=date&fromage=3`;
     return withPage(null, async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       const hasResults = await page.waitForSelector('a[data-jk]', { timeout: 15000 }).catch(() => null);
