@@ -38,6 +38,8 @@ const columns = [
   columnHelper.accessor((row) => parseName(row.name).job, {
     id: 'job',
     header: 'Job',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    meta: { minWidth: 220 } as any,
     cell: (info) => info.getValue() || <span className="text-zinc-600">—</span>,
   }),
   columnHelper.accessor('success', {
@@ -48,8 +50,8 @@ const columns = [
       return ok ? (
         <span className="text-green-400">✓</span>
       ) : (
-        <span className="text-red-400" title={errorMessage ?? undefined}>
-          ✗{errorMessage ? <span className="ml-1.5 text-xs text-zinc-500">{errorMessage}</span> : null}
+        <span className="text-red-400 flex items-center gap-1.5" title={errorMessage ?? undefined}>
+          ✗{errorMessage ? <span className="text-xs text-zinc-500 max-w-[160px] truncate">{errorMessage}</span> : null}
         </span>
       )
     },
@@ -132,10 +134,12 @@ export function HistoryRoute() {
                 <TableRow key={headerGroup.id} className="border-zinc-800">
                   {headerGroup.headers.map((header) => {
                     const sorted = header.column.getIsSorted()
+                    const colMeta = header.column.columnDef.meta as { minWidth?: number } | undefined
                     return (
                       <TableHead
                         key={header.id}
                         className="text-zinc-400 bg-zinc-900 px-3 py-2 cursor-pointer select-none"
+                        style={colMeta?.minWidth ? { minWidth: colMeta.minWidth } : undefined}
                         onClick={header.column.getToggleSortingHandler()}
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
@@ -149,11 +153,16 @@ export function HistoryRoute() {
             <TableBody>
               {table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} className="border-zinc-800 hover:bg-zinc-900/50">
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="px-3 py-2 text-zinc-300">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    const cellMeta = cell.column.columnDef.meta as { minWidth?: number } | undefined
+                    return (
+                      <TableCell key={cell.id} className="px-3 py-2 text-zinc-300"
+                        style={cellMeta?.minWidth ? { minWidth: cellMeta.minWidth } : undefined}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    )
+                  })}
                 </TableRow>
               ))}
             </TableBody>
