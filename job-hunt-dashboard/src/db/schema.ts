@@ -64,6 +64,8 @@ export const webhookRuns = sqliteTable('webhook_runs', {
   inputTokens: integer('input_tokens'),
   outputTokens: integer('output_tokens'),
   costUsd: real('cost_usd'),
+  matchedCount: integer('matched_count'),
+  archivedCount: integer('archived_count'),
 })
 
 export const profile = sqliteTable('profile', {

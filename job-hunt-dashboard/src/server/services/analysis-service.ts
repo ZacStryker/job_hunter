@@ -34,7 +34,7 @@ function applyAnalysisTemplate(
     .replaceAll('{{JOB_LISTING_JSON}}', jobJson)
 }
 
-export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{ processed: number; failed: number; inputTokens: number; outputTokens: number }> {
+export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{ processed: number; failed: number; matched: number; archived: number; inputTokens: number; outputTokens: number }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
@@ -59,6 +59,7 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
 
   let processed = 0
   let failed = 0
+  let archivedInRun = 0
   let totalInputTokens = 0
   let totalOutputTokens = 0
   let i = 0
@@ -173,6 +174,7 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
         .where(eq(jobs.id, job.id))
         .run()
 
+      if (result.recommended_action === 'skip') archivedInRun++
       processed++
     } catch (err) {
       console.error(`[analysis] job ${job.id} failed:`, err instanceof Error ? err.message : String(err))
@@ -181,5 +183,5 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
     }
   }
 
-  return { processed, failed, inputTokens: totalInputTokens, outputTokens: totalOutputTokens }
+  return { processed, failed, matched: processed - archivedInRun, archived: archivedInRun, inputTokens: totalInputTokens, outputTokens: totalOutputTokens }
 }

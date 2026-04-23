@@ -34,10 +34,10 @@ app.post('/analysis', (c) => {
     const write = (ev: object) => s.writeln(JSON.stringify(ev))
     const startMs = Date.now()
     try {
-      const { processed, failed, inputTokens, outputTokens } = await runAnalysis((msg) => write({ status: msg }))
+      const { processed, failed, matched, archived, inputTokens, outputTokens } = await runAnalysis((msg) => write({ status: msg }))
       const costUsd = inputTokens * OPUS_4_7_INPUT + outputTokens * OPUS_4_7_OUTPUT
       recordRun({ name: 'Analysis', success: true, itemCount: processed, errorMessage: null,
-        durationMs: Date.now() - startMs, inputTokens, outputTokens, costUsd })
+        durationMs: Date.now() - startMs, inputTokens, outputTokens, costUsd, matchedCount: matched, archivedCount: archived })
       write({ done: true, processed, failed })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

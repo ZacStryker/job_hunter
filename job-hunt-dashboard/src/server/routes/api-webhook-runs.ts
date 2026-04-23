@@ -14,6 +14,8 @@ export function recordRun(params: {
   inputTokens?: number | null
   outputTokens?: number | null
   costUsd?: number | null
+  matchedCount?: number | null
+  archivedCount?: number | null
 }) {
   try {
     db.insert(webhookRuns).values({
@@ -26,6 +28,8 @@ export function recordRun(params: {
       inputTokens: params.inputTokens ?? null,
       outputTokens: params.outputTokens ?? null,
       costUsd: params.costUsd ?? null,
+      matchedCount: params.matchedCount ?? null,
+      archivedCount: params.archivedCount ?? null,
     }).run()
   } catch (err) {
     console.error('[webhook-runs] Failed to record run:', err)

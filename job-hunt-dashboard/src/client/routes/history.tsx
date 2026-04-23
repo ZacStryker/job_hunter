@@ -35,12 +35,23 @@ const columns = [
     header: 'Workflow',
     cell: (info) => info.getValue(),
   }),
-  columnHelper.accessor((row) => parseName(row.name).job, {
+  columnHelper.accessor((row) => row, {
     id: 'job',
     header: 'Job',
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     meta: { minWidth: 220 } as any,
-    cell: (info) => info.getValue() || <span className="text-zinc-600">—</span>,
+    cell: (info) => {
+      const row = info.getValue()
+      if (row.name === 'Analysis' && row.itemCount !== null) {
+        return (
+          <span className="text-zinc-300">
+            {row.itemCount} analyzed, {row.matchedCount ?? 0} matched, {row.archivedCount ?? 0} archived
+          </span>
+        )
+      }
+      const job = parseName(row.name).job
+      return job || <span className="text-zinc-600">—</span>
+    },
   }),
   columnHelper.accessor('success', {
     header: 'Success',
