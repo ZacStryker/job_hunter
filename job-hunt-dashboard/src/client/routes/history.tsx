@@ -4,9 +4,11 @@ import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
+  getPaginationRowModel,
   useReactTable,
 } from '@tanstack/react-table'
 import type { SortingState } from '@tanstack/react-table'
+import { Button } from '../components/ui/button'
 import {
   TableBody,
   TableCell,
@@ -16,6 +18,8 @@ import {
 } from '../components/ui/table'
 import type { WebhookRun } from '@shared/schemas'
 import { useWebhookRunsQuery } from '../hooks/useWebhookRunsQuery'
+
+const PAGE_SIZE = 20
 
 function parseName(name: string): { workflow: string; job: string } {
   if (name.startsWith('Cover Letter - ')) return { workflow: 'Cover Letter', job: name.slice('Cover Letter - '.length) }
@@ -113,10 +117,20 @@ export function HistoryRoute() {
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     enableMultiSort: false,
+    initialState: { pagination: { pageSize: PAGE_SIZE, pageIndex: 0 } },
     state: { sorting },
-    onSortingChange: setSorting,
+    onSortingChange: (updater) => {
+      table.setPageIndex(0)
+      setSorting(updater)
+    },
   })
+
+  const { pageIndex, pageSize } = table.getState().pagination
+  const totalRows = table.getFilteredRowModel().rows.length
+  const from = totalRows === 0 ? 0 : pageIndex * pageSize + 1
+  const to = Math.min((pageIndex + 1) * pageSize, totalRows)
 
   return (
     <div className="p-4 space-y-3">
@@ -138,46 +152,77 @@ export function HistoryRoute() {
         </div>
       )}
       {!isPending && !isError && runs.length > 0 && (
-        <div className="rounded-lg border border-zinc-800 overflow-hidden">
-          <table className="w-full text-sm">
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-zinc-800">
-                  {headerGroup.headers.map((header) => {
-                    const sorted = header.column.getIsSorted()
-                    const colMeta = header.column.columnDef.meta as { minWidth?: number } | undefined
-                    return (
-                      <TableHead
-                        key={header.id}
-                        className="text-zinc-400 bg-zinc-900 px-3 py-2 cursor-pointer select-none"
-                        style={colMeta?.minWidth ? { minWidth: colMeta.minWidth } : undefined}
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
-                      </TableHead>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className="border-zinc-800 hover:bg-zinc-900/50">
-                  {row.getVisibleCells().map((cell) => {
-                    const cellMeta = cell.column.columnDef.meta as { minWidth?: number } | undefined
-                    return (
-                      <TableCell key={cell.id} className="px-3 py-2 text-zinc-300"
-                        style={cellMeta?.minWidth ? { minWidth: cellMeta.minWidth } : undefined}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableBody>
-          </table>
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col">
+          <div className="overflow-auto">
+            <table className="w-full text-sm">
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id} className="border-zinc-800">
+                    {headerGroup.headers.map((header) => {
+                      const sorted = header.column.getIsSorted()
+                      const colMeta = header.column.columnDef.meta as { minWidth?: number } | undefined
+                      return (
+                        <TableHead
+                          key={header.id}
+                          className="text-zinc-400 bg-zinc-900 px-3 py-2 cursor-pointer select-none"
+                          style={colMeta?.minWidth ? { minWidth: colMeta.minWidth } : undefined}
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                        </TableHead>
+                      )
+                    })}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id} className="border-zinc-800 hover:bg-zinc-900/50">
+                    {row.getVisibleCells().map((cell) => {
+                      const cellMeta = cell.column.columnDef.meta as { minWidth?: number } | undefined
+                      return (
+                        <TableCell key={cell.id} className="px-3 py-2 text-zinc-300"
+                          style={cellMeta?.minWidth ? { minWidth: cellMeta.minWidth } : undefined}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      )
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-between px-3 py-2 border-t border-zinc-800 shrink-0">
+            <span className="text-xs text-zinc-500">
+              {totalRows === 0 ? '0 runs' : `${from}–${to} of ${totalRows}`}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+              >
+                ←
+              </Button>
+              <span className="text-xs text-zinc-400 px-2">
+                {pageIndex + 1} / {table.getPageCount()}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+              >
+                →
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
+  getPaginationRowModel,
   useReactTable,
 } from '@tanstack/react-table'
 import type { SortingState } from '@tanstack/react-table'
@@ -14,8 +15,11 @@ import {
   TableHeader,
   TableRow,
 } from '../ui/table'
+import { Button } from '../ui/button'
 import type { Job } from '@shared/schemas'
 import { ScoreBadge } from '../pipeline/ScoreBadge'
+
+const PAGE_SIZE = 20
 
 const columnHelper = createColumnHelper<Job>()
 
@@ -74,10 +78,20 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     enableMultiSort: false,
+    initialState: { pagination: { pageSize: PAGE_SIZE, pageIndex: 0 } },
     state: { sorting },
-    onSortingChange: setSorting,
+    onSortingChange: (updater) => {
+      table.setPageIndex(0)
+      setSorting(updater)
+    },
   })
+
+  const { pageIndex, pageSize } = table.getState().pagination
+  const totalRows = table.getFilteredRowModel().rows.length
+  const from = totalRows === 0 ? 0 : pageIndex * pageSize + 1
+  const to = Math.min((pageIndex + 1) * pageSize, totalRows)
 
   if (appliedJobs.length === 0) {
     return (
@@ -132,6 +146,35 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
             ))}
           </TableBody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-between px-3 py-2 border-t border-zinc-800 shrink-0">
+        <span className="text-xs text-zinc-500">
+          {totalRows === 0 ? '0 applications' : `${from}–${to} of ${totalRows}`}
+        </span>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            ←
+          </Button>
+          <span className="text-xs text-zinc-400 px-2">
+            {pageIndex + 1} / {table.getPageCount()}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            →
+          </Button>
+        </div>
       </div>
     </div>
   )

@@ -4,6 +4,7 @@ import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
+  getPaginationRowModel,
   useReactTable,
 } from '@tanstack/react-table'
 import type { SortingState, VisibilityState, Updater, RowSelectionState } from '@tanstack/react-table'
@@ -33,6 +34,7 @@ const STATUS_OPTIONS = [
   { value: 'ghosted', label: 'Ghosted' },
 ]
 
+const PAGE_SIZE = 20
 const VISIBILITY_KEY = 'job-hunt-column-visibility'
 
 function loadVisibility(): VisibilityState {
@@ -258,16 +260,24 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
     getRowId: (row) => String(row.id),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     enableMultiSort: false,
     enableRowSelection: true,
+    initialState: { pagination: { pageSize: PAGE_SIZE, pageIndex: 0 } },
     state: { columnVisibility, sorting, rowSelection },
     onColumnVisibilityChange: handleVisibilityChange,
     onSortingChange: (updater) => {
+      table.setPageIndex(0)
       setSorting(updater)
       lastSelectedIndexRef.current = null
     },
     onRowSelectionChange: setRowSelection,
   })
+
+  const { pageIndex, pageSize } = table.getState().pagination
+  const totalRows = table.getFilteredRowModel().rows.length
+  const from = totalRows === 0 ? 0 : pageIndex * pageSize + 1
+  const to = Math.min((pageIndex + 1) * pageSize, totalRows)
 
   const selectedIds = table.getSelectedRowModel().rows.map((r) => r.original.id)
   const selectedCount = selectedIds.length
@@ -330,6 +340,35 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
             ))}
           </TableBody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-between px-3 py-2 border-t border-zinc-800 shrink-0">
+        <span className="text-xs text-zinc-500">
+          {totalRows === 0 ? '0 jobs' : `${from}–${to} of ${totalRows}`}
+        </span>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            ←
+          </Button>
+          <span className="text-xs text-zinc-400 px-2">
+            {pageIndex + 1} / {table.getPageCount()}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            →
+          </Button>
+        </div>
       </div>
     </div>
   )

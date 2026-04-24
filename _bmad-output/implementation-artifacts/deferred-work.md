@@ -386,6 +386,12 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 - Concurrent cover letter generation for the same job races on `${rawId}.pdf.tmp` — two simultaneous POST `/:id/generate-cover-letter` requests write to the same fixed temp path; second `renameSync` wins, DB gets two rows but one PDF. Pre-existing pattern shared with resume generation [`api-jobs.ts`].
 - `inserted` query matches by `createdAt: now` timestamp — two concurrent generations completing within the same millisecond could match the wrong row or null. Pre-existing pattern across all generation routes [`api-jobs.ts`].
 
+## Deferred from: pagination added to Jobs/Matches/Applications/Logs views (2026-04-24)
+
+- **Shift-select breaks across page boundaries** [`PipelineTable.tsx`] — `lastSelectedIndexRef` stores a row index relative to the current page only. Shift-clicking from page 1 into page 2 maps the old index onto new-page rows, silently selecting incorrect jobs. Fix requires clearing `lastSelectedIndexRef` on page navigation or scoping shift-select to single-page ranges.
+- **Page index not reset when data changes** [`PipelineTable.tsx`, `TrackerTable.tsx`] — If the job list shrinks (e.g. after a bulk archive empties the current page), the TanStack Table internal page index is not reset. The user lands on an empty page and must manually navigate back. Add a `useEffect` that calls `table.setPageIndex(0)` when the data length changes.
+- **Arrow button `←`/`→` missing `aria-label`** [`PipelineTable.tsx`, `TrackerTable.tsx`, `history.tsx`] — Screen readers announce bare Unicode arrows with no page-navigation semantics. Pre-existing in `MessagesTable.tsx`. Add `aria-label="Previous page"` / `aria-label="Next page"` in a future accessibility pass.
+
 ## Deferred from: code review of 22-1-add-job-by-url (2026-04-21)
 
 - `detectSource` in `api-jobs.ts` maps all `*.indeed.com` subdomains (ca, uk, de, etc.) to the `indeed` scraper. Country-specific Indeed domains have different page structures; the wrong scraper will silently return null fields → 422 → manual form. Acceptable for now given graceful-degradation path, but should add supported-domain list if coverage expands.
