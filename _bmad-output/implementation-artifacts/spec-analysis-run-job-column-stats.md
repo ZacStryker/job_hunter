@@ -2,7 +2,8 @@
 title: 'Analysis run job column stats'
 type: 'feature'
 created: '2026-04-23'
-status: 'ready-for-dev'
+status: 'done'
+baseline_commit: '32425fa19ac9a958336543bd36cc5198df102990'
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
@@ -51,14 +52,14 @@ status: 'ready-for-dev'
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/db/schema.ts` -- add `matchedCount: integer('matched_count')` and `archivedCount: integer('archived_count')` to the `webhookRuns` table definition
-- [ ] `src/db/migrations/0017_analysis_run_counts.sql` -- create with `ALTER TABLE webhook_runs ADD COLUMN matched_count INTEGER; ALTER TABLE webhook_runs ADD COLUMN archived_count INTEGER;`
-- [ ] `src/db/migrations/meta/_journal.json` -- append entry `{ idx: 17, version: "6", when: <epoch>, tag: "0017_analysis_run_counts", breakpoints: true }`
-- [ ] `src/server/services/analysis-service.ts` -- add `archived` counter (increment when `result.recommended_action === 'skip'`); return `{ processed, failed, matched: processed - archived, archived, inputTokens, outputTokens }` from `runAnalysis`
-- [ ] `src/server/routes/api-webhooks.ts` -- destructure `matched`, `archived` from `runAnalysis` result; pass `matchedCount: matched, archivedCount: archived` to `recordRun`
-- [ ] `src/server/routes/api-webhook-runs.ts` -- add `matchedCount` and `archivedCount` to `recordRun` params and `db.insert` values
-- [ ] `src/shared/schemas.ts` -- add `matchedCount: z.number().int().nullable()` and `archivedCount: z.number().int().nullable()` to `webhookRunSchema`
-- [ ] `src/client/routes/history.tsx` -- in the Job column cell, when `row.name === 'Analysis'` and `row.itemCount !== null`, render `"${row.itemCount} analyzed, ${row.matchedCount ?? 0} matched, ${row.archivedCount ?? 0} archived"` instead of the parsed `job` string
+- [x] `src/db/schema.ts` -- add `matchedCount: integer('matched_count')` and `archivedCount: integer('archived_count')` to the `webhookRuns` table definition
+- [x] `src/db/migrations/0017_analysis_run_counts.sql` -- create with `ALTER TABLE webhook_runs ADD COLUMN matched_count INTEGER; ALTER TABLE webhook_runs ADD COLUMN archived_count INTEGER;`
+- [x] `src/db/migrations/meta/_journal.json` -- append entry `{ idx: 17, version: "6", when: <epoch>, tag: "0017_analysis_run_counts", breakpoints: true }`
+- [x] `src/server/services/analysis-service.ts` -- add `archived` counter (increment when `result.recommended_action === 'skip'`); return `{ processed, failed, matched: processed - archived, archived, inputTokens, outputTokens }` from `runAnalysis`
+- [x] `src/server/routes/api-webhooks.ts` -- destructure `matched`, `archived` from `runAnalysis` result; pass `matchedCount: matched, archivedCount: archived` to `recordRun`
+- [x] `src/server/routes/api-webhook-runs.ts` -- add `matchedCount` and `archivedCount` to `recordRun` params and `db.insert` values
+- [x] `src/shared/schemas.ts` -- add `matchedCount: z.number().int().nullable()` and `archivedCount: z.number().int().nullable()` to `webhookRunSchema`
+- [x] `src/client/routes/history.tsx` -- in the Job column cell, when `row.name === 'Analysis'` and `row.itemCount !== null`, render `"${row.itemCount} analyzed, ${row.matchedCount ?? 0} matched, ${row.archivedCount ?? 0} archived"` instead of the parsed `job` string
 
 **Acceptance Criteria:**
 - Given a completed Analysis run with 8 processed jobs (5 matched, 3 skipped), when viewing the Logs table, then the Job column shows "8 analyzed, 5 matched, 3 archived".
@@ -74,3 +75,34 @@ status: 'ready-for-dev'
 
 **Commands:**
 - `cd job-hunt-dashboard && npx tsc --noEmit` -- expected: no new type errors
+
+## Suggested Review Order
+
+**DB & Migration**
+
+- New nullable columns added to `webhookRuns` table definition
+  [`schema.ts:66`](../../job-hunt-dashboard/src/db/schema.ts#L66)
+
+- Migration SQL adding the two columns
+  [`0017_analysis_run_counts.sql:1`](../../job-hunt-dashboard/src/db/migrations/0017_analysis_run_counts.sql#L1)
+
+**Service Logic**
+
+- `archivedInRun` counter incremented on `skip`; `matched` derived as `processed − archived`
+  [`analysis-service.ts:62`](../../job-hunt-dashboard/src/server/services/analysis-service.ts#L62)
+
+**API Plumbing**
+
+- `matched`/`archived` destructured from `runAnalysis` and forwarded to `recordRun`
+  [`api-webhooks.ts:37`](../../job-hunt-dashboard/src/server/routes/api-webhooks.ts#L37)
+
+- `recordRun` signature and insert include `matchedCount`/`archivedCount`
+  [`api-webhook-runs.ts:8`](../../job-hunt-dashboard/src/server/routes/api-webhook-runs.ts#L8)
+
+**Types & UI**
+
+- `webhookRunSchema` extended with nullable int fields
+  [`schemas.ts:93`](../../job-hunt-dashboard/src/shared/schemas.ts#L93)
+
+- Job column renders stats string for Analysis rows with non-null `itemCount`
+  [`history.tsx:49`](../../job-hunt-dashboard/src/client/routes/history.tsx#L49)

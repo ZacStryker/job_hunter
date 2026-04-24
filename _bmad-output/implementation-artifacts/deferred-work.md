@@ -403,3 +403,8 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 - `POST /scrape/job-details` in `scraper/src/routes/scrape.js` does not catch errors thrown by `fetchers[source](url)` — scrapeWithRetry exhausting all retries propagates as an unhandled exception, returning a generic Fastify 500 with no structured error. Pre-existing pattern in scraper codebase.
 - `AUTH_DIR`/`AUTH_PATH` in `scraper/src/scrapers/linkedin.js` — `fetchLinkedInJobDetails` inherits the same module-level path resolution. If `AUTH_DIR` env var is missing, the path resolves unexpectedly. Pre-existing issue in the scraper.
 - `page.evaluate` in scrapers (linkedin.js, indeed.js, indeed_nl.js) uses `innerText` (layout-dependent, returns empty string for hidden elements) rather than `textContent`. Pre-existing pattern throughout scraper codebase.
+
+## Deferred from: skip archived jobs in analysis flow (2026-04-24)
+
+- **Race: archive between query and analysis start** — A job could be archived by the user between the `pendingJobs` SELECT and the `db.update({ analysisStatus: 'analyzing' })` mark. The job would be analyzed even though the user archived it in that window. Pre-existing; not introduced by this change.
+- **Race: concurrent archive during in-flight analysis** — If a user archives a job while it is in `analyzing` state, the final `db.update({ analysisStatus: 'done', ... })` write still succeeds unconditionally. The job stays archived (the write doesn't clear `archived`), but tokens were still spent. Pre-existing.

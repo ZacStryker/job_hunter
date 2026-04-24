@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { jobs, profile } from '../../db/schema'
 import { loadEffectivePrompt } from './prompt-defaults'
@@ -51,7 +51,7 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
   const pendingJobs = db
     .select()
     .from(jobs)
-    .where(eq(jobs.analysisStatus, 'pending'))
+    .where(and(eq(jobs.analysisStatus, 'pending'), eq(jobs.archived, false)))
     .limit(10)
     .all()
 
