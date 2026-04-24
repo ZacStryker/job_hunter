@@ -392,6 +392,11 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 - **Page index not reset when data changes** [`PipelineTable.tsx`, `TrackerTable.tsx`] — If the job list shrinks (e.g. after a bulk archive empties the current page), the TanStack Table internal page index is not reset. The user lands on an empty page and must manually navigate back. Add a `useEffect` that calls `table.setPageIndex(0)` when the data length changes.
 - **Arrow button `←`/`→` missing `aria-label`** [`PipelineTable.tsx`, `TrackerTable.tsx`, `history.tsx`] — Screen readers announce bare Unicode arrows with no page-navigation semantics. Pre-existing in `MessagesTable.tsx`. Add `aria-label="Previous page"` / `aria-label="Next page"` in a future accessibility pass.
 
+## Deferred from: PipelineTable truncation for Company/Job Title/Location (2026-04-24)
+
+- **Hardcoded `max-w-[Xpx]` values don't scale with column density** [`PipelineTable.tsx`] — When only a few columns are visible (e.g., Archive with 7 fixed columns), available width per column is much larger than the 200–280 px caps. Widths are appropriate for a dense 10-column layout but may truncate unnecessarily when columns are sparse. Consider `max-w-full` with a percentage-based cap, or remove caps entirely on layouts with few columns.
+- **`title` tooltip missing on Notes (`roleFit`) cell** [`PipelineTable.tsx`] — The existing Notes column uses the same `max-w-[200px] truncate block` pattern but lacks a `title` attribute, unlike Company/Job Title/Location which had it added in this change. Add `title={v}` to the Notes cell for consistency.
+
 ## Deferred from: code review of 22-1-add-job-by-url (2026-04-21)
 
 - `detectSource` in `api-jobs.ts` maps all `*.indeed.com` subdomains (ca, uk, de, etc.) to the `indeed` scraper. Country-specific Indeed domains have different page structures; the wrong scraper will silently return null fields → 422 → manual form. Acceptable for now given graceful-degradation path, but should add supported-domain list if coverage expands.

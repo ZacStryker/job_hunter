@@ -54,18 +54,22 @@ const columnHelper = createColumnHelper<Job>()
 const staticColumns = [
   columnHelper.accessor('company', {
     header: 'Company',
-    cell: (info) => info.getValue(),
+    cell: (info) => (
+      <span className="max-w-[200px] truncate block text-zinc-300" title={info.getValue()}>{info.getValue()}</span>
+    ),
   }),
   columnHelper.accessor('jobTitle', {
     header: 'Job Title',
-    cell: (info) => info.getValue(),
+    cell: (info) => (
+      <span className="max-w-[280px] truncate block text-zinc-300" title={info.getValue()}>{info.getValue()}</span>
+    ),
   }),
   columnHelper.accessor('location', {
     header: 'Location',
     cell: (info) => {
       const v = info.getValue()
       return v ? (
-        <span className="text-zinc-300">{v}</span>
+        <span className="max-w-[180px] truncate block text-zinc-300" title={v}>{v}</span>
       ) : (
         <span className="text-zinc-500">—</span>
       )
