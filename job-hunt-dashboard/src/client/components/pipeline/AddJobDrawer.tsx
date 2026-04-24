@@ -5,16 +5,15 @@ import { useAddJobMutation } from '../../hooks/useAddJobMutation'
 
 interface AddJobDrawerProps {
   open: boolean
-  prefillUrl: string
   onClose: () => void
   onSuccess: () => void
 }
 
-export function AddJobDrawer({ open, prefillUrl, onClose, onSuccess }: AddJobDrawerProps) {
+export function AddJobDrawer({ open, onClose, onSuccess }: AddJobDrawerProps) {
   const [company, setCompany] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [location, setLocation] = useState('')
-  const [url, setUrl] = useState(prefillUrl)
+  const [url, setUrl] = useState('')
   const mutation = useAddJobMutation()
 
   const isValid = company.trim().length > 0 && jobTitle.trim().length > 0 && url.trim().length > 0
