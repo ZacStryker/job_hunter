@@ -40,8 +40,8 @@ const columns = [
     cell: (info) => info.getValue(),
   }),
   columnHelper.accessor((row) => row, {
-    id: 'job',
-    header: 'Job',
+    id: 'detail',
+    header: 'Detail',
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     meta: { minWidth: 220 } as any,
     cell: (info) => {
@@ -80,13 +80,6 @@ const columns = [
           ✗{errorMessage ? <span className="text-xs text-zinc-500 max-w-[160px] truncate">{errorMessage}</span> : null}
         </span>
       )
-    },
-  }),
-  columnHelper.accessor('itemCount', {
-    header: 'Item Count',
-    cell: (info) => {
-      const val = info.getValue()
-      return val !== null ? String(val) : '—'
     },
   }),
   columnHelper.accessor('durationMs', {
