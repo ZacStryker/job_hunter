@@ -58,9 +58,32 @@ const WORKFLOW_COLOR_MAP: Record<string, string> = {
 
 const DARK_GRID = '#3f3f46'
 const DARK_TICK = '#a1a1aa'
-const TOOLTIP_STYLE = { background: '#18181b', border: '1px solid #3f3f46', color: '#f4f4f5' }
-const TOOLTIP_TEXT_STYLE = { color: '#f4f4f5' }
-const TOOLTIP_PROPS = { contentStyle: TOOLTIP_STYLE, labelStyle: TOOLTIP_TEXT_STYLE, itemStyle: TOOLTIP_TEXT_STYLE }
+const TOOLTIP_STYLE = { background: '#18181b', border: '1px solid #3f3f46', color: '#f4f4f5', borderRadius: 4, padding: '8px 12px' }
+
+type TooltipPayloadItem = { name: string; value: number; color: string }
+
+function FilteredTooltip({ active, payload, label }: {
+  active?: boolean
+  payload?: TooltipPayloadItem[]
+  label?: string
+}): React.JSX.Element | null {
+  if (!active || !payload?.length) return null
+  const filtered = payload.filter(p => p.value != null && !Number.isNaN(p.value) && p.value !== 0)
+  if (!filtered.length) return null
+  const displayLabel = typeof label === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(label)
+    ? formatPerDayDate(label)
+    : label
+  return (
+    <div style={TOOLTIP_STYLE}>
+      {displayLabel && <p style={{ color: '#f4f4f5', marginBottom: 4, fontSize: 12 }}>{displayLabel}</p>}
+      {filtered.map(p => (
+        <p key={String(p.name ?? '')} style={{ color: p.color ?? '#f4f4f5', margin: '2px 0', fontSize: 12 }}>
+          {p.name}: {Number.isInteger(p.value) ? p.value : (p.value as number).toFixed(2)}
+        </p>
+      ))}
+    </div>
+  )
+}
 
 type LabelContentProps = { x?: number; y?: number; width?: number; height?: number; value?: number }
 
@@ -246,7 +269,7 @@ export function DashboardRoute() {
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
                     <YAxis {...AXIS_PROPS} />
-                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Tooltip content={<FilteredTooltip />} />
                     <Legend wrapperStyle={{ color: DARK_TICK, fontSize: 11 }} />
                     {WORKFLOW_KEYS.map(k => (
                       <Area key={k} type="monotone" dataKey={k} stackId="1" stroke={WORKFLOW_COLOR_MAP[k]} fill={`url(#gradAuto${k.replace(/ /g, '')})`} />
@@ -266,7 +289,7 @@ export function DashboardRoute() {
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="workflow" {...AXIS_PROPS} />
                     <YAxis {...AXIS_PROPS} allowDecimals={true} />
-                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Tooltip content={<FilteredTooltip />} />
                     <Bar dataKey="cost">
                       {data.automation.costByWorkflow.map(entry => (
                         <Cell key={entry.workflow} fill={WORKFLOW_COLOR_MAP[entry.workflow] ?? '#a1a1aa'} />
@@ -320,7 +343,7 @@ export function DashboardRoute() {
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
                     <YAxis {...AXIS_PROPS} />
-                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Tooltip content={<FilteredTooltip />} />
                     <Legend wrapperStyle={{ color: DARK_TICK, fontSize: 11 }} />
                     <Area type="monotone" dataKey="linkedin" stackId="1" stroke={SOURCE_COLOR_MAP.linkedin} fill="url(#gradJobsLinkedin)" />
                     <Area type="monotone" dataKey="indeed" stackId="1" stroke={SOURCE_COLOR_MAP.indeed} fill="url(#gradJobsIndeed)" />
@@ -343,7 +366,7 @@ export function DashboardRoute() {
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="name" {...AXIS_PROPS} />
                     <YAxis {...AXIS_PROPS} />
-                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Tooltip content={<FilteredTooltip />} />
                     <Bar dataKey="value">
                       {data.jobs.bySource.filter(e => e.value > 0).map(entry => (
                         <Cell key={entry.name} fill={SOURCE_COLOR_MAP[entry.name] ?? '#a1a1aa'} />
@@ -386,7 +409,7 @@ export function DashboardRoute() {
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
                     <YAxis {...AXIS_PROPS} />
-                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Tooltip content={<FilteredTooltip />} />
                     <Legend wrapperStyle={{ color: DARK_TICK, fontSize: 11 }} />
                     <Area type="monotone" dataKey="apply" stackId="1" stroke={REC_COLOR_MAP.Apply} fill="url(#gradMatchesApply)" />
                     <Area type="monotone" dataKey="investigate" stackId="1" stroke={REC_COLOR_MAP.Investigate} fill="url(#gradMatchesInvestigate)" />
@@ -405,7 +428,7 @@ export function DashboardRoute() {
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="score" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={45} />
                     <YAxis {...AXIS_PROPS} />
-                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Tooltip content={<FilteredTooltip />} />
                     <Bar dataKey="count">
                       {data.matches.byScore.map((entry, i) => (
                         <Cell key={entry.score} fill={SCORE_COLORS[i] ?? '#a1a1aa'} />
@@ -445,7 +468,7 @@ export function DashboardRoute() {
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
                     <YAxis {...AXIS_PROPS} />
-                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Tooltip content={<FilteredTooltip />} />
                     <Legend wrapperStyle={{ color: DARK_TICK, fontSize: 11 }} />
                     {APP_STATUS_KEYS.map(k => (
                       <Area key={k} type="monotone" dataKey={k} stackId="1" stroke={STATUS_COLOR_MAP[k]} fill={`url(#gradApp${k.replace(/ /g, '')})`} />
@@ -465,7 +488,7 @@ export function DashboardRoute() {
                     <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
                     <XAxis dataKey="status" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={55} />
                     <YAxis {...AXIS_PROPS} />
-                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Tooltip content={<FilteredTooltip />} />
                     <Bar dataKey="count">
                       {data.applications.byStatus.filter(e => e.status !== 'No Response').map(entry => (
                         <Cell key={entry.status} fill={STATUS_COLOR_MAP[entry.status] ?? '#a1a1aa'} />
