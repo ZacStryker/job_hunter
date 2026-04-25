@@ -53,6 +53,17 @@ const columns = [
           </span>
         )
       }
+      if (row.name === 'Discovery' && row.itemCount !== null) {
+        const breakdown = row.sourceBreakdown
+        const parts = breakdown
+          ? Object.entries(breakdown).filter(([, count]) => count >= 1).map(([src, count]) => `${src}: ${count}`)
+          : []
+        return (
+          <span className="text-zinc-300">
+            {row.itemCount} added{parts.length > 0 ? ` (${parts.join(', ')})` : ''}
+          </span>
+        )
+      }
       const job = parseName(row.name).job
       return job || <span className="text-zinc-600">—</span>
     },

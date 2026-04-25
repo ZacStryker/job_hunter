@@ -14,7 +14,7 @@ const DB_SOURCE: Record<string, string> = {
   linkedin: 'linkedin', indeed: 'indeed', indeed_nl: 'indeed_nl', arc: 'arc',
 }
 
-export async function runDiscovery(onProgress?: (msg: string) => void): Promise<{ inserted: number }> {
+export async function runDiscovery(onProgress?: (msg: string) => void): Promise<{ inserted: number; bySource: Record<string, number> }> {
   const scraperUrl = process.env.SCRAPER_URL
   const scraperToken = process.env.SCRAPER_TOKEN
   if (!scraperUrl) throw new Error('SCRAPER_URL not configured')
@@ -58,7 +58,7 @@ export async function runDiscovery(onProgress?: (msg: string) => void): Promise<
     return true
   })
 
-  if (newJobs.length === 0) return { inserted: 0 }
+  if (newJobs.length === 0) return { inserted: 0, bySource: {} }
 
   onProgress?.(`Inserting ${newJobs.length} new jobs…`)
 
@@ -83,5 +83,10 @@ export async function runDiscovery(onProgress?: (msg: string) => void): Promise<
     }
   })
 
-  return { inserted: newJobs.length }
+  const bySource: Record<string, number> = {}
+  for (const job of newJobs) {
+    bySource[job.source] = (bySource[job.source] ?? 0) + 1
+  }
+
+  return { inserted: newJobs.length, bySource }
 }

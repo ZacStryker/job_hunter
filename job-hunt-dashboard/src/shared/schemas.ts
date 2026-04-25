@@ -92,6 +92,7 @@ export const webhookRunSchema = z.object({
   costUsd: z.number().nullable(),
   matchedCount: z.number().int().nullable(),
   archivedCount: z.number().int().nullable(),
+  sourceBreakdown: z.record(z.string(), z.number()).nullable(),
 })
 export type WebhookRun = z.infer<typeof webhookRunSchema>
 

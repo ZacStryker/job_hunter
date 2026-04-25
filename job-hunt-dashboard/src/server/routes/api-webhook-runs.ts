@@ -16,6 +16,7 @@ export function recordRun(params: {
   costUsd?: number | null
   matchedCount?: number | null
   archivedCount?: number | null
+  sourceBreakdown?: Record<string, number> | null
 }) {
   try {
     db.insert(webhookRuns).values({
@@ -30,6 +31,7 @@ export function recordRun(params: {
       costUsd: params.costUsd ?? null,
       matchedCount: params.matchedCount ?? null,
       archivedCount: params.archivedCount ?? null,
+      sourceBreakdown: params.sourceBreakdown ? JSON.stringify(params.sourceBreakdown) : null,
     }).run()
   } catch (err) {
     console.error('[webhook-runs] Failed to record run:', err)
@@ -37,7 +39,11 @@ export function recordRun(params: {
 }
 
 app.get('/', (c) => {
-  const runs = db.select().from(webhookRuns).orderBy(desc(webhookRuns.runAt)).all()
+  const rows = db.select().from(webhookRuns).orderBy(desc(webhookRuns.runAt)).all()
+  const runs = rows.map((r) => ({
+    ...r,
+    sourceBreakdown: r.sourceBreakdown ? (() => { try { return JSON.parse(r.sourceBreakdown!) as Record<string, number> } catch { return null } })() : null,
+  }))
   return c.json({ runs })
 })
 
