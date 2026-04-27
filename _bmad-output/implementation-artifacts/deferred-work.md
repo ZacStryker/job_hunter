@@ -408,3 +408,14 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 
 - **Race: archive between query and analysis start** — A job could be archived by the user between the `pendingJobs` SELECT and the `db.update({ analysisStatus: 'analyzing' })` mark. The job would be analyzed even though the user archived it in that window. Pre-existing; not introduced by this change.
 - **Race: concurrent archive during in-flight analysis** — If a user archives a job while it is in `analyzing` state, the final `db.update({ analysisStatus: 'done', ... })` write still succeeds unconditionally. The job stays archived (the write doesn't clear `archived`), but tokens were still spent. Pre-existing.
+
+## Deferred from: code review of 18-1-search-config-ui (2026-04-27)
+
+- **No authentication on `/api/search-configs` endpoints** — Pre-existing single-user localhost design; Epic 24 tracks auth layer. Not introduced by this story.
+- **GET returns disabled rows with no UI toggle** — `enabled` column reserved for future use per dev notes; all current rows are enabled by default. No action needed until a toggle UI is introduced.
+- **No max-length constraints on `query` or `location` fields** — Low risk for single-user tool; harden with `.max()` constraints before multi-user launch.
+- **`Promise.all` over scraper calls — one failure aborts entire discovery run** — Pre-existing behavior from before this story; `Promise.allSettled` would be safer but is not a regression here.
+- **No uniqueness constraint on `(source, query, location)`** — Rapid double-click or concurrent sessions can insert duplicate configs. Minor for single-user; add a UNIQUE index if duplicate scraper calls become a problem.
+- **Migration seed data hard-codes personal search terms** — Required by AC-2 for behavior-unchanged first boot. Will need a strategy when multi-user is introduced (each user should get their own defaults, not shared seeds).
+- **Edit button clickable while `addMutation.isPending`** — Low UX impact; concurrent add + edit state is possible but resolves cleanly via invalidation.
+- **Error messages (save/delete) may be off-screen when table is long** — UX polish; move error rendering to a fixed-position toast or above the table header in a future accessibility pass.

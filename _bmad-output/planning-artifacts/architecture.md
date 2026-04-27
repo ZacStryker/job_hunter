@@ -1,10 +1,12 @@
 ---
 stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
 lastStep: 8
-status: 'complete'
+status: 'extended'
 completedAt: '2026-03-27'
+extendedAt: '2026-04-26'
 inputDocuments:
   - '_bmad-output/planning-artifacts/prd.md'
+  - '_bmad-output/planning-artifacts/sprint-change-proposal-2026-04-26.md'
 workflowType: 'architecture'
 project_name: 'Job Hunt Dashboard'
 user_name: 'Stryker'
@@ -151,12 +153,48 @@ src/
 - **Validation:** Zod schema in `src/shared/schemas.ts` — parses `/ingest` payload, infers TypeScript types used across server and client; single source of truth for the job record shape
 - **Upsert strategy:** SQLite transaction wrapping all rows in a sync batch — if any row fails validation or write, entire batch rolls back; user-owned fields (`applied`, `status`, `status_override`, `cover_letter_sent_at`) excluded from ON CONFLICT UPDATE clause
 
-### Authentication & Security
+#### Multi-Tenancy & Per-User Data Isolation
 
-- **App auth:** None — single user, localhost only
-- **Google Sheets OAuth:** OAuth 2.0 tokens stored in `.env` only (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`); token refresh handled in the Sheets sync service; expired token produces clear error, no silent failure
-- **API binding:** Hono server binds to `127.0.0.1` only — not `0.0.0.0`; not network-accessible
-- **Credentials:** Never logged, never included in API responses, never committed
+**New tables (Epic 24 additions):**
+
+| Table | Key columns |
+|---|---|
+| `users` | `id`, `email`, `password_hash`, `role` (`admin`\|`standard`), `is_active` (boolean), `activation_token` (nullable), `created_at` |
+| `invite_keys` | `id`, `key`, `used_by_user_id` (nullable FK → users), `used_at` (nullable), `created_at` |
+| `user_secrets` | `user_id` (FK → users), `key_name` (e.g. `anthropic_api_key`), `ciphertext`, `updated_at`; unique on `(user_id, key_name)` |
+| `sessions` | `id` (token string, PK), `user_id` (FK → users), `data` (JSON text), `expires_at`, `created_at` |
+
+**Data isolation:**
+- All existing tables (`jobs`, `search_configs`, `email_events`, `cover_letters`) gain a non-nullable `user_id` FK column in a single focused migration (Epic 24, Story 24-5)
+- All DB queries in server routes must include `where(eq(table.userId, userId))` using `ctx.get('userId')` from the session — never accept `user_id` from request body or params
+- Cross-user data access is architecturally impossible once the FK constraint and query scoping are both in place
+
+**Migration strategy:**
+- A bootstrap admin account is created at first deploy using `ADMIN_EMAIL` + `ADMIN_PASSWORD` env vars; these vars are removed from `.env` after the first admin login
+- All existing rows (single-user era data) are assigned `user_id = 1` (the bootstrap admin) in the same migration
+- Migration is idempotent — checks for `user_id` column existence before attempting ALTER TABLE
+
+### Authentication & Session
+
+- **Session-based auth:** httpOnly, Secure cookie; server-side session store in SQLite `sessions` table; session ID is a cryptographically random 32-byte hex token; session data stored as JSON blob
+- **Password hashing:** argon2id — better memory-hardness than bcrypt; use `argon2` npm package (Bun-compatible); params: memory=65536, iterations=3, parallelism=4
+- **Invite-key registration:** new accounts require a valid, unused invite key; keys are single-use, stored in `invite_keys` table, marked consumed on successful registration
+- **Email verification:** account `is_active = false` until activation link is clicked; activation token is a random 32-byte hex stored in `users.activation_token`; token expires 48 hours after registration
+- **Auth middleware (`auth-middleware.ts`):** applied to all `/api/*` routes; reads session cookie → validates against `sessions` table → sets `ctx.set('userId', session.userId)`; returns `401` on missing, invalid, or expired session
+- **Admin middleware (`admin-middleware.ts`):** applied to all `/api/admin/*` routes; reads `users.role` for the session's `userId`; returns `403` if role is not `admin`
+- **CSRF protection:** all state-mutating `POST`/`PATCH`/`DELETE` routes require an `x-csrf-token` header matching the double-submit value stored in the session; exempt routes: `POST /auth/login`, `POST /auth/register`, `GET /auth/activate` (public or safe by design)
+- **API binding:** production: `0.0.0.0` (Nginx terminates TLS; app port never exposed directly); development: `127.0.0.1`
+- **Google Sheets OAuth:** OAuth tokens stored per-user in `user_secrets` table, encrypted at rest (see Encryption at Rest below); token refresh handled in Sheets sync service; expired token produces clear error, no silent failure
+- **Credentials:** never logged, never included in API responses, never committed; per-user secrets returned as presence flags only — `{ hasAnthropicKey: true }` — never raw values
+
+### Encryption at Rest
+
+- **Scheme:** AES-256-GCM — authenticated encryption providing both confidentiality and integrity; auth tag prevents silent ciphertext tampering
+- **Scope:** all per-user secrets stored in the `user_secrets` table: `anthropic_api_key`, `imap_host`, `imap_user`, `imap_pass`, `google_refresh_token`
+- **Key source:** `ENCRYPTION_KEY` env var — 32-byte hex string (256 bits); generate with `openssl rand -hex 32`; never derived per-user; never stored in DB
+- **IV handling:** random 12-byte IV generated fresh per encryption call; stored alongside ciphertext as a single `hex_iv:hex_ciphertext:hex_authTag` string in one column; IV is never reused
+- **Encryption module:** `src/server/lib/crypto.ts` — exports `encrypt(plaintext: string): string` and `decrypt(ciphertext: string): string`; all reads/writes to `user_secrets` must go through this module; no inline crypto calls anywhere else in the codebase
+- **Key rotation:** not in scope for MVP; if needed post-MVP, a migration script re-encrypts all `user_secrets` rows with the new key at deploy time
 
 ### API & Communication Patterns
 
@@ -168,6 +206,24 @@ src/
   - `POST /api/ingest` — accepts `Job[]`, runs transactional upsert, returns sync result
   - `POST /api/sync` — triggers Sheets OAuth fetch → maps columns → calls ingest logic; returns sync result or error
   - `PATCH /api/jobs/:id` — updates user-owned fields only (`applied`, `status`, `status_override`)
+
+**Auth & Onboarding Routes (public — no auth middleware):**
+  - `POST /auth/register` — validate invite key + create inactive `users` row + send activation email
+  - `GET /auth/activate?token=` — validate activation token → set `is_active = true` → redirect to login
+  - `POST /auth/login` — validate credentials → create `sessions` row → set httpOnly Secure cookie
+  - `POST /auth/logout` — delete `sessions` row → clear cookie
+  - `POST /auth/reset-request` — admin-initiated: generate reset token + send email to user; invalidates user's current sessions
+  - `POST /auth/reset` — validate reset token → update `password_hash` → delete all sessions for that user
+
+**Admin Routes (require `role === 'admin'`):**
+  - `GET /api/admin/users` — returns `[{ id, email, role, isActive, createdAt }]`; never includes secrets or password hashes
+  - `PATCH /api/admin/users/:id` — update `email`, `role`, `isActive`; cannot demote own admin account
+  - `POST /api/admin/impersonate/:id` — overwrite session `userId` to target user; store original admin ID in session as `impersonatingAs` for de-impersonation
+
+**Onboarding Routes (require auth; app redirects to onboarding if incomplete):**
+  - `GET /api/onboarding/status` — returns `{ hasAnthropicKey: boolean, hasImapConfig: boolean }`
+  - `PUT /api/onboarding/anthropic` — encrypt + store `anthropic_api_key`; run a test call to Anthropic to verify the key before saving
+  - `PUT /api/onboarding/imap` — encrypt + store IMAP credentials; run IMAP NOOP to verify connectivity before saving; IMAP step is skippable
 - **Static serving:** Hono serves `dist/` in production; `@hono/vite-dev-server` proxies to Vite in dev
 
 ### Frontend Architecture
@@ -183,10 +239,51 @@ src/
 ### Infrastructure & Deployment
 
 - **Runtime:** Bun 1.3.x — single binary, no Node.js required
-- **Production:** `bun start` — single process, single port; Hono serves API + static bundle
-- **Development:** `bun run dev` — concurrent processes via `bun run --bun concurrently`; Vite dev server on :5173, Hono API on :3001; `@hono/vite-dev-server` proxies `/api/*` from Vite to Hono
+- **Development:** `bun run dev` — concurrent processes via `bun run --bun concurrently`; Vite dev server on :5173, Hono API on :3001; `@hono/vite-dev-server` proxies `/api/*` from Vite to Hono; binds to `127.0.0.1`
+- **Local production:** `bun start` — single process, single port; Hono serves API + static bundle
 - **Config:** All configuration via `.env`; `.env.example` committed with all required keys documented; app fails fast with clear error on missing required env vars
-- **No CI/CD, no containerization, no cloud deployment** — localhost personal tool
+
+#### Production Deployment (Linode)
+
+- **Target:** Linode VPS, Ubuntu 24.04 LTS
+- **Container strategy:** Docker Compose — single `app` service; SQLite volume-mounted at `/data/jobs.db`; no separate DB container
+- **Reverse proxy:** Nginx — TLS termination via Let's Encrypt (Certbot); HTTP → HTTPS redirect; proxies all traffic to `localhost:3000`; sets `Upgrade` header for future SSE/WebSocket compatibility
+- **Restart policy:** `unless-stopped` on the app service
+- **Backups:** daily SQLite `.backup` to Linode Object Storage; 30-day retention
+
+**Dockerfile:**
+```dockerfile
+FROM oven/bun:1.3-alpine
+WORKDIR /app
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
+COPY . .
+RUN bun run build
+CMD ["bun", "start"]
+```
+
+**docker-compose.yml:**
+```yaml
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - sqlite_data:/data
+    env_file: .env
+volumes:
+  sqlite_data:
+```
+
+**First-deploy sequence:**
+1. Provision Linode; install Docker, Nginx, Certbot
+2. Clone repo; populate `.env` (including `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `ENCRYPTION_KEY`, `SMTP_*`, `APP_URL`)
+3. `docker compose up --build -d`
+4. Run Certbot to issue TLS cert and configure Nginx
+5. Verify activation email flow end-to-end before sending any invite keys
+6. Remove `ADMIN_EMAIL`/`ADMIN_PASSWORD` from `.env` after first admin login; `docker compose up -d --force-recreate`
 
 ### Decision Impact Analysis
 
@@ -318,13 +415,21 @@ src/
 - Return `{ error: string }` (not `{ message: string }` or `{ error: { message } }`) from all error responses
 - Store dates as ISO strings — never transform to Date objects before storing in DB or sending in API response
 - Use `snake_case` for all Drizzle column definitions; use `camelCase` for all API JSON fields
+- Read `userId` from `ctx.get('userId')` — never from request body, query params, or headers
+- Scope all DB queries against user-owned tables with `where(eq(table.userId, userId))` — no unscoped cross-user reads
+- Return presence flags for per-user secrets — `{ hasAnthropicKey: boolean }` — never return raw or encrypted secret values
+- Call `encrypt()` / `decrypt()` from `src/server/lib/crypto.ts` for all `user_secrets` reads and writes
 
 **Anti-Patterns (forbidden):**
 - ❌ `queryClient.setQueryData` without a corresponding invalidation strategy documented
 - ❌ Defining job field types inline in a component — always import from `shared/schemas.ts`
 - ❌ `fetch('/api/jobs')` directly in a component — always use a hook from `src/client/hooks/`
 - ❌ `console.log` for errors — use `console.error` on server; surface to UI via TanStack Query error state on client
-- ❌ Binding Hono server to `0.0.0.0` — always `127.0.0.1`
+- ❌ Binding Hono to `0.0.0.0` in development — `127.0.0.1` in dev; `0.0.0.0` is for production Docker only (behind Nginx)
+- ❌ Accepting `userId` from client input (`req.body.userId`, query param, URL param) — always read from session
+- ❌ Storing plaintext in `user_secrets` — always call `encrypt()` before any write to that table
+- ❌ Returning decrypted secret values or raw ciphertext in any API response
+- ❌ Omitting `where(eq(table.userId, userId))` on any query against a user-scoped table (`jobs`, `search_configs`, `email_events`, `cover_letters`, `user_secrets`)
 
 ## Project Structure & Boundaries
 
@@ -350,20 +455,29 @@ job-hunt-dashboard/
 │   │   └── schemas.ts                # Zod schemas + inferred TS types (Job, IngestPayload, SyncResult)
 │   ├── db/
 │   │   ├── client.ts                 # Drizzle client singleton (reads DB_PATH from env)
-│   │   ├── schema.ts                 # Drizzle table: jobs (annotated: Sheets-owned vs user-owned)
+│   │   ├── schema.ts                 # Drizzle tables: jobs, users, invite_keys, user_secrets, sessions (+ all data tables)
 │   │   ├── migrate.ts                # Boot migration runner — called from src/index.ts on startup
 │   │   └── migrations/               # Drizzle Kit generated SQL — committed to repo
-│   │       └── 0001_initial.sql
+│   │       ├── 0001_initial.sql
+│   │       └── 0002_multi_tenancy.sql  # Adds users/sessions/invite_keys/user_secrets; user_id FK on data tables
 │   ├── server/
 │   │   ├── routes/
 │   │   │   ├── api-jobs.ts           # GET /api/jobs, PATCH /api/jobs/:id
 │   │   │   ├── api-ingest.ts         # POST /api/ingest — Zod parse → transactional upsert
-│   │   │   └── api-sync.ts           # POST /api/sync — triggers sheets-sync → calls ingest logic
+│   │   │   ├── api-sync.ts           # POST /api/sync — triggers sheets-sync → calls ingest logic
+│   │   │   ├── api-auth.ts           # POST /auth/register|login|logout|reset-request|reset, GET /auth/activate
+│   │   │   ├── api-admin.ts          # GET/PATCH /api/admin/users, POST /api/admin/impersonate/:id
+│   │   │   └── api-onboarding.ts     # GET /api/onboarding/status, PUT /api/onboarding/anthropic|imap
 │   │   ├── services/
 │   │   │   ├── sheets-sync.ts        # Google Sheets API v4 fetch + column-to-schema mapping
 │   │   │   └── oauth-client.ts       # OAuth 2.0 token refresh; throws on expiry with clear message
+│   │   ├── lib/
+│   │   │   ├── crypto.ts             # encrypt()/decrypt() — AES-256-GCM; reads ENCRYPTION_KEY from env
+│   │   │   └── mailer.ts             # SMTP send via nodemailer; used for activation + password reset emails
 │   │   └── middleware/
-│   │       └── error-handler.ts      # Global Hono error middleware → { error: string } + HTTP status
+│   │       ├── error-handler.ts      # Global Hono error middleware → { error: string } + HTTP status
+│   │       ├── auth-middleware.ts    # Session validation → ctx.set('userId', id); returns 401 if no valid session
+│   │       └── admin-middleware.ts   # Role check → returns 403 if session user is not admin
 │   └── client/
 │       ├── main.tsx                  # React entry: QueryClientProvider → RouterProvider
 │       ├── index.css                 # Tailwind base + shadcn CSS variables
@@ -505,15 +619,35 @@ Pipeline/Tracker components
 ```
 PORT=3000
 DB_PATH=./data/jobs.db
+
+# Google OAuth (global client credentials; per-user tokens stored encrypted in user_secrets)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_REFRESH_TOKEN=
 GOOGLE_SPREADSHEET_ID=
+
+# Session & encryption (generate with: openssl rand -hex 64 / openssl rand -hex 32)
+SESSION_SECRET=
+ENCRYPTION_KEY=
+
+# Application URL (used in activation and password-reset email links)
+APP_URL=
+
+# SMTP (for activation and password reset emails)
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=
+
+# First-deploy bootstrap only — remove from .env after initial admin login
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
+
+# Optional: comma-separated invite keys to auto-create on boot
+INVITE_KEY_SEED=
+
 # Post-MVP
 # N8N_WEBHOOK_SECRET=
-# IMAP_HOST=
-# IMAP_USER=
-# IMAP_PASS=
 ```
 
 ## Architecture Validation Results

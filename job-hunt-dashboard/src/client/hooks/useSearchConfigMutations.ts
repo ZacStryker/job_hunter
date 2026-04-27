@@ -1,6 +1,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { SearchConfig, SearchConfigInput } from '@shared/schemas'
 
+async function extractError(res: Response): Promise<string> {
+  try {
+    const body = await res.json() as { error?: string }
+    return body.error ?? res.statusText
+  } catch {
+    return res.statusText
+  }
+}
+
 export function useAddSearchConfigMutation() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -10,10 +19,7 @@ export function useAddSearchConfigMutation() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       })
-      if (!res.ok) {
-        const err = await res.json() as { error: string }
-        throw new Error(err.error)
-      }
+      if (!res.ok) throw new Error(await extractError(res))
       return res.json() as Promise<SearchConfig>
     },
     onSuccess: () => {
@@ -31,10 +37,7 @@ export function useUpdateSearchConfigMutation() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       })
-      if (!res.ok) {
-        const err = await res.json() as { error: string }
-        throw new Error(err.error)
-      }
+      if (!res.ok) throw new Error(await extractError(res))
       return res.json() as Promise<SearchConfig>
     },
     onSuccess: () => {
@@ -48,10 +51,7 @@ export function useDeleteSearchConfigMutation() {
   return useMutation({
     mutationFn: async (id: number): Promise<{ id: number }> => {
       const res = await fetch(`/api/search-configs/${id}`, { method: 'DELETE' })
-      if (!res.ok) {
-        const err = await res.json() as { error: string }
-        throw new Error(err.error)
-      }
+      if (!res.ok) throw new Error(await extractError(res))
       return res.json() as Promise<{ id: number }>
     },
     onSuccess: () => {

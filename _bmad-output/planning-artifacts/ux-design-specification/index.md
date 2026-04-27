@@ -78,3 +78,27 @@
     - [Browser Strategy](./responsive-design-accessibility.md#browser-strategy)
     - [Accessibility Strategy](./responsive-design-accessibility.md#accessibility-strategy)
     - [Implementation Guidelines](./responsive-design-accessibility.md#implementation-guidelines)
+
+---
+
+## Epics 24–26 Extension — Auth, Onboarding & Admin
+
+- [Auth, Onboarding & Admin UX](./auth-onboarding-admin-ux.md)
+  - [Executive Summary](./auth-onboarding-admin-ux.md#executive-summary)
+  - [Core User Experience](./auth-onboarding-admin-ux.md#core-user-experience)
+  - [Desired Emotional Response](./auth-onboarding-admin-ux.md#desired-emotional-response)
+  - [UX Pattern Analysis & Inspiration](./auth-onboarding-admin-ux.md#ux-pattern-analysis--inspiration-new-surfaces)
+  - [Design System Foundation (Additions)](./auth-onboarding-admin-ux.md#design-system-foundation-additions)
+  - [Visual Design Foundation (Additions)](./auth-onboarding-admin-ux.md#visual-design-foundation-additions)
+  - [Design Direction: A — Minimal Centered](./auth-onboarding-admin-ux.md#design-direction-decision)
+  - [User Journey Flows](./auth-onboarding-admin-ux.md#user-journey-flows)
+    - [Journey 4: First-Time User Setup](./auth-onboarding-admin-ux.md#journey-4-first-time-user-setup)
+    - [Journey 5: Login](./auth-onboarding-admin-ux.md#journey-5-login-returning-user)
+    - [Journey 6: Admin User Management](./auth-onboarding-admin-ux.md#journey-6-admin-user-management)
+  - [Component Strategy](./auth-onboarding-admin-ux.md#component-strategy)
+    - [StepIndicator](./auth-onboarding-admin-ux.md#stepindicator)
+    - [ConnectionTestButton](./auth-onboarding-admin-ux.md#connectiontestbutton)
+    - [ImpersonationBanner](./auth-onboarding-admin-ux.md#impersonationbanner)
+    - [AuthFormCard](./auth-onboarding-admin-ux.md#authformcard)
+  - [UX Consistency Patterns](./auth-onboarding-admin-ux.md#ux-consistency-patterns-new-surfaces)
+  - [Responsive Design & Accessibility](./auth-onboarding-admin-ux.md#responsive-design--accessibility)

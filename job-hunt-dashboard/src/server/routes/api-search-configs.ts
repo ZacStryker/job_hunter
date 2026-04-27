@@ -56,8 +56,8 @@ app.put('/:id', async (c) => {
 })
 
 app.delete('/:id', (c) => {
-  const rawId = parseInt(c.req.param('id'), 10)
-  if (isNaN(rawId)) {
+  const rawId = Number(c.req.param('id'))
+  if (!Number.isInteger(rawId) || rawId <= 0) {
     return c.json({ error: 'Invalid id' }, 400)
   }
   const result = db.delete(searchConfigs).where(eq(searchConfigs.id, rawId)).returning({ id: searchConfigs.id }).get()

@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UX Design Directions — Auth, Onboarding & Admin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          zinc: {
+            950: '#09090b',
+          }
+        }
+      }
+    }
+  }
+</script>
+<style>
+  body { background: #09090b; color: #f4f4f5; font-family: Inter, system-ui, -apple-system, sans-serif; }
+  .section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: #71717a; }
+  .direction-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .mockup-frame { border: 1px solid #3f3f46; border-radius: 8px; overflow: hidden; background: #09090b; }
+  .screen-label { font-size: 11px; color: #71717a; padding: 6px 12px; border-bottom: 1px solid #27272a; background: #18181b; }
+  .tab-btn { padding: 6px 16px; font-size: 12px; font-weight: 500; border-radius: 4px; cursor: pointer; transition: background 0.15s; }
+  .tab-btn.active { background: #27272a; color: #f4f4f5; }
+  .tab-btn:not(.active) { color: #71717a; }
+  .test-btn-idle { background: transparent; border: 1px solid #3f3f46; color: #a1a1aa; }
+  .test-btn-pass { background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; color: #10b981; }
+  .test-btn-fail { background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #ef4444; }
+  .step-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+  .step-dot.done { background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #10b981; }
+  .step-dot.active { background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; color: #3b82f6; }
+  .step-dot.pending { background: transparent; border: 1px solid #3f3f46; color: #71717a; }
+  .step-line { flex: 1; height: 1px; background: #27272a; margin: 0 4px; }
+  .step-line.done { background: #10b981; }
+</style>
+</head>
+<body class="min-h-screen p-8">
+
+<!-- Header -->
+<div class="max-w-7xl mx-auto mb-12">
+  <h1 class="text-xl font-semibold text-zinc-100 mb-1">Design Direction Exploration</h1>
+  <p class="text-sm text-zinc-400">Auth, Onboarding & Admin — Job Hunt Dashboard · 4 directions across 4 screens</p>
+  <div class="mt-4 flex gap-3">
+    <span class="direction-tag bg-zinc-800 text-zinc-300">A — Minimal Centered</span>
+    <span class="direction-tag bg-blue-950 text-blue-300">B — Contextual Frame</span>
+    <span class="direction-tag bg-violet-950 text-violet-300">C — Split Flow</span>
+    <span class="direction-tag bg-amber-950 text-amber-300">D — Progress Forward</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SCREEN 1: LANDING PAGE -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="max-w-7xl mx-auto mb-16">
+  <div class="section-label mb-4">Screen 1 — Landing Page</div>
+  <div class="grid grid-cols-2 gap-6 xl:grid-cols-4">
+
+    <!-- A: Minimal -->
+    <div class="mockup-frame">
+      <div class="screen-label flex items-center justify-between">
+        <span>Landing</span>
+        <span class="direction-tag bg-zinc-800 text-zinc-300 text-[10px]">A</span>
+      </div>
+      <div class="flex flex-col items-center justify-center p-8 min-h-64" style="background:#09090b">
+        <p class="text-zinc-500 text-xs mb-6 text-center">Job Hunt Dashboard</p>
+        <button class="w-full max-w-xs bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2.5 px-4 rounded-md">
+          Register with Invite Key
+        </button>
+        <a href="#" class="text-xs text-zinc-500 mt-4 hover:text-zinc-300">Already have an account? Sign in</a>
+      </div>
+    </div>
+
+    <!-- B: Contextual Frame -->
+    <div class="mockup-frame">
+      <div class="screen-label flex items-center justify-between">
+        <span>Landing</span>
+        <span class="direction-tag bg-blue-950 text-blue-300 text-[10px]">B</span>
+      </div>
+      <div class="flex flex-col items-center justify-center p-6 min-h-64" style="background:#09090b">
+        <div class="text-center mb-6">
+          <h2 class="text-base font-semibold text-zinc-100">Job Hunt Dashboard</h2>
+          <p class="text-xs text-zinc-400 mt-1">Track applications. Triage with AI. Stay in control.</p>
+        </div>
+        <div class="w-full max-w-xs rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+          <button class="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2.5 px-4 rounded-md">
+            Register with Invite Key
+          </button>
+          <div class="relative my-3">
+            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-zinc-700"></div></div>
+            <div class="relative flex justify-center"><span class="bg-zinc-900 px-2 text-xs text-zinc-500">or</span></div>
+          </div>
+          <button class="w-full border border-zinc-700 text-zinc-300 text-sm font-medium py-2 px-4 rounded-md hover:bg-zinc-800">
+            Sign In
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- C: Split Flow -->
+    <div class="mockup-frame">
+      <div class="screen-label flex items-center justify-between">
+        <span>Landing</span>
+        <span class="direction-tag bg-violet-950 text-violet-300 text-[10px]">C</span>
+      </div>
+      <div class="flex min-h-64" style="background:#09090b">
+        <div class="flex-1 flex flex-col justify-center p-5 border-r border-zinc-800">
+          <h2 class="text-sm font-semibold text-zinc-100 mb-2">Job Hunt Dashboard</h2>
+          <ul class="space-y-1.5">
+            <li class="flex items-center gap-2 text-xs text-zinc-400">
+              <span class="w-1 h-1 rounded-full bg-emerald-500 flex-shrink-0"></span>AI-scored job pipeline
+            </li>
+            <li class="flex items-center gap-2 text-xs text-zinc-400">
+              <span class="w-1 h-1 rounded-full bg-emerald-500 flex-shrink-0"></span>Email monitoring
+            </li>
+            <li class="flex items-center gap-2 text-xs text-zinc-400">
+              <span class="w-1 h-1 rounded-full bg-emerald-500 flex-shrink-0"></span>Invite-only access
+            </li>
+          </ul>
+        </div>
+        <div class="flex-1 flex flex-col justify-center p-5">
+          <p class="text-xs text-zinc-500 mb-3">You were invited.</p>
+          <button class="w-full bg-blue-600 text-white text-xs font-medium py-2 px-3 rounded-md mb-2">
+            Register with Invite Key
+          </button>
+          <button class="w-full border border-zinc-700 text-zinc-400 text-xs font-medium py-2 px-3 rounded-md">
+            Sign In
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- D: Progress Forward -->
+    <div class="mockup-frame">
+      <div class="screen-label flex items-center justify-between">
+        <span>Landing</span>
+        <span class="direction-tag bg-amber-950 text-amber-300 text-[10px]">D</span>
+      </div>
+      <div class="flex flex-col items-center justify-center p-6 min-h-64" style="background:#09090b">
+        <div class="w-full max-w-xs">
+          <div class="flex items-center gap-2 mb-6">
+            <div class="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-white text-xs font-bold">J</div>
+            <span class="text-sm font-semibold text-zinc-100">Job Hunt Dashboard</span>
+          </div>
+          <p class="text-xs text-zinc-400 mb-5">Invite-only. If you have a key, you're in.</p>
+          <button class="w-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2.5 px-4 rounded-md mb-3">
+            Register →
+          </button>
+          <button class="w-full text-zinc-400 text-sm py-2 hover:text-zinc-200">
+            Sign In
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SCREEN 2: REGISTRATION FORM -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="max-w-7xl mx-auto mb-16">
+  <div class="section-label mb-4">Screen 2 — Registration Form</div>
+  <div class="grid grid-cols-2 gap-6 xl:grid-cols-4">
+
+    <!-- A -->
+    <div class="mockup-frame">
+      <div class="screen-label flex items-center justify-between">
+        <span>Register</span>
+        <span class="direction-tag bg-zinc-800 text-zinc-300 text-[10px]">A</span>
+      </div>
+      <div class="flex items-center justify-center p-6 min-h-80" style="background:#09090b">
+        <div class="w-full max-w-xs rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+          <h2 class="text-sm font-semibold text-zinc-100 mb-5">Create account</h2>
+          <div class="space-y-3">
+            <div>
+              <label class="text-xs text-zinc-400 block mb-1">Invite key</label>
+              <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-100 font-mono" placeholder="XXXX-XXXX-XXXX" />
+            </div>
+            <div>
+              <label class="text-xs text-zinc-400 block mb-1">Email</label>
+              <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-300" placeholder="you@example.com" />
+            </div>
+            <div>
+              <label class="text-xs text-zinc-400 block mb-1">Password</label>
+              <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-300" placeholder="••••••••" type="password" />
+            </div>
+          </div>
+          <button class="w-full mt-5 bg-blue-600 text-white text-xs font-medium py-2.5 rounded-md">Create account</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- B -->
+    <div class="mockup-frame">
+      <div class="screen-label flex items-center justify-between">
+        <span>Register</span>
+        <span class="direction-tag bg-blue-950 text-blue-300 text-[10px]">B</span>
+      </div>
+      <div class="flex flex-col items-center justify-center p-6 min-h-80" style="background:#09090b">
+        <p class="text-xs text-zinc-500 mb-4">Job Hunt Dashboard</p>
+        <div class="w-full max-w-xs rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+          <h2 class="text-sm font-semibold text-zinc-100 mb-1">Create account</h2>
+          <p class="text-xs text-zinc-500 mb-5">You'll receive an activation email after registering.</p>
+          <div class="space-y-3">
+            <div class="flex gap-2 items-center bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2">
+              <span class="text-xs text-zinc-500 font-mono">KEY</span>
+              <div class="w-px h-3 bg-zinc-600"></div>
+              <input class="flex-1 bg-transparent text-xs text-zinc-100 font-mono outline-none" placeholder="XXXX-XXXX-XXXX" />
+            </div>
+            <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-300 outline-none" placeholder="Email address" />
+            <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-300 outline-none" placeholder="Password" type="password" />
+          </div>
+          <button class="w-full mt-5 bg-blue-600 text-white text-xs font-medium py-2.5 rounded-md">Create account</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- C -->
+    <div class="mockup-frame">
+      <div class="screen-label flex items-center justify-between">
+        <span>Register</span>
+        <span class="direction-tag bg-violet-950 text-violet-300 text-[10px]">C</span>
+      </div>
+      <div class="flex items-center justify-center p-6 min-h-80" style="background:#09090b">
+        <div class="w-full max-w-xs">
+          <a href="#" class="text-xs text-zinc-500 mb-4 flex items-center gap-1 hover:text-zinc-300">← Back</a>
+          <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+            <h2 class="text-sm font-semibold text-zinc-100 mb-5">You were invited.</h2>
+            <div class="space-y-3">
+              <div>
+                <label class="text-[10px] font-medium uppercase tracking-wide text-zinc-500 block mb-1">Invite Key</label>
+                <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-100 font-mono outline-none" placeholder="XXXX-XXXX-XXXX" />
+              </div>
+              <div>
+                <label class="text-[10px] font-medium uppercase tracking-wide text-zinc-500 block mb-1">Email</label>
+                <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-300 outline-none" placeholder="you@example.com" />
+              </div>
+              <div>
+                <label class="text-[10px] font-medium uppercase tracking-wide text-zinc-500 block mb-1">Password</label>
+                <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-300 outline-none" placeholder="Min 8 characters" type="password" />
+              </div>
+            </div>
+            <button class="w-full mt-5 bg-blue-600 text-white text-xs font-medium py-2.5 rounded-md">Register →</button>
+            <p class="text-center text-xs text-zinc-600 mt-3">Already have an account? <a href="#" class="text-zinc-400">Sign in</a></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- D -->
+    <div class="mockup-frame">
+      <div class="screen-label flex items-center justify-between">
+        <span>Register</span>
+        <span class="direction-tag bg-amber-950 text-amber-300 text-[10px]">D</span>
+      </div>
+      <div class="flex items-center justify-center p-6 min-h-80" style="background:#09090b">
+        <div class="w-full max-w-xs rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+          <div class="flex items-center gap-2 mb-5">
+            <div class="w-5 h-5 rounded bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">J</div>
+            <span class="text-xs font-semibold text-zinc-300">Job Hunt Dashboard</span>
+          </div>
+          <h2 class="text-base font-semibold text-zinc-100 mb-4">Create your account</h2>
+          <div class="space-y-3">
+            <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-100 font-mono outline-none" placeholder="Invite key: XXXX-XXXX-XXXX" />
+            <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-300 outline-none" placeholder="Email address" />
+            <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-300 outline-none" placeholder="Password" type="password" />
+          </div>
+          <button class="w-full mt-5 bg-blue-600 text-white text-sm font-medium py-2.5 rounded-md">Create account</button>
+          <p class="text-center text-xs text-zinc-600 mt-3"><a href="#" class="text-zinc-400 hover:text-zinc-200">Sign in instead</a></p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SCREEN 3: ONBOARDING — API KEY STEP (the key moment) -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="max-w-7xl mx-auto mb-16">
+  <div class="section-label mb-1">Screen 3 — Onboarding: API Key Step</div>
+  <p class="text-xs text-zinc-600 mb-4">The defining experience — this screen is shown in pass state (green) and fail state (red) per direction.</p>
+  <div class="grid grid-cols-2 gap-6 xl:grid-cols-4">
+
+    <!-- A: Minimal, dot step indicator -->
+    <div class="mockup-frame">
+      <div class="screen-label flex items-center justify-between">
+        <span>Onboarding · Step 2</span>
+        <span class="direction-tag bg-zinc-800 text-zinc-300 text-[10px]">A</span>
+      </div>
+      <div class="flex items-center justify-center p-6 min-h-96" style="background:#09090b">
+        <div class="w-full max-w-sm rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+          <!-- Dot step indicator -->
+          <div class="flex items-center justify-center gap-2 mb-6">
+            <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+            <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+            <div class="w-2 h-2 rounded-full bg-zinc-700"></div>
+            <div class="w-2 h-2 rounded-full bg-zinc-700"></div>
+          </div>
+          <h2 class="text-sm font-semibold text-zinc-100 mb-1">Anthropic API Key</h2>
+          <p class="text-xs text-zinc-400 mb-5">Used for AI scoring. Your key is encrypted and never shared.</p>
+          <label class="text-xs text-zinc-400 block mb-1.5">API Key</label>
+          <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-100 font-mono mb-3 outline-none" placeholder="sk-ant-api03-..." />
+          <!-- Pass state -->
+          <div class="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/30 border border-emerald-900 rounded-md px-3 py-2 mb-4">
+            <span>✓</span><span>Connection successful</span>
+          </div>
+          <div class="flex gap-2">
+            <button class="flex-1 border border-zinc-700 text-zinc-400 text-xs py-2 rounded-md">Back</button>
+            <button class="flex-1 bg-blue-600 text-white text-xs font-medium py-2 rounded-md">Continue →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B: Numbered step bar -->
+    <div class="mockup-frame">
+      <div class="screen-label flex items-center justify-between">
+        <span>Onboarding · Step 2</span>
+        <span class="direction-tag bg-blue-950 text-blue-300 text-[10px]">B</span>
+      </div>
+      <div class="flex items-center justify-center p-6 min-h-96" style="background:#09090b">
+        <div class="w-full max-w-sm rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+          <!-- Numbered step bar -->
+          <div class="flex items-center mb-6">
+            <div class="step-dot done text-xs">✓</div>
+            <div class="step-line done"></div>
+            <div class="step-dot active">2</div>
+            <div class="step-line"></div>
+            <div class="step-dot pending">3</div>
+            <div class="step-line"></div>
+            <div class="step-dot pending">4</div>
+          </div>
+          <h2 class="text-sm font-semibold text-zinc-100 mb-1">Connect Anthropic</h2>
+          <p class="text-xs text-zinc-400 mb-4">Step 2 of 4 — Used for AI analysis of job fit.</p>
+          <label class="text-[10px] font-medium uppercase tracking-wide text-zinc-500 block mb-1.5">API Key</label>
+          <div class="flex gap-2 mb-3">
+            <input class="flex-1 bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-100 font-mono outline-none" placeholder="sk-ant-..." />
+            <button class="test-btn-pass px-3 py-2 rounded-md text-xs font-medium flex items-center gap-1">✓ Pass</button>
+          </div>
+          <p class="text-xs text-zinc-500 mb-5">Get your key at console.anthropic.com</p>
+          <div class="flex gap-2">
+            <button class="border border-zinc-700 text-zinc-400 text-xs py-2 px-4 rounded-md">Back</button>
+            <button class="flex-1 bg-blue-600 text-white text-xs font-medium py-2 rounded-md">Continue →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- C: Two-pane with sidebar -->
+    <div class="mockup-frame">
+      <div class="screen-label flex items-center justify-between">
+        <span>Onboarding · Step 2</span>
+        <span class="direction-tag bg-violet-950 text-violet-300 text-[10px]">C</span>
+      </div>
+      <div class="min-h-96" style="background:#09090b">
+        <div class="flex h-full">
+          <!-- Left sidebar -->
+          <div class="w-36 border-r border-zinc-800 bg-zinc-900/50 p-4 flex-shrink-0">
+            <p class="text-[10px] text-zinc-500 mb-3 uppercase tracking-wide">Setup</p>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2 text-xs text-emerald-400">
+                <span class="text-[10px]">✓</span><span>Welcome</span>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-blue-300 font-medium">
+                <div class="w-1.5 h-1.5 rounded-full bg-blue-400"></div><span>API Key</span>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-zinc-500">
+                <div class="w-1.5 h-1.5 rounded-full bg-zinc-600"></div><span>IMAP</span>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-zinc-500">
+                <div class="w-1.5 h-1.5 rounded-full bg-zinc-600"></div><span>Done</span>
+              </div>
+            </div>
+          </div>
+          <!-- Right content -->
+          <div class="flex-1 p-5">
+            <h2 class="text-sm font-semibold text-zinc-100 mb-1">Anthropic API Key</h2>
+            <p class="text-xs text-zinc-400 mb-4">Encrypted at rest. Never returned to client.</p>
+            <label class="text-[10px] font-medium uppercase tracking-wide text-zinc-500 block mb-1.5">API Key</label>
+            <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-100 font-mono mb-2 outline-none" placeholder="sk-ant-api03-..." />
+            <!-- Fail state -->
+            <div class="flex items-center gap-2 text-xs text-red-400 bg-red-950/30 border border-red-900 rounded-md px-3 py-2 mb-4">
+              <span>✗</span><span>Invalid key — check console.anthropic.com</span>
+            </div>
+            <div class="flex gap-2">
+              <button class="test-btn-idle px-3 py-1.5 rounded-md text-xs font-medium">Test again</button>
+              <button class="flex-1 bg-blue-600 text-white text-xs font-medium py-1.5 rounded-md opacity-50 cursor-not-allowed">Continue</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- D: Top progress bar -->
+    <div class="mockup-frame">
+      <div class="screen-label flex items-center justify-between">
+        <span>Onboarding · Step 2</span>
+        <span class="direction-tag bg-amber-950 text-amber-300 text-[10px]">D</span>
+      </div>
+      <div class="min-h-96" style="background:#09090b">
+        <!-- Progress bar at top -->
+        <div class="px-4 pt-4 pb-3 border-b border-zinc-800">
+          <div class="flex justify-between text-[10px] text-zinc-500 mb-1.5">
+            <span>Step 2 of 4</span><span>50% complete</span>
+          </div>
+          <div class="w-full bg-zinc-800 rounded-full h-1">
+            <div class="bg-blue-500 h-1 rounded-full" style="width:50%"></div>
+          </div>
+          <div class="flex justify-between mt-1.5 text-[9px] text-zinc-600">
+            <span>Welcome</span><span class="text-blue-400">API Key</span><span>IMAP</span><span>Done</span>
+          </div>
+        </div>
+        <div class="p-5">
+          <h2 class="text-sm font-semibold text-zinc-100 mb-1">Anthropic API Key</h2>
+          <p class="text-xs text-zinc-400 mb-4">Enables AI-powered job scoring for your pipeline.</p>
+          <label class="text-[10px] font-medium uppercase tracking-wide text-zinc-500 block mb-1.5">API Key</label>
+          <input class="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-xs text-zinc-100 font-mono mb-2 outline-none" placeholder="sk-ant-api03-..." />
+          <div class="flex gap-2 mb-4">
+            <button class="test-btn-idle px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5">
+              <span class="inline-block w-2 h-2 border border-current rounded-full opacity-50"></span>Test Connection
+            </button>
+          </div>
+          <div class="flex gap-2 pt-2 border-t border-zinc-800">
+            <button class="border border-zinc-700 text-zinc-400 text-xs py-2 px-4 rounded-md">← Back</button>
+            <button class="flex-1 bg-blue-600 text-white text-xs font-medium py-2 rounded-md opacity-40">Continue →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SCREEN 4: ADMIN USER TABLE -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="max-w-7xl mx-auto mb-16">
+  <div class="section-label mb-4">Screen 4 — Admin User Table</div>
+  <div class="grid grid-cols-2 gap-6">
+
+    <!-- A + B combined wide view: Minimal (inline actions) -->
+    <div class="mockup-frame col-span-1">
+      <div class="screen-label flex items-center justify-between">
+        <span>Admin · Users</span>
+        <span class="direction-tag bg-zinc-800 text-zinc-300 text-[10px]">A — Minimal actions</span>
+      </div>
+      <div class="p-4" style="background:#09090b">
+        <!-- Impersonation banner -->
+        <div class="rounded-md border border-amber-800 bg-amber-900/40 px-3 py-2 flex items-center justify-between mb-4 text-xs">
+          <span class="text-amber-300 font-medium">Impersonating Jane Smith</span>
+          <button class="text-amber-400 border border-amber-700 rounded px-2 py-0.5 text-[10px] font-medium hover:bg-amber-900">Exit</button>
+        </div>
+        <div class="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="border-b border-zinc-800">
+                <th class="text-left py-2 px-3 text-[10px] font-medium uppercase tracking-wide text-zinc-500">User</th>
+                <th class="text-left py-2 px-3 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Role</th>
+                <th class="text-left py-2 px-3 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Active</th>
+                <th class="text-left py-2 px-3 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                <td class="py-2 px-3">
+                  <div class="font-medium text-zinc-200">Stryker</div>
+                  <div class="text-zinc-500">zacstryker@gmail.com</div>
+                </td>
+                <td class="py-2 px-3"><span class="border border-blue-700 text-blue-400 px-1.5 py-0.5 rounded text-[10px]">Admin</span></td>
+                <td class="py-2 px-3">
+                  <div class="w-8 h-4 bg-emerald-600 rounded-full relative cursor-pointer">
+                    <div class="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div>
+                  </div>
+                </td>
+                <td class="py-2 px-3">
+                  <div class="flex gap-1">
+                    <button class="text-zinc-500 hover:text-zinc-300 text-[10px] px-1.5 py-0.5 rounded border border-zinc-700">Edit</button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                <td class="py-2 px-3">
+                  <div class="font-medium text-zinc-200">Jane Smith</div>
+                  <div class="text-zinc-500">jane@example.com</div>
+                </td>
+                <td class="py-2 px-3"><span class="border border-zinc-600 text-zinc-400 px-1.5 py-0.5 rounded text-[10px]">Standard</span></td>
+                <td class="py-2 px-3">
+                  <div class="w-8 h-4 bg-emerald-600 rounded-full relative cursor-pointer">
+                    <div class="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div>
+                  </div>
+                </td>
+                <td class="py-2 px-3">
+                  <div class="flex gap-1">
+                    <button class="text-zinc-500 hover:text-zinc-300 text-[10px] px-1.5 py-0.5 rounded border border-zinc-700">Edit</button>
+                    <button class="text-zinc-500 hover:text-zinc-300 text-[10px] px-1.5 py-0.5 rounded border border-zinc-700">Reset PW</button>
+                    <button class="text-amber-600 hover:text-amber-400 text-[10px] px-1.5 py-0.5 rounded border border-amber-800">Impersonate</button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="hover:bg-zinc-800/30">
+                <td class="py-2 px-3">
+                  <div class="font-medium text-zinc-400">Bob Chen</div>
+                  <div class="text-zinc-600">bob@example.com</div>
+                </td>
+                <td class="py-2 px-3"><span class="border border-zinc-700 text-zinc-600 px-1.5 py-0.5 rounded text-[10px]">Standard</span></td>
+                <td class="py-2 px-3">
+                  <div class="w-8 h-4 bg-zinc-700 rounded-full relative cursor-pointer">
+                    <div class="absolute left-0.5 top-0.5 w-3 h-3 bg-zinc-400 rounded-full"></div>
+                  </div>
+                </td>
+                <td class="py-2 px-3">
+                  <div class="flex gap-1">
+                    <button class="text-zinc-500 hover:text-zinc-300 text-[10px] px-1.5 py-0.5 rounded border border-zinc-700">Edit</button>
+                    <button class="text-zinc-500 hover:text-zinc-300 text-[10px] px-1.5 py-0.5 rounded border border-zinc-700">Reset PW</button>
+                    <button class="text-amber-700 hover:text-amber-500 text-[10px] px-1.5 py-0.5 rounded border border-amber-900">Impersonate</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- C + D: 3-dot menu + drawer pattern -->
+    <div class="mockup-frame col-span-1">
+      <div class="screen-label flex items-center justify-between">
+        <span>Admin · Users</span>
+        <span class="direction-tag bg-violet-950 text-violet-300 text-[10px]">C/D — Drawer actions</span>
+      </div>
+      <div class="p-4" style="background:#09090b">
+        <!-- No active impersonation — normal state -->
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold text-zinc-100">Users</h3>
+          <span class="text-xs text-zinc-500">3 users</span>
+        </div>
+        <div class="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="border-b border-zinc-800">
+                <th class="text-left py-2 px-3 text-[10px] font-medium uppercase tracking-wide text-zinc-500">User</th>
+                <th class="text-left py-2 px-3 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Role</th>
+                <th class="text-left py-2 px-3 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Active</th>
+                <th class="text-left py-2 px-3 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Last login</th>
+                <th class="py-2 px-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                <td class="py-2 px-3">
+                  <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 rounded-full bg-blue-800 flex items-center justify-center text-[10px] font-semibold text-blue-200">S</div>
+                    <div>
+                      <div class="font-medium text-zinc-200">Stryker</div>
+                      <div class="text-zinc-500 text-[10px]">zacstryker@gmail.com</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-2 px-3"><span class="border border-blue-700 text-blue-400 px-1.5 py-0.5 rounded text-[10px]">Admin</span></td>
+                <td class="py-2 px-3">
+                  <div class="w-8 h-4 bg-emerald-600 rounded-full relative"><div class="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div></div>
+                </td>
+                <td class="py-2 px-3 text-zinc-500 text-[10px]">just now</td>
+                <td class="py-2 px-3 text-right">
+                  <button class="text-zinc-500 hover:text-zinc-300 px-1">···</button>
+                </td>
+              </tr>
+              <tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                <td class="py-2 px-3">
+                  <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 rounded-full bg-violet-800 flex items-center justify-center text-[10px] font-semibold text-violet-200">J</div>
+                    <div>
+                      <div class="font-medium text-zinc-200">Jane Smith</div>
+                      <div class="text-zinc-500 text-[10px]">jane@example.com</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-2 px-3"><span class="border border-zinc-600 text-zinc-400 px-1.5 py-0.5 rounded text-[10px]">Standard</span></td>
+                <td class="py-2 px-3">
+                  <div class="w-8 h-4 bg-emerald-600 rounded-full relative"><div class="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div></div>
+                </td>
+                <td class="py-2 px-3 text-zinc-500 text-[10px]">2h ago</td>
+                <td class="py-2 px-3 text-right">
+                  <button class="text-zinc-500 hover:text-zinc-300 px-1">···</button>
+                </td>
+              </tr>
+              <!-- Row with open context menu -->
+              <tr class="bg-zinc-800/40 relative">
+                <td class="py-2 px-3">
+                  <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center text-[10px] font-semibold text-zinc-300">B</div>
+                    <div>
+                      <div class="font-medium text-zinc-400">Bob Chen</div>
+                      <div class="text-zinc-600 text-[10px]">bob@example.com</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-2 px-3"><span class="border border-zinc-700 text-zinc-600 px-1.5 py-0.5 rounded text-[10px]">Standard</span></td>
+                <td class="py-2 px-3">
+                  <div class="w-8 h-4 bg-zinc-700 rounded-full relative"><div class="absolute left-0.5 top-0.5 w-3 h-3 bg-zinc-400 rounded-full"></div></div>
+                </td>
+                <td class="py-2 px-3 text-zinc-600 text-[10px]">3d ago</td>
+                <td class="py-2 px-3 text-right relative">
+                  <button class="text-zinc-300 px-1">···</button>
+                  <!-- Dropdown menu -->
+                  <div class="absolute right-2 top-7 w-36 rounded-md border border-zinc-700 bg-zinc-800 shadow-xl z-10 text-left">
+                    <button class="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">Edit user</button>
+                    <button class="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">Reset password</button>
+                    <div class="border-t border-zinc-700 my-1"></div>
+                    <button class="w-full text-left px-3 py-2 text-xs text-amber-400 hover:bg-zinc-700">Impersonate →</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- EVALUATION GUIDE -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="max-w-7xl mx-auto mb-8">
+  <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+    <h3 class="text-sm font-semibold text-zinc-100 mb-4">Evaluation Guide</h3>
+    <div class="grid grid-cols-2 gap-8 xl:grid-cols-4">
+      <div>
+        <div class="direction-tag bg-zinc-800 text-zinc-300 mb-2">A — Minimal</div>
+        <p class="text-xs text-zinc-400">Maximum signal reduction. No decorative framing, no app branding on auth pages. Fastest to build, most focused. Risk: feels generic.</p>
+      </div>
+      <div>
+        <div class="direction-tag bg-blue-950 text-blue-300 mb-2">B — Contextual</div>
+        <p class="text-xs text-zinc-400">App name above form cards. Numbered step bar in onboarding. Inline test button next to input. Most "developer tool" feel — matches Vercel/Linear reference.</p>
+      </div>
+      <div>
+        <div class="direction-tag bg-violet-950 text-violet-300 mb-2">C — Split</div>
+        <p class="text-xs text-zinc-400">Landing splits value props from CTA. Onboarding uses left sidebar for step context. Best orientation, most layout complexity. Sidebar takes width on smaller screens.</p>
+      </div>
+      <div>
+        <div class="direction-tag bg-amber-950 text-amber-300 mb-2">D — Progress</div>
+        <p class="text-xs text-zinc-400">App logo on auth pages. Horizontal progress bar drives onboarding. Test button is idle until key entered. Strongest "forward motion" feeling through the flow.</p>
+      </div>
+    </div>
+    <div class="mt-6 border-t border-zinc-800 pt-4">
+      <p class="text-xs text-zinc-500">Note: Admin view shows two distinct patterns — A uses visible inline action buttons (faster, more clickable); C/D uses 3-dot menu + dropdown (cleaner table, slightly more friction). Both are valid for 10-user scale.</p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

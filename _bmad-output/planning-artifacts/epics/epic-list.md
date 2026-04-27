@@ -40,4 +40,30 @@ User can trigger cover letter generation for any job — delivered via email, tr
 User can see additional job data fields (date scraped, status) in the pipeline table and archive irrelevant jobs to keep active views focused.
 **FRs covered:** FR34, FR35 (fulfilled), FR36, FR37, FR38
 
+## Epic 24: Authentication & Multi-User Data Foundation
+Users can register with an invite key, activate via email, and log in — with all existing features operating correctly in a fully per-user isolated context.
+**FRs covered:** FR-A1, FR-A2, FR-A3, FR-A4, FR-A11
+**NFRs addressed:** NFR-A1, NFR-A2, NFR-A3, NFR-A5
+**UX:** UX-AUTH1, UX-AUTH2, UX-AUTH3, UX-AUTH4, UX-AUTH5, UX-AUTH13, UX-AUTH14
+**Architecture:** New DB tables (users, invite_keys, user_secrets, sessions), data isolation migration (0002), auth/admin middleware, CSRF, crypto module, mailer module, public auth routes, AuthFormCard
+
+## Epic 25: User Onboarding
+After first login, a new user completes a 4-step guided setup — Anthropic API key (live-tested, hard-gated), IMAP configuration (soft-gated, skippable) — and lands on a functional personal dashboard; onboarding never shown again.
+**FRs covered:** FR-A5
+**NFRs addressed:** NFR-A1, NFR-A6
+**UX:** UX-AUTH6 (StepIndicator), UX-AUTH7 (ConnectionTestButton), UX-AUTH8 (API key step), UX-AUTH9 (IMAP step)
+**Architecture:** Onboarding API routes, per-user secrets encryption, onboarding completion gate in auth middleware
+
+## Epic 26: Admin User Management
+Admin can view all users, toggle active status, send password reset emails with session invalidation, edit user profiles in a drawer, impersonate any user with a persistent amber banner and one-click exit, and manage invite keys.
+**FRs covered:** FR-A6, FR-A7, FR-A8, FR-A9, FR-A10, FR-A12
+**UX:** UX-AUTH10 (admin user table), UX-AUTH11 (ImpersonationBanner), UX-AUTH12 (confirmation dialogs)
+**Architecture:** Admin API routes (GET/PATCH /api/admin/users/:id, POST /api/admin/impersonate/:id, POST /api/admin/impersonate/exit, GET/POST/DELETE /api/admin/invite-keys), admin middleware
+
+## Epic 27: Production Deployment
+The app runs on Linode behind Nginx with TLS, reachable from the internet; Docker Compose manages lifecycle; SQLite is volume-mounted; first-deploy bootstrap creates the admin account automatically.
+**FRs covered:** (operational — no new user-facing FRs)
+**NFRs addressed:** NFR-A4, NFR-A6
+**Architecture:** Dockerfile, docker-compose.yml, Nginx config, .env.example update, import.meta.dirname path fix, first-deploy bootstrap script
+
 ---

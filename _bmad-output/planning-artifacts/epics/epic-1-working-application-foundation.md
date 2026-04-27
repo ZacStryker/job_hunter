@@ -38,13 +38,19 @@ So that every subsequent story has a stable, typed data contract to build agains
 
 **Given** `src/db/schema.ts` is defined
 **When** a developer inspects it
-**Then** the `jobs` table contains all Sheets-owned columns (`company`, `job_title`, `fit_score`, `recommendation`, `role_fit`, `requirements_met`, `requirements_missed`, `red_flags`, `job_description`, `source_url`, `date_scraped`) and all user-owned columns (`applied`, `status`, `status_override`, `cover_letter_sent_at`, `date_applied`) plus `id` (integer autoincrement)
-**And** a unique index `company_job_title_idx` on `(company, job_title)` is defined
+**Then** the `jobs` table contains:
+  - **Scraper-owned columns** (written by Discovery service, never overwritten by Analysis or user actions): `external_job_id` (text, not null), `title` (text, not null), `company` (text, not null), `source` (text, not null — 'linkedin' | 'indeed'), `location` (text, nullable), `source_url` (text, not null), `date_scraped` (text, not null, ISO 8601)
+  - **Analysis-owned columns** (written by Analysis service, never overwritten by user actions): `analysis_status` (text, not null, default 'pending' — 'pending' | 'done' | 'failed'), `job_description` (text, nullable), `fit_score` (integer, nullable), `recommendation` (text, nullable — 'skip' | 'investigate' | 'apply'), `role_fit` (text, nullable), `requirements_met` (text, nullable), `requirements_missed` (text, nullable), `red_flags` (text, nullable)
+  - **User-owned columns** (never overwritten by Discovery or Analysis): `applied` (integer, default 0), `status` (text, nullable), `status_override` (text, nullable), `cover_letter_sent_at` (text, nullable), `date_applied` (text, nullable)
+  - `id` (integer, autoincrement primary key)
+**And** a unique index on `external_job_id` is defined — this is the deduplication key for the Discovery service
 **And** column names use `snake_case`; `drizzle.config.ts` sets `casing: 'camelCase'` for automatic snake_case → camelCase mapping on all query results
 
 **Given** `src/shared/schemas.ts` is defined
 **When** a developer imports from it
-**Then** `jobSchema`, `ingestPayloadSchema`, `syncResultSchema` (Zod) and their inferred TypeScript types (`Job`, `IngestPayload`, `SyncResult`) are all exported and usable in both `src/server/` and `src/client/`
+**Then** `jobSchema`, `discoveryResultSchema`, `analysisResultSchema` (Zod) and their inferred TypeScript types (`Job`, `DiscoveryResult`, `AnalysisResult`) are all exported and usable in both `src/server/` and `src/client/`
+**And** `discoveryResultSchema` is `{ added: number }` — Discovery only inserts, never updates
+**And** `analysisResultSchema` is `{ analyzed: number, failed: number }`
 
 **Given** `src/db/migrate.ts` exists and is called from `src/index.ts`
 **When** `bun start` is run on a clean install
@@ -61,8 +67,8 @@ So that setup errors are immediately obvious and the interface is ready for dail
 
 **Given** `.env.example` is committed to the repo
 **When** a developer inspects it
-**Then** all required environment variables are documented: `PORT`, `DB_PATH`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_SPREADSHEET_ID`
-**And** post-MVP variables (`N8N_WEBHOOK_SECRET`, `IMAP_HOST`, `IMAP_USER`, `IMAP_PASS`) are present but commented out with setup instructions
+**Then** all required environment variables are documented: `PORT`, `DB_PATH`, `SCRAPER_URL`, `SCRAPER_TOKEN`, `ANTHROPIC_API_KEY`
+**And** post-MVP variables (`IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASS`) are present but commented out with setup instructions
 
 **Given** a required env var is missing from `.env`
 **When** `bun start` is run
@@ -70,9 +76,9 @@ So that setup errors are immediately obvious and the interface is ready for dail
 
 **Given** all env vars are present and `bun start` succeeds
 **When** the user opens `localhost:3000`
-**Then** the React SPA renders with a header bar (`h-14`) containing the app name (left), two view tabs — Pipeline and Tracker (center), and a Sync button placeholder (right)
+**Then** the React SPA renders with a header bar (`h-14`) containing the app name (left), two view tabs — Pipeline and Tracker (center), and action button placeholders (right)
 **And** TanStack Router is configured with routes `/` (Pipeline) and `/tracker`; TanStack `QueryClientProvider` wraps the router at the app root
-**And** the Pipeline route (`/`) renders an empty table card with the message "No jobs yet. Hit Sync to pull from Google Sheets."
+**And** the Pipeline route (`/`) renders an empty table card with the message "No jobs yet. Hit Discover to find new jobs."
 
 **Given** the app is running in dev mode (`bun run dev`)
 **When** `localhost:5173` is opened

@@ -254,7 +254,7 @@ export function DashboardRoute() {
               <ChartCard
                 title="Workflows per Day by Workflow Type"
                 tableHeaders={['Date', 'Discovery', 'Analysis', 'Cover Letter', 'Resume']}
-                tableData={data.automation.perDay.map(e => [e.date, e.Discovery, e.Analysis, e['Cover Letter'], e.Resume])}
+                tableData={data.automation.perDay.map(e => [e.date, e.Discovery, e.Analysis, e['Cover Letter'], e.Resume]).reverse()}
               >
                 <ResponsiveContainer width="100%" height={120}>
                   <AreaChart data={data.automation.perDay}>
@@ -314,7 +314,7 @@ export function DashboardRoute() {
               <ChartCard
                 title="Jobs per Day by Source"
                 tableHeaders={['Date', 'LinkedIn', 'Indeed', 'Indeed NL', 'Arc', 'Manual']}
-                tableData={data.jobs.perDay.map(e => [e.date, e.linkedin, e.indeed, e.indeed_nl, e.arc, e.manual])}
+                tableData={data.jobs.perDay.map(e => [e.date, e.linkedin, e.indeed, e.indeed_nl, e.arc, e.manual]).reverse()}
               >
                 <ResponsiveContainer width="100%" height={120}>
                   <AreaChart data={data.jobs.perDay}>
@@ -392,7 +392,7 @@ export function DashboardRoute() {
               <ChartCard
                 title="Matches per Day by Recommendation"
                 tableHeaders={['Date', 'Apply', 'Investigate']}
-                tableData={data.matches.perDay.map(e => [e.date, e.apply, e.investigate])}
+                tableData={data.matches.perDay.map(e => [e.date, e.apply, e.investigate]).reverse()}
               >
                 <ResponsiveContainer width="100%" height={120}>
                   <AreaChart data={data.matches.perDay}>
@@ -453,7 +453,7 @@ export function DashboardRoute() {
               <ChartCard
                 title="Applications per Day by Response Type"
                 tableHeaders={['Date', 'No Response', 'Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other']}
-                tableData={data.applications.perDay.map(e => [e.date, e['No Response'], e.Submitted, e.Rejected, e.Screening, e.Interview, e.Offer, e.Other])}
+                tableData={data.applications.perDay.map(e => [e.date, e['No Response'], e.Submitted, e.Rejected, e.Screening, e.Interview, e.Offer, e.Other]).reverse()}
               >
                 <ResponsiveContainer width="100%" height={120}>
                   <AreaChart data={data.applications.perDay}>

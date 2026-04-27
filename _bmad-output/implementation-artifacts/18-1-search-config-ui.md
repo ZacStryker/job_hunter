@@ -1,6 +1,6 @@
 # Story 18.1: Search Config UI
 
-Status: review
+Status: done
 
 ## Story
 
@@ -203,6 +203,32 @@ claude-sonnet-4-6
 - `src/client/routes/config.tsx` (modified)
 - `src/client/lib/router.ts` (modified)
 
+## Review Findings
+
+### Decision Needed
+- [x] [Review][Decision] AC-6 layout deviation: SearchConfigCard renders first — **accepted**, intentional UX improvement; spec updated accordingly.
+- [x] [Review][Decision] AC-8 form position deviation: Add-form above table — **accepted**, forms-first UX pattern; spec updated accordingly.
+- [x] [Review][Decision] Unspecified feature: PUT + inline edit UI — **accepted** as useful scope expansion; well-implemented and tested.
+
+### Patches
+- [x] [Review][Patch] `parseInt` silent coercion in DELETE — `parseInt('1abc', 10)` returns `1`, deletes wrong row [api-search-configs.ts:59]
+- [x] [Review][Patch] Mutation hooks crash on non-JSON error bodies — `await res.json()` called unconditionally on `!res.ok` responses; a proxy 502 HTML page throws an unhandled rejection [useSearchConfigMutations.ts:55,75,93]
+- [x] [Review][Patch] Migration seed rows have no idempotency guard — `INSERT INTO` runs unconditionally; replaying the migration duplicates all 6 seed rows [0015_search_configs.sql:8-14]
+- [x] [Review][Patch] DELETE accepts negative/zero IDs — inconsistent with PUT which guards `rawId <= 0`; fix: add same guard [api-search-configs.ts:59-60]
+- [x] [Review][Patch] GET response Zod parse fails permanently on any row with an unrecognized `source` — use `.safeParse()` or a looser response schema [useSearchConfigsQuery.ts:16]
+- [x] [Review][Patch] `DB_SOURCE` map not typed as `Record<ScraperSource, string>` — new sources added to `SCRAPER_SOURCES` without a `DB_SOURCE` entry silently fall through and write wrong source to jobs table [discovery-service.ts:13]
+
+### Deferred
+- [x] [Review][Defer] No authentication on `/api/search-configs` endpoints [api-search-configs.ts] — deferred, pre-existing single-user design; Epic 24 tracks auth
+- [x] [Review][Defer] GET returns disabled rows with no UI toggle to enable/disable [api-search-configs.ts:10] — deferred, `enabled` field reserved for future use per dev notes
+- [x] [Review][Defer] No max-length constraints on `query` or `location` fields [schemas.ts] — deferred, low risk for single-user; harden before multi-user launch
+- [x] [Review][Defer] `Promise.all` over scraper calls — one failure aborts entire discovery run [discovery-service.ts] — deferred, pre-existing behavior not introduced by this story
+- [x] [Review][Defer] No uniqueness constraint on `(source, query, location)` — rapid double-click or two tabs can insert duplicates [0015_search_configs.sql] — deferred, minor for single-user
+- [x] [Review][Defer] Migration seed data hard-codes personal search terms — will seed every fresh DB including future multi-user instances [0015_search_configs.sql] — deferred, required by AC-2; revisit during multi-user migration strategy
+- [x] [Review][Defer] Edit button can be clicked while `addMutation.isPending` — minor concurrent-state inconsistency [config.tsx] — deferred, low UX impact
+- [x] [Review][Defer] Error messages (save/delete) may be off-screen when table is long [config.tsx] — deferred, UX polish
+
 ## Change Log
 
 - 2026-04-18: Story implemented — search_configs DB table + migration, full REST API, discovery-service DB-backed, SearchConfigCard UI, config route pre-fetches search configs.
+- 2026-04-27: Code review — 3 decision-needed, 6 patches, 8 deferred, 4 dismissed.

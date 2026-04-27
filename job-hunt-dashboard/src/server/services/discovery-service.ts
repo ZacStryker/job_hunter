@@ -1,6 +1,7 @@
 import { eq, isNotNull } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { jobs, searchConfigs } from '../../db/schema'
+import type { ScraperSource } from '../../shared/schemas'
 
 interface ScraperResult {
   id: string
@@ -10,7 +11,7 @@ interface ScraperResult {
   url: string | null
 }
 
-const DB_SOURCE: Record<string, string> = {
+const DB_SOURCE: Record<ScraperSource, string> = {
   linkedin: 'linkedin', indeed: 'indeed', indeed_nl: 'indeed_nl', arc: 'arc',
 }
 
@@ -35,7 +36,7 @@ export async function runDiscovery(onProgress?: (msg: string) => void): Promise<
       }).then(async (res) => {
         if (!res.ok) throw new Error(`Scraper error ${res.status} for "${s.query}"`)
         const data = await res.json() as { results?: ScraperResult[] }
-        return { source: DB_SOURCE[s.source] ?? s.source, results: data.results ?? [] }
+        return { source: DB_SOURCE[s.source as ScraperSource] ?? s.source, results: data.results ?? [] }
       })
     })
   )

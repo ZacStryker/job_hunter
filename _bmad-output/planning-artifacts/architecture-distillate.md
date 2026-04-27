@@ -9,7 +9,7 @@ parts: 1
 ---
 
 ## Project Context
-- Job Hunt Dashboard: single-user localhost personal tool; fullstack SPA + local API; ~500 job records, no auth/sessions, no real-time, no CI/CD, no cloud
+- Job Hunt Dashboard: multi-user hosted platform; fullstack SPA + local API; ~500 job records per user; session-based auth with invite-key registration; deployed on Linode behind Nginx with TLS
 - Stack fully specified in PRD (non-negotiable): Bun 1.3.x runtime, Hono 4.x API, React 19.x + Vite 8.x SPA, Drizzle ORM + bun:sqlite, TanStack Query v5 + Router v1 + Table v8, shadcn/ui, Tailwind; browser target: Firefox latest only
 - 24 MVP functional requirements (FR1–FR24); post-MVP FR25–FR33 (IMAP email polling, n8n cover letter pipeline) explicitly deferred
 - Scale: low complexity; 500-record table must render without lag; drawer open must be instant (data pre-loaded); sync of 200 Sheets rows under 10 seconds
@@ -20,6 +20,8 @@ parts: 1
 - Shared Zod schema: `src/shared/schemas.ts` is single source of truth for job record shape; imported by both server (runtime validation) and client (compile-time types); never redefine inline
 - Type safety: DB schema → API response → client state must share types from `shared/schemas.ts`; no drift
 - Error surface: all integration failures (OAuth, Sheets API, post-MVP n8n) must surface clearly; no silent data mutation; no stack traces in API responses
+- User isolation: ALL queries against `jobs`, `search_configs`, `email_events`, `cover_letters`, `user_secrets` MUST include `where(eq(table.userId, ctx.get('userId')))`; NEVER accept userId from request body or params
+- Secret handling: per-user secrets NEVER returned raw; always presence flag only (`{ hasAnthropicKey: true }`); always `encrypt()` before write; always `decrypt()` inside the service that needs the value — never in route handlers
 
 ## Scaffold & Initialization
 - Rejected: bhvr (monorepo/Turbo conflicts with single-process PRD design); Rejected: manual scaffold from scratch (viable but unnecessary boilerplate)
@@ -39,16 +41,37 @@ parts: 1
 
 ## API Design
 - Style: REST under `/api/*`; response shape: direct data on success (no envelope wrapper — `{ success: true, data: ... }` forbidden); errors: `{ error: string }` + HTTP status
-- Routes: `GET /api/jobs` (full payload, all records, loaded once on mount); `POST /api/ingest` (accepts `Job[]`, transactional upsert, returns `{ added, updated }`); `POST /api/sync` (triggers Sheets OAuth fetch → column mapping → ingest logic); `PATCH /api/jobs/:id` (user-owned fields only: `applied`, `status`, `status_override`)
+- Core routes: `GET /api/jobs`; `POST /api/ingest`; `POST /api/sync`; `PATCH /api/jobs/:id`
+- Auth routes (public): `POST /auth/register`; `GET /auth/activate?token=`; `POST /auth/login`; `POST /auth/logout`; `POST /auth/reset-request`; `POST /auth/reset`
+- Admin routes (role=admin): `GET /api/admin/users`; `PATCH /api/admin/users/:id`; `POST /api/admin/impersonate/:id`; `GET /api/admin/invite-keys`; `POST /api/admin/invite-keys`; `DELETE /api/admin/invite-keys/:id`
+- Onboarding routes (auth required): `GET /api/onboarding/status`; `PUT /api/onboarding/anthropic`; `PUT /api/onboarding/imap`
 - Route param: `:id` (never `:jobId` or `:job_id`); JSON fields: camelCase; DB columns: snake_case (Drizzle handles translation)
 - Error middleware: single Hono handler catches all thrown errors → `{ error: message }` + HTTP status; no stack traces
-- Hono binds to `127.0.0.1` only (never `0.0.0.0`)
+- Hono binds: `0.0.0.0` in production Docker (behind Nginx); `127.0.0.1` in dev (never `0.0.0.0` in dev)
 
-## Authentication & Security
-- App auth: none (single user, localhost)
-- Google Sheets OAuth 2.0: tokens in `.env` only (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_SPREADSHEET_ID`); token refresh in `oauth-client.ts`; expired token → clear error, no silent failure
-- Credentials: never logged, never in API responses, never committed
+## Authentication & Session
+- Session-based auth: httpOnly Secure cookie; server-side session store in SQLite `sessions` table; session ID = cryptographically random 32-byte hex
+- Password hashing: argon2id (`argon2` npm package); params: memory=65536, iterations=3, parallelism=4
+- Invite-key registration: single-use keys in `invite_keys` table; consumed on registration
+- Email verification: `users.is_active = false` until activation link clicked; token = random 32-byte hex; expires 48h
+- Auth middleware (`auth-middleware.ts`): all `/api/*` routes; validates session cookie → `ctx.set('userId', id)`; returns 401 on invalid/expired
+- Admin middleware (`admin-middleware.ts`): all `/api/admin/*` routes; checks `users.role === 'admin'`; returns 403
+- CSRF: `x-csrf-token` double-submit required on all POST/PATCH/DELETE; exempt: `/auth/login`, `/auth/register`, `/auth/activate`
+- Google Sheets OAuth tokens: stored per-user in `user_secrets` table, encrypted at rest; token refresh in `oauth-client.ts`
+- Credentials: never logged, never in API responses; per-user secrets returned as presence flags only (`{ hasAnthropicKey: true }`)
 - Missing/invalid env vars: app exits at startup with `console.error` listing missing keys; no silent defaults
+
+## Encryption at Rest
+- Scheme: AES-256-GCM; scope: all `user_secrets` rows (`anthropic_api_key`, `imap_host`, `imap_user`, `imap_pass`, `google_refresh_token`)
+- Key: `ENCRYPTION_KEY` env var (32-byte hex, `openssl rand -hex 32`); never stored in DB; never derived per-user
+- IV: random 12-byte per encryption call; stored as `hex_iv:hex_ciphertext:hex_authTag` in single column
+- Module: `src/server/lib/crypto.ts` exports `encrypt(string): string` and `decrypt(string): string`; all `user_secrets` I/O goes through this module — no inline crypto calls elsewhere
+
+## Multi-Tenancy & Per-User Data Isolation
+- New tables: `users` (id, email, password_hash, role, is_active, activation_token, created_at); `invite_keys` (id, key, used_by_user_id, used_at); `user_secrets` (user_id FK, key_name, ciphertext, updated_at; unique on user_id+key_name); `sessions` (id token PK, user_id FK, data JSON, expires_at)
+- Existing tables (`jobs`, `search_configs`, `email_events`, `cover_letters`) get `user_id` non-nullable FK in migration `0002_multi_tenancy.sql`
+- All DB queries on user-scoped tables: `where(eq(table.userId, userId))` using `ctx.get('userId')` — never from request body or params
+- Bootstrap: first deploy creates admin from `ADMIN_EMAIL`/`ADMIN_PASSWORD` env vars; existing rows assigned `user_id = 1`; migration idempotent
 
 ## Frontend Architecture
 - Server state: TanStack Query v5 only — never duplicate in React state; `useQuery(['jobs'])` loads once, cached; `useMutation` for sync and job updates
@@ -79,9 +102,16 @@ src/
     routes/api-jobs.ts      # GET /api/jobs, PATCH /api/jobs/:id
     routes/api-ingest.ts    # POST /api/ingest
     routes/api-sync.ts      # POST /api/sync
+    routes/api-auth.ts      # /auth/* routes
+    routes/api-admin.ts     # /api/admin/* routes (admin only)
+    routes/api-onboarding.ts # /api/onboarding/* routes
     services/sheets-sync.ts # ONLY file knowing Sheets column names; outputs Job[]
     services/oauth-client.ts
+    lib/crypto.ts           # encrypt()/decrypt() — AES-256-GCM; all user_secrets I/O goes here
+    lib/mailer.ts           # SMTP send for activation + password reset
     middleware/error-handler.ts
+    middleware/auth-middleware.ts   # session → ctx.set('userId'); 401 if invalid
+    middleware/admin-middleware.ts  # role check; 403 if not admin
   client/
     main.tsx                # QueryClientProvider → RouterProvider
     lib/query-client.ts     # queryClient singleton
@@ -116,10 +146,11 @@ src/
 - `console.error` on server; surface via TanStack Query error state on client; `console.log` for errors is forbidden
 
 ## Development & Production Workflow
-- Dev: `bun run dev` — `concurrently` runs Vite on :5173 + Hono API on :3001; `@hono/vite-dev-server` proxies `/api/*` to :3001
-- Prod: `bun run build` → Vite outputs to `dist/`; `bun start` → runs migrations then Hono on :3000 serving `dist/` + API
-- Env vars: `PORT`, `DB_PATH`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_SPREADSHEET_ID`; post-MVP: `N8N_WEBHOOK_SECRET`, `IMAP_HOST`, `IMAP_USER`, `IMAP_PASS`
-- `.env.example` committed with all required keys documented; `.env` gitignored
+- Dev: `bun run dev` — `concurrently` runs Vite on :5173 + Hono API on :3001; `@hono/vite-dev-server` proxies `/api/*` to :3001; binds `127.0.0.1`
+- Local prod: `bun run build` → `dist/`; `bun start` → runs migrations then Hono on :3000
+- Hosted prod: Docker Compose on Linode VPS; Nginx TLS termination via Let's Encrypt; container mounts SQLite volume; restart: `unless-stopped`
+- Env vars required: `PORT`, `DB_PATH`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_SPREADSHEET_ID`, `SESSION_SECRET`, `ENCRYPTION_KEY`, `APP_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`; first-deploy only: `ADMIN_EMAIL`, `ADMIN_PASSWORD`; optional: `INVITE_KEY_SEED`
+- `.env.example` committed; `.env` gitignored
 
 ## Implementation Sequence
 1. Scaffold + wiring (create-hono seed → add full stack)

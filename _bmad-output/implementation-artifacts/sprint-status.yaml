@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-04-21 # 23-1 done
+last_updated: 2026-04-27 # epics 24-27 stories designed and sprint-status populated; migration numbers corrected
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -148,8 +148,8 @@ development_status:
   17-1-config-view-and-nav-reorganization: done
 
   # Epic 18: Search Config UI
-  epic-18: in-progress
-  18-1-search-config-ui: review
+  epic-18: done
+  18-1-search-config-ui: done
 
   # Epic 19: Live Pipeline Feedback
   epic-19: in-progress
@@ -170,3 +170,30 @@ development_status:
   # Epic 23: Cover Letter PDF Output
   epic-23: in-progress
   23-1-cover-letter-pdf-generation: done
+
+  # Epic 24: Authentication & Multi-User Data Foundation
+  epic-24: backlog
+  24-1-crypto-module-mailer-module-and-auth-db-schema: backlog
+  24-2-auth-api-routes-registration-activation-login-logout-and-password-reset: backlog
+  24-3-per-user-data-isolation-migration-auth-middleware-and-query-scoping: backlog
+  24-4-auth-ui-landing-page-registration-check-email-and-login: backlog
+  epic-24-retrospective: optional
+
+  # Epic 25: User Onboarding
+  epic-25: backlog
+  25-1-onboarding-api-status-anthropic-api-key-and-imap-setup: backlog
+  25-2-onboarding-ui-4-step-setup-flow: backlog
+  epic-25-retrospective: optional
+
+  # Epic 26: Admin User Management
+  epic-26: backlog
+  26-1-admin-api-user-list-update-password-reset-and-impersonation: backlog
+  26-2-admin-ui-user-table-inline-actions-and-impersonation-banner: backlog
+  26-3-admin-invite-key-management: backlog
+  epic-26-retrospective: optional
+
+  # Epic 27: Production Deployment
+  epic-27: backlog
+  27-1-dockerfile-and-docker-compose-configuration: backlog
+  27-2-nginx-reverse-proxy-and-deployment-runbook: backlog
+  epic-27-retrospective: optional
