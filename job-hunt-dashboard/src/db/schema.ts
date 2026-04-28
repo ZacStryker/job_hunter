@@ -1,4 +1,4 @@
-import { integer, real, text, sqliteTable, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { integer, real, text, sqliteTable, uniqueIndex, primaryKey, index } from 'drizzle-orm/sqlite-core'
 
 export const jobs = sqliteTable('jobs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -110,3 +110,45 @@ export const prompts = sqliteTable('prompts', {
   userMessage: text('user_message').notNull(),
   updatedAt: text('updated_at').notNull(),
 })
+
+export const users = sqliteTable('users', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  role: text('role').notNull().default('standard'), // 'standard' | 'admin'
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(false),
+  activationToken: text('activation_token'),
+  activationTokenExpiresAt: text('activation_token_expires_at'),
+  resetToken: text('reset_token'),
+  resetTokenExpiresAt: text('reset_token_expires_at'),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  uniqueIndex('users_activation_token_idx').on(table.activationToken),
+  uniqueIndex('users_reset_token_idx').on(table.resetToken),
+])
+
+export const inviteKeys = sqliteTable('invite_keys', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  key: text('key').notNull().unique(),
+  usedByUserId: integer('used_by_user_id').references(() => users.id),
+  usedAt: text('used_at'),
+})
+
+export const userSecrets = sqliteTable('user_secrets', {
+  userId: integer('user_id').notNull().references(() => users.id),
+  keyName: text('key_name').notNull(),
+  ciphertext: text('ciphertext').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.keyName] }),
+])
+
+export const sessions = sqliteTable('sessions', {
+  id: text('id').primaryKey(),         // 32-byte hex string; NOT autoincrement
+  userId: integer('user_id').notNull().references(() => users.id),
+  data: text('data'),                  // JSON blob; null is valid
+  expiresAt: text('expires_at').notNull(),
+}, (table) => [
+  index('sessions_user_id_idx').on(table.userId),
+  index('sessions_expires_at_idx').on(table.expiresAt),
+])

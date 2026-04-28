@@ -134,6 +134,20 @@
       "when": 1745596800000,
       "tag": "0018_discovery_source_breakdown",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1777309625885,
+      "tag": "0019_auth_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1777378107951,
+      "tag": "0020_auth_indexes",
+      "breakpoints": true
     }
   ]
 }

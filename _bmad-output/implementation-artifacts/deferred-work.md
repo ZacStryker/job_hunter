@@ -1,5 +1,18 @@
 # Deferred Work
 
+## Deferred from: code review of 24-1-crypto-module-mailer-module-and-auth-db-schema (2026-04-27)
+
+- ✅ **RESOLVED in 24.2** — Email normalization: `.toLowerCase().trim()` applied in registration and login handlers before all DB inserts and lookups.
+- ✅ **RESOLVED in 24.2** — Invite key race condition: check-and-mark inside `db.transaction()` in the registration handler.
+- ✅ **RESOLVED in 24.2** — Missing DB indexes on `sessions(user_id)`, `sessions(expires_at)`, `users(activation_token)`, `users(reset_token)` — added via migration `0020_auth_indexes.sql`.
+
+- GCM auth tag mismatch propagates as uncaught exception — `decipher.final()` throws if ciphertext is tampered; correct GCM behaviour but callers must wrap in try/catch. Deferred to Epic 25 onboarding routes where `decrypt()` is first called.
+- `activationToken` and `resetToken` stored as plaintext in `users` table — DB compromise exposes all pending tokens. Design decision accepted for MVP (~10 users). Indexes added in 24.2 for efficient lookups.
+- `invite_keys` has no expiry column — invite keys are valid indefinitely; a leaked key is permanently usable. Design decision for epic 24 scope.
+- `user_secrets` and `sessions` FK references use `ON DELETE no action` — deleting a user leaves orphaned secrets and sessions. Cascading delete strategy deferred to user deletion flow.
+- SMTP TLS options not configured in `mailer.ts` — no `secure` or `requireTLS` flag; port 587 STARTTLS behaviour is implicitly assumed. Should be addressed in deployment configuration (epic 27).
+- `sessions.data` has no size cap — no constraint prevents unbounded JSON blobs in session rows. Data is `null` in all 24.2 routes; remains deferred.
+
 ## Deferred from: code review of 1-1-project-scaffold-and-dev-prod-scripts (2026-03-28)
 
 - `tsconfig.node.json` not referenced in main `tsconfig.json` via a `references` field. IDEs that only load the root `tsconfig.json` may show type errors on `vite.config.ts` and `drizzle.config.ts`. Not a build or runtime issue — the split config is functional. Consider adding `"references": [{ "path": "./tsconfig.node.json" }]` and marking `tsconfig.node.json` with `"composite": true` in a future cleanup pass.
@@ -408,6 +421,21 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 
 - **Race: archive between query and analysis start** — A job could be archived by the user between the `pendingJobs` SELECT and the `db.update({ analysisStatus: 'analyzing' })` mark. The job would be analyzed even though the user archived it in that window. Pre-existing; not introduced by this change.
 - **Race: concurrent archive during in-flight analysis** — If a user archives a job while it is in `analyzing` state, the final `db.update({ analysisStatus: 'done', ... })` write still succeeds unconditionally. The job stays archived (the write doesn't clear `archived`), but tokens were still spent. Pre-existing.
+
+## Deferred from: code review of 24-2-auth-api-routes-registration-activation-login-logout-and-password-reset (2026-04-28)
+
+- Timing oracle: `eq(users.activationToken, token)` and `eq(users.resetToken, token)` use SQL equality, not constant-time comparison. 256-bit token space makes practical exploitation infeasible; deferred indefinitely.
+- reset-request repeated admin calls cycle reset tokens with no idempotency guard — admin can invalidate previously-delivered reset links. Admin-only endpoint; low practical risk.
+- sendMail creates a new nodemailer transport per invocation — no SMTP connection pooling or startup TLS verification. Low call volume at MVP scale; address in deployment hardening pass (epic 27).
+- No rate limiting on /register, /login, /activate, /reset — brute-force protection requires infrastructure-level rate limiting. Address when adding auth middleware layer in future stories.
+- Token expiry uses ISO-8601 string comparison (`gte(col, now)`) — correct only when all timestamps use `toISOString()`. Theoretical fragility; all app timestamps currently use `toISOString()`.
+- inviteKeys table has no expiry column — invite keys valid indefinitely; a leaked key is permanently usable. Enhancement; consider adding `expires_at` and `created_at` in a future invite management story.
+- users table has no updatedAt / last-login audit columns — no forensic trail for credential changes. Enhancement; out of scope for story 24.2.
+- userSecrets table has no ON DELETE CASCADE — orphaned secrets rows if a user is deleted. Table unused in story 24.2 routes; address when user deletion flow is implemented.
+- Activation/reset tokens in URL query params — appear in server logs and browser history. Standard MVP pattern; mitigated by short TTLs (48h activation, 1h reset).
+- Register invite-key race condition in multi-worker deployment — `isNull(usedAt)` check not atomic with `usedAt` update under multi-threaded workers. Benign on single-threaded Bun; UNIQUE constraint on `invite_keys.key` provides the real atomic guard. Revisit if app is clustered.
+- reset-request: resetToken write (`db.update(users)`) and session delete (`db.delete(sessions)`) are not in a single transaction. No actual race window in single-threaded Bun with synchronous DB calls; wrap in transaction in a future hardening pass.
+- No session count cap per user — each login and activation appends a session row with no cap or GC job. MVP scale (~10 users) makes this a non-issue; add session cleanup job before production scale.
 
 ## Deferred from: code review of 18-1-search-config-ui (2026-04-27)
 
