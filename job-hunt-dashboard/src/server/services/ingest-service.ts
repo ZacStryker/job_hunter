@@ -1,13 +1,13 @@
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { jobs } from '../../db/schema'
 import type { JobInput } from '../../shared/schemas'
 
-export function ingestJobs(rows: JobInput[]): { added: number; updated: number } {
-  // Pre-query existing keys to count adds vs updates accurately
+export function ingestJobs(rows: JobInput[], userId: number): { added: number; updated: number } {
   const existing = db
     .select({ company: jobs.company, jobTitle: jobs.jobTitle })
     .from(jobs)
+    .where(eq(jobs.userId, userId))
     .all()
   const existingKeys = new Set(existing.map((r) => `${r.company}\x00${r.jobTitle}`))
 
@@ -18,9 +18,9 @@ export function ingestJobs(rows: JobInput[]): { added: number; updated: number }
     for (const row of rows) {
       tx
         .insert(jobs)
-        .values(row)
+        .values({ ...row, userId })
         .onConflictDoUpdate({
-          target: [jobs.company, jobs.jobTitle],
+          target: [jobs.company, jobs.jobTitle, jobs.userId],
           set: {
             sourceUrl: sql`excluded.source_url`,
             dateScraped: sql`excluded.date_scraped`,

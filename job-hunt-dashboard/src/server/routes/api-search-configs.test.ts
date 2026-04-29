@@ -1,11 +1,19 @@
 process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, beforeAll, beforeEach } from 'bun:test'
+import { Hono } from 'hono'
 import { Database } from 'bun:sqlite'
 
-const { default: searchConfigsApp } = await import('./api-search-configs')
+const { default: searchConfigsRoute } = await import('./api-search-configs')
 const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
+
+const searchConfigsApp = (() => {
+  const w = new Hono()
+  w.use('*', (c, next) => { c.set('userId', 1); return next() })
+  w.route('/', searchConfigsRoute)
+  return w
+})()
 
 const CREATE_SEARCH_CONFIGS_TABLE = `
   CREATE TABLE IF NOT EXISTS search_configs (
@@ -13,7 +21,8 @@ const CREATE_SEARCH_CONFIGS_TABLE = `
     source TEXT NOT NULL,
     query TEXT NOT NULL,
     location TEXT,
-    enabled INTEGER NOT NULL DEFAULT 1
+    enabled INTEGER NOT NULL DEFAULT 1,
+    user_id INTEGER NOT NULL DEFAULT 1
   )
 `
 

@@ -18,7 +18,10 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
     duration_ms INTEGER,
     input_tokens INTEGER,
     output_tokens INTEGER,
-    cost_usd REAL
+    cost_usd REAL,
+    matched_count INTEGER,
+    archived_count INTEGER,
+    source_breakdown TEXT
   )
 `
 

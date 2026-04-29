@@ -226,3 +226,5 @@ export const promptInputSchema = z.object({
 export type Prompt = z.infer<typeof promptSchema>
 export type PromptInput = z.infer<typeof promptInputSchema>
 export type PromptFlow = z.infer<typeof promptFlowSchema>
+
+export type SessionResponse = { userId: number; email: string; role: string }

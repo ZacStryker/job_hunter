@@ -4,16 +4,16 @@ import { describe, test, expect, beforeAll, beforeEach, afterEach, mock } from '
 import { Database } from 'bun:sqlite'
 
 // Mock both services BEFORE dynamic import — bun:test hoisting requirement
-let mockRunDiscovery: (onProgress?: (msg: string) => void) => Promise<{ inserted: number }> =
-  async () => ({ inserted: 0 })
+let mockRunDiscovery: (onProgress?: (msg: string) => void) => Promise<{ inserted: number; bySource: Record<string, number> }> =
+  async () => ({ inserted: 0, bySource: {} })
 mock.module('../services/discovery-service', () => ({
-  runDiscovery: (onProgress?: (msg: string) => void) => mockRunDiscovery(onProgress),
+  runDiscovery: (onProgress?: (msg: string) => void, _userId?: number) => mockRunDiscovery(onProgress),
 }))
 
-let mockRunAnalysis: (onProgress?: (msg: string) => void) => Promise<{ processed: number; failed: number; inputTokens: number; outputTokens: number }> =
-  async () => ({ processed: 0, failed: 0, inputTokens: 0, outputTokens: 0 })
+let mockRunAnalysis: (onProgress?: (msg: string) => void) => Promise<{ processed: number; failed: number; matched: number; archived: number; inputTokens: number; outputTokens: number }> =
+  async () => ({ processed: 0, failed: 0, matched: 0, archived: 0, inputTokens: 0, outputTokens: 0 })
 mock.module('../services/analysis-service', () => ({
-  runAnalysis: (onProgress?: (msg: string) => void) => mockRunAnalysis(onProgress),
+  runAnalysis: (onProgress?: (msg: string) => void, _userId?: number) => mockRunAnalysis(onProgress),
 }))
 
 const { default: webhooksApp } = await import('./api-webhooks')
@@ -31,7 +31,10 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
     duration_ms INTEGER,
     input_tokens INTEGER,
     output_tokens INTEGER,
-    cost_usd REAL
+    cost_usd REAL,
+    matched_count INTEGER,
+    archived_count INTEGER,
+    source_breakdown TEXT
   )
 `
 
@@ -49,8 +52,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  mockRunDiscovery = async () => ({ inserted: 0 })
-  mockRunAnalysis = async () => ({ processed: 0, failed: 0, inputTokens: 0, outputTokens: 0 })
+  mockRunDiscovery = async () => ({ inserted: 0, bySource: {} })
+  mockRunAnalysis = async () => ({ processed: 0, failed: 0, matched: 0, archived: 0, inputTokens: 0, outputTokens: 0 })
 })
 
 describe('POST /api/webhooks/discovery', () => {
@@ -65,7 +68,7 @@ describe('POST /api/webhooks/discovery', () => {
 
   test('streams done event with inserted count on success', async () => {
     process.env.SCRAPER_URL = 'http://test-scraper.invalid'
-    mockRunDiscovery = async () => ({ inserted: 5 })
+    mockRunDiscovery = async () => ({ inserted: 5, bySource: {} })
 
     const res = await webhooksApp.request('/discovery', { method: 'POST' })
     expect(res.status).toBe(200)
@@ -109,7 +112,7 @@ describe('POST /api/webhooks/discovery', () => {
     mockRunDiscovery = async (onProgress) => {
       onProgress?.('Searching linkedin: genai python…')
       onProgress?.('Searching indeed: engineer…')
-      return { inserted: 2 }
+      return { inserted: 2, bySource: {} }
     }
 
     const res = await webhooksApp.request('/discovery', { method: 'POST' })
@@ -137,7 +140,7 @@ describe('POST /api/webhooks/analysis', () => {
 
   test('streams done event with processed/failed counts and records run on success', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key'
-    mockRunAnalysis = async () => ({ processed: 7, failed: 1, inputTokens: 0, outputTokens: 0 })
+    mockRunAnalysis = async () => ({ processed: 7, failed: 1, matched: 7, archived: 0, inputTokens: 0, outputTokens: 0 })
 
     const res = await webhooksApp.request('/analysis', { method: 'POST' })
     expect(res.status).toBe(200)
@@ -159,7 +162,7 @@ describe('POST /api/webhooks/analysis', () => {
 
   test('records durationMs, inputTokens, outputTokens, costUsd for analysis run', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key'
-    mockRunAnalysis = async () => ({ processed: 2, failed: 0, inputTokens: 1000, outputTokens: 500 })
+    mockRunAnalysis = async () => ({ processed: 2, failed: 0, matched: 2, archived: 0, inputTokens: 1000, outputTokens: 500 })
 
     const res = await webhooksApp.request('/analysis', { method: 'POST' })
     expect(res.status).toBe(200)
@@ -202,7 +205,7 @@ describe('POST /api/webhooks/analysis', () => {
     mockRunAnalysis = async (onProgress) => {
       onProgress?.('Found 3 jobs to analyze')
       onProgress?.('Analyzing 1 / 3: Acme Corp — Senior Engineer')
-      return { processed: 3, failed: 0, inputTokens: 0, outputTokens: 0 }
+      return { processed: 3, failed: 0, matched: 3, archived: 0, inputTokens: 0, outputTokens: 0 }
     }
 
     const res = await webhooksApp.request('/analysis', { method: 'POST' })

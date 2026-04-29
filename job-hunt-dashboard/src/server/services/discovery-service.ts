@@ -1,4 +1,4 @@
-import { eq, isNotNull } from 'drizzle-orm'
+import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { jobs, searchConfigs } from '../../db/schema'
 import type { ScraperSource } from '../../shared/schemas'
@@ -15,12 +15,17 @@ const DB_SOURCE: Record<ScraperSource, string> = {
   linkedin: 'linkedin', indeed: 'indeed', indeed_nl: 'indeed_nl', arc: 'arc',
 }
 
-export async function runDiscovery(onProgress?: (msg: string) => void): Promise<{ inserted: number; bySource: Record<string, number> }> {
+export async function runDiscovery(onProgress?: (msg: string) => void, userId?: number): Promise<{ inserted: number; bySource: Record<string, number> }> {
   const scraperUrl = process.env.SCRAPER_URL
   const scraperToken = process.env.SCRAPER_TOKEN
   if (!scraperUrl) throw new Error('SCRAPER_URL not configured')
 
-  const searches = db.select().from(searchConfigs).where(eq(searchConfigs.enabled, true)).all()
+  const searches = db.select().from(searchConfigs)
+    .where(and(
+      eq(searchConfigs.enabled, true),
+      userId !== undefined ? eq(searchConfigs.userId, userId) : sql`1=1`,
+    ))
+    .all()
 
   const responses = await Promise.all(
     searches.map((s) => {
@@ -48,7 +53,10 @@ export async function runDiscovery(onProgress?: (msg: string) => void): Promise<
   const existing = db
     .select({ externalJobId: jobs.externalJobId })
     .from(jobs)
-    .where(isNotNull(jobs.externalJobId))
+    .where(and(
+      isNotNull(jobs.externalJobId),
+      userId !== undefined ? eq(jobs.userId, userId) : sql`1=1`,
+    ))
     .all()
   const existingIds = new Set(existing.map((r) => r.externalJobId!))
 
@@ -65,29 +73,33 @@ export async function runDiscovery(onProgress?: (msg: string) => void): Promise<
 
   const dateScraped = new Date().toISOString()
 
-  db.transaction((tx) => {
-    for (const job of newJobs) {
-      tx
-        .insert(jobs)
-        .values({
-          company: job.company,
-          jobTitle: job.title,
-          location: job.location ?? null,
-          sourceUrl: job.url ?? null,
-          source: job.source,
-          externalJobId: job.id,
-          dateScraped,
-          analysisStatus: 'pending',
-        })
-        .onConflictDoNothing()
-        .run()
-    }
-  })
+  if (userId !== undefined) {
+    db.transaction((tx) => {
+      for (const job of newJobs) {
+        tx
+          .insert(jobs)
+          .values({
+            company: job.company,
+            jobTitle: job.title,
+            location: job.location ?? null,
+            sourceUrl: job.url ?? null,
+            source: job.source,
+            externalJobId: job.id,
+            dateScraped,
+            analysisStatus: 'pending',
+            userId,
+          })
+          .onConflictDoNothing()
+          .run()
+      }
+    })
+  }
+  // userId undefined: inserts skipped (userId is NOT NULL) — bySource still computed below
 
   const bySource: Record<string, number> = {}
   for (const job of newJobs) {
     bySource[job.source] = (bySource[job.source] ?? 0) + 1
   }
 
-  return { inserted: newJobs.length, bySource }
+  return { inserted: userId !== undefined ? newJobs.length : 0, bySource }
 }

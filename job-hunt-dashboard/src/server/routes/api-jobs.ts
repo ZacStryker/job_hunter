@@ -9,12 +9,13 @@ import { generateCoverLetter } from '../services/cover-letter-service'
 import { generateResume } from '../services/resume-service'
 import { recordRun } from './api-webhook-runs'
 import type { Job } from '../../shared/schemas'
+import type { AppEnv } from '../types'
 
 // USD per token (per-million prices / 1_000_000)
 const SONNET_4_6_INPUT = 3 / 1_000_000
 const SONNET_4_6_OUTPUT = 15 / 1_000_000
 
-const app = new Hono()
+const app = new Hono<AppEnv>()
 
 const STATUS_OVERRIDE_VALUES = ['phone_screen', 'interview', 'technical', 'offer', 'rejected', 'withdrawn', 'ghosted'] as const
 
@@ -25,13 +26,14 @@ const jobPatchSchema = z.object({
 })
 
 app.get('/', (c) => {
-  const allJobs = db.select().from(jobs).all()
+  const userId = c.get('userId')
+  const allJobs = db.select().from(jobs).where(eq(jobs.userId, userId)).all()
   const allMessages = db.select({
     company: messages.company,
     jobTitle: messages.jobTitle,
     type: messages.type,
     receivedAt: messages.receivedAt,
-  }).from(messages).where(isNotNull(messages.type)).all()
+  }).from(messages).where(and(isNotNull(messages.type), eq(messages.userId, userId))).all()
 
   const latestMessageByKey = new Map<string, { type: string; receivedAt: string }>()
   for (const msg of allMessages) {
@@ -55,6 +57,7 @@ app.get('/', (c) => {
 })
 
 app.get('/:id', (c) => {
+  const userId = c.get('userId')
   const idParam = c.req.param('id')
   if (!/^\d+$/.test(idParam)) {
     return c.json({ error: 'Invalid job id' }, 400)
@@ -69,7 +72,7 @@ app.get('/:id', (c) => {
     jobTitle: jobs.jobTitle,
     location: jobs.location,
     jobDescription: jobs.jobDescription,
-  }).from(jobs).where(eq(jobs.id, rawId)).get()
+  }).from(jobs).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
 
   if (!job) {
     return c.json({ error: 'Job not found' }, 404)
@@ -79,6 +82,7 @@ app.get('/:id', (c) => {
 })
 
 app.get('/:id/events', (c) => {
+  const userId = c.get('userId')
   const idParam = c.req.param('id')
   if (!/^\d+$/.test(idParam)) {
     return c.json({ error: 'Invalid job id' }, 400)
@@ -88,7 +92,7 @@ app.get('/:id/events', (c) => {
     return c.json({ error: 'Invalid job id' }, 400)
   }
 
-  const job = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
+  const job = db.select().from(jobs).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
   if (!job) {
     return c.json({ error: 'Job not found' }, 404)
   }
@@ -106,6 +110,7 @@ app.get('/:id/events', (c) => {
       sql`lower(${messages.company}) = lower(${job.company})`,
       sql`lower(${messages.jobTitle}) = lower(${job.jobTitle})`,
       isNotNull(messages.type),
+      eq(messages.userId, userId),
     ))
     .all()
 
@@ -183,6 +188,7 @@ const manualJobSchema = z.object({
 })
 
 app.post('/', async (c) => {
+  const userId = c.get('userId')
   let body: unknown
   try { body = await c.req.json() } catch { return c.json({ error: 'Invalid JSON body' }, 400) }
   const parsed = manualJobSchema.safeParse(body)
@@ -192,7 +198,7 @@ app.post('/', async (c) => {
   const locationValue = location?.trim() || null
 
   const existing = db.select({ id: jobs.id }).from(jobs)
-    .where(and(eq(jobs.company, company), eq(jobs.jobTitle, jobTitle))).get()
+    .where(and(eq(jobs.company, company), eq(jobs.jobTitle, jobTitle), eq(jobs.userId, userId))).get()
   if (existing) return c.json({ error: 'Job already exists' }, 409)
 
   const dateScraped = new Date().toISOString()
@@ -200,18 +206,20 @@ app.post('/', async (c) => {
     company, jobTitle,
     location: locationValue,
     sourceUrl,
-    source: 'manual',
+    source: 'Manual',
     analysisStatus: 'pending',
     dateScraped,
+    userId,
   }).run()
 
   const created = db.select().from(jobs)
-    .where(and(eq(jobs.company, company), eq(jobs.jobTitle, jobTitle))).get()
+    .where(and(eq(jobs.company, company), eq(jobs.jobTitle, jobTitle), eq(jobs.userId, userId))).get()
   if (!created) return c.json({ error: 'Failed to retrieve created job' }, 500)
   return c.json({ job: created }, 201)
 })
 
 app.post('/bulk-archive', async (c) => {
+  const userId = c.get('userId')
   let body: unknown
   try {
     body = await c.req.json()
@@ -225,8 +233,10 @@ app.post('/bulk-archive', async (c) => {
 
   const { ids } = parsed.data
   const archived = db.transaction((tx) => {
-    const matching = tx.select({ id: jobs.id }).from(jobs).where(inArray(jobs.id, ids)).all()
-    tx.update(jobs).set({ archived: true }).where(inArray(jobs.id, ids)).run()
+    const matching = tx.select({ id: jobs.id }).from(jobs)
+      .where(and(inArray(jobs.id, ids), eq(jobs.userId, userId))).all()
+    tx.update(jobs).set({ archived: true })
+      .where(and(inArray(jobs.id, ids), eq(jobs.userId, userId))).run()
     return matching.length
   })
 
@@ -234,6 +244,7 @@ app.post('/bulk-archive', async (c) => {
 })
 
 app.patch('/:id', async (c) => {
+  const userId = c.get('userId')
   const idParam = c.req.param('id')
   if (!/^\d+$/.test(idParam)) {
     return c.json({ error: 'Invalid job id' }, 400)
@@ -260,9 +271,9 @@ app.patch('/:id', async (c) => {
     return c.json({ error: 'No updatable fields provided' }, 400)
   }
 
-  const existing = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
+  const existing = db.select().from(jobs).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
   if (!existing) {
-    return c.json({ error: 'Job not found' }, 404)
+    return c.json({ error: 'Not found' }, 404)
   }
 
   const updateFields: Partial<typeof jobs.$inferInsert> = {}
@@ -277,7 +288,7 @@ app.patch('/:id', async (c) => {
   if (patch.statusOverride !== undefined) updateFields.statusOverride = patch.statusOverride
   if (patch.archived !== undefined) updateFields.archived = patch.archived
 
-  db.update(jobs).set(updateFields).where(eq(jobs.id, rawId)).run()
+  db.update(jobs).set(updateFields).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
 
   if (
     patch.statusOverride !== undefined &&
@@ -291,11 +302,12 @@ app.patch('/:id', async (c) => {
     }).run()
   }
 
-  const updatedJob = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
+  const updatedJob = db.select().from(jobs).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
   return c.json({ job: updatedJob })
 })
 
 app.post('/:id/generate-cover-letter', async (c) => {
+  const userId = c.get('userId')
   const idParam = c.req.param('id')
   if (!/^\d+$/.test(idParam)) {
     return c.json({ error: 'Invalid job id' }, 400)
@@ -305,7 +317,7 @@ app.post('/:id/generate-cover-letter', async (c) => {
     return c.json({ error: 'Invalid job id' }, 400)
   }
 
-  const job = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
+  const job = db.select().from(jobs).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
   if (!job) {
     return c.json({ error: 'Job not found' }, 404)
   }
@@ -346,10 +358,11 @@ app.post('/:id/generate-cover-letter', async (c) => {
     db.transaction((tx) => {
       tx.insert(coverLetters).values({
         jobId: rawId,
+        userId,
         content: coverLetterText,
         createdAt: now,
       }).run()
-      tx.update(jobs).set({ coverLetterSentAt: now }).where(eq(jobs.id, rawId)).run()
+      tx.update(jobs).set({ coverLetterSentAt: now }).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
     })
   } catch {
     return c.json({ error: 'Failed to store cover letter' }, 500)
@@ -362,7 +375,7 @@ app.post('/:id/generate-cover-letter', async (c) => {
   }
 
   const inserted = db.select().from(coverLetters)
-    .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.createdAt, now)))
+    .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.createdAt, now), eq(coverLetters.userId, userId)))
     .get()
 
   recordRun({ name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
@@ -371,6 +384,7 @@ app.post('/:id/generate-cover-letter', async (c) => {
 })
 
 app.post('/:id/generate-resume', async (c) => {
+  const userId = c.get('userId')
   const idParam = c.req.param('id')
   if (!/^\d+$/.test(idParam)) {
     return c.json({ error: 'Invalid job id' }, 400)
@@ -380,7 +394,7 @@ app.post('/:id/generate-resume', async (c) => {
     return c.json({ error: 'Invalid job id' }, 400)
   }
 
-  const job = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
+  const job = db.select().from(jobs).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
   if (!job) {
     return c.json({ error: 'Job not found' }, 404)
   }
@@ -417,7 +431,7 @@ app.post('/:id/generate-resume', async (c) => {
     const tmpPath = join(resumesDir, `${rawId}.pdf.tmp`)
     await Bun.write(tmpPath, pdfBuffer)
     renameSync(tmpPath, finalPath)
-    db.update(jobs).set({ resumeGeneratedAt: new Date().toISOString() }).where(eq(jobs.id, rawId)).run()
+    db.update(jobs).set({ resumeGeneratedAt: new Date().toISOString() }).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
   } catch (err) {
     console.error('Failed to persist resume PDF:', err)
     // Non-fatal — user still gets their download
@@ -434,6 +448,7 @@ app.post('/:id/generate-resume', async (c) => {
 })
 
 app.get('/:id/resume', async (c) => {
+  const userId = c.get('userId')
   const idParam = c.req.param('id')
   if (!/^\d+$/.test(idParam)) {
     return c.json({ error: 'Invalid job id' }, 400)
@@ -443,7 +458,7 @@ app.get('/:id/resume', async (c) => {
     return c.json({ error: 'Invalid job id' }, 400)
   }
 
-  const job = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
+  const job = db.select().from(jobs).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
   if (!job) {
     return c.json({ error: 'Job not found' }, 404)
   }
@@ -469,6 +484,7 @@ app.get('/:id/resume', async (c) => {
 })
 
 app.get('/:id/cover-letter', async (c) => {
+  const userId = c.get('userId')
   const idParam = c.req.param('id')
   if (!/^\d+$/.test(idParam)) {
     return c.json({ error: 'Invalid job id' }, 400)
@@ -478,8 +494,14 @@ app.get('/:id/cover-letter', async (c) => {
     return c.json({ error: 'Invalid job id' }, 400)
   }
 
+  const job = db.select({ id: jobs.id }).from(jobs)
+    .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
+  }
+
   const letter = db.select().from(coverLetters)
-    .where(eq(coverLetters.jobId, rawId))
+    .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.userId, userId)))
     .orderBy(desc(coverLetters.createdAt))
     .get()
 
@@ -491,6 +513,7 @@ app.get('/:id/cover-letter', async (c) => {
 })
 
 app.get('/:id/cover-letter/pdf', async (c) => {
+  const userId = c.get('userId')
   const idParam = c.req.param('id')
   if (!/^\d+$/.test(idParam)) {
     return c.json({ error: 'Invalid job id' }, 400)
@@ -500,7 +523,7 @@ app.get('/:id/cover-letter/pdf', async (c) => {
     return c.json({ error: 'Invalid job id' }, 400)
   }
 
-  const job = db.select().from(jobs).where(eq(jobs.id, rawId)).get()
+  const job = db.select().from(jobs).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
   if (!job) {
     return c.json({ error: 'Job not found' }, 404)
   }

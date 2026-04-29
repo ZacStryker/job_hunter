@@ -4,8 +4,9 @@ import { db } from '../../db/client'
 import { prompts } from '../../db/schema'
 import { PROMPT_FLOWS, DEFAULT_PROMPTS } from '../services/prompt-defaults'
 import { promptInputSchema } from '../../shared/schemas'
+import type { AppEnv } from '../types'
 
-const app = new Hono()
+const app = new Hono<AppEnv>()
 
 app.get('/', (c) => {
   const rows = db.select().from(prompts).all()

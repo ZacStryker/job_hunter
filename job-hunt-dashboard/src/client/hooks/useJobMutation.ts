@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Job } from '@shared/schemas'
+import { apiFetch } from '../lib/api'
 
 type JobPatch = {
   applied?: boolean
@@ -14,7 +15,7 @@ export function useJobMutation(jobId: number) {
 
   return useMutation<Job, Error, MutationInput, { previousJobs: Job[] | undefined }>({
     mutationFn: async ({ id, patch }) => {
-      const res = await fetch(`/api/jobs/${id}`, {
+      const res = await apiFetch(`/api/jobs/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),

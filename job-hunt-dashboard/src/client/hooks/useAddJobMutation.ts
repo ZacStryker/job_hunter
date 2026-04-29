@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { apiFetch } from '../lib/api'
 
 interface AddJobInput {
   company: string
@@ -11,7 +12,7 @@ export function useAddJobMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (data: AddJobInput) => {
-      const res = await fetch('/api/jobs', {
+      const res = await apiFetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
 import { ingestPayloadSchema } from '../../shared/schemas'
 import { ingestJobs } from '../services/ingest-service'
+import type { AppEnv } from '../types'
 
-const app = new Hono()
+const app = new Hono<AppEnv>()
 
 app.post('/', async (c) => {
   let body: unknown
@@ -17,7 +18,8 @@ app.post('/', async (c) => {
     return c.json({ error: parsed.error.message }, 400)
   }
 
-  const result = ingestJobs(parsed.data)
+  const userId = c.get('userId')
+  const result = ingestJobs(parsed.data, userId)
   return c.json(result)
 })
 

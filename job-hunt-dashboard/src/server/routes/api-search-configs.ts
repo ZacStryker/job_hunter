@@ -1,17 +1,20 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { searchConfigs } from '../../db/schema'
 import { searchConfigInputSchema } from '../../shared/schemas'
+import type { AppEnv } from '../types'
 
-const app = new Hono()
+const app = new Hono<AppEnv>()
 
 app.get('/', (c) => {
-  const rows = db.select().from(searchConfigs).all()
+  const userId = c.get('userId')
+  const rows = db.select().from(searchConfigs).where(eq(searchConfigs.userId, userId)).all()
   return c.json(rows)
 })
 
 app.post('/', async (c) => {
+  const userId = c.get('userId')
   let body: unknown
   try {
     body = await c.req.json()
@@ -23,11 +26,12 @@ app.post('/', async (c) => {
     return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body' }, 400)
   }
   const { source, query, location } = parsed.data
-  const result = db.insert(searchConfigs).values({ source, query, location }).returning().get()
+  const result = db.insert(searchConfigs).values({ source, query, location, userId }).returning().get()
   return c.json(result, 201)
 })
 
 app.put('/:id', async (c) => {
+  const userId = c.get('userId')
   const rawId = Number(c.req.param('id'))
   if (!Number.isInteger(rawId) || rawId <= 0) {
     return c.json({ error: 'Invalid id' }, 400)
@@ -46,7 +50,7 @@ app.put('/:id', async (c) => {
   const result = db
     .update(searchConfigs)
     .set({ source, query, location })
-    .where(eq(searchConfigs.id, rawId))
+    .where(and(eq(searchConfigs.id, rawId), eq(searchConfigs.userId, userId)))
     .returning()
     .get()
   if (!result) {
@@ -56,11 +60,15 @@ app.put('/:id', async (c) => {
 })
 
 app.delete('/:id', (c) => {
+  const userId = c.get('userId')
   const rawId = Number(c.req.param('id'))
   if (!Number.isInteger(rawId) || rawId <= 0) {
     return c.json({ error: 'Invalid id' }, 400)
   }
-  const result = db.delete(searchConfigs).where(eq(searchConfigs.id, rawId)).returning({ id: searchConfigs.id }).get()
+  const result = db.delete(searchConfigs)
+    .where(and(eq(searchConfigs.id, rawId), eq(searchConfigs.userId, userId)))
+    .returning({ id: searchConfigs.id })
+    .get()
   if (!result) {
     return c.json({ error: 'Not found' }, 404)
   }

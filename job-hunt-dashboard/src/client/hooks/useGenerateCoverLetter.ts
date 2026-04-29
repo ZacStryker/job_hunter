@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { CoverLetter } from '@shared/schemas'
+import { apiFetch } from '../lib/api'
 
 export function useGenerateCoverLetter(jobId: number) {
   const queryClient = useQueryClient()
@@ -7,7 +8,7 @@ export function useGenerateCoverLetter(jobId: number) {
   return useMutation<CoverLetter, Error>({
     mutationFn: async () => {
       if (!jobId) throw new Error('No job selected')
-      const res = await fetch(`/api/jobs/${jobId}/generate-cover-letter`, { method: 'POST' })
+      const res = await apiFetch(`/api/jobs/${jobId}/generate-cover-letter`, { method: 'POST' })
       if (!res.ok) {
         let message = `HTTP ${res.status}`
         try {

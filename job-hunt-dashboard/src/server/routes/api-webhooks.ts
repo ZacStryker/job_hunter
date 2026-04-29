@@ -3,20 +3,22 @@ import { stream } from 'hono/streaming'
 import { recordRun } from './api-webhook-runs'
 import { runDiscovery } from '../services/discovery-service'
 import { runAnalysis } from '../services/analysis-service'
+import type { AppEnv } from '../types'
 
 // USD per token (per-million prices / 1_000_000)
 const OPUS_4_7_INPUT = 15 / 1_000_000
 const OPUS_4_7_OUTPUT = 75 / 1_000_000
 
-const app = new Hono()
+const app = new Hono<AppEnv>()
 
 app.post('/discovery', (c) => {
   if (!process.env.SCRAPER_URL) return c.json({ error: 'SCRAPER_URL not configured' }, 503)
+  const userId = c.get('userId')
   return stream(c, async (s) => {
     const write = (ev: object) => s.writeln(JSON.stringify(ev))
     const startMs = Date.now()
     try {
-      const { inserted, bySource } = await runDiscovery((msg) => write({ status: msg }))
+      const { inserted, bySource } = await runDiscovery((msg) => write({ status: msg }), userId)
       recordRun({ name: 'Discovery', success: true, itemCount: inserted, errorMessage: null, durationMs: Date.now() - startMs, sourceBreakdown: Object.keys(bySource).length > 0 ? bySource : null })
       write({ done: true, inserted })
     } catch (err) {
@@ -30,11 +32,12 @@ app.post('/discovery', (c) => {
 
 app.post('/analysis', (c) => {
   if (!process.env.ANTHROPIC_API_KEY) return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 503)
+  const userId = c.get('userId')
   return stream(c, async (s) => {
     const write = (ev: object) => s.writeln(JSON.stringify(ev))
     const startMs = Date.now()
     try {
-      const { processed, failed, matched, archived, inputTokens, outputTokens } = await runAnalysis((msg) => write({ status: msg }))
+      const { processed, failed, matched, archived, inputTokens, outputTokens } = await runAnalysis((msg) => write({ status: msg }), userId)
       const costUsd = inputTokens * OPUS_4_7_INPUT + outputTokens * OPUS_4_7_OUTPUT
       recordRun({ name: 'Analysis', success: true, itemCount: processed, errorMessage: null,
         durationMs: Date.now() - startMs, inputTokens, outputTokens, costUsd, matchedCount: matched, archivedCount: archived })

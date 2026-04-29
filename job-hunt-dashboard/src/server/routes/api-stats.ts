@@ -3,8 +3,9 @@ import { db } from '../../db/client'
 import { jobs, webhookRuns, messages } from '../../db/schema'
 import { and, eq, gte, isNotNull } from 'drizzle-orm'
 import { STATS_PERIODS } from '../../shared/schemas'
+import type { AppEnv } from '../types'
 
-const app = new Hono()
+const app = new Hono<AppEnv>()
 
 function getPeriodCutoffs(period: string) {
   if (period === 'all') return { datetimeCutoff: null, dateCutoff: null }
@@ -28,6 +29,7 @@ function buildBaseWhere(archivedFilter: ArchivedFilter) {
 }
 
 app.get('/', (c) => {
+  const userId = c.get('userId')
   const rawPeriod = c.req.query('period') ?? 'all'
   const period = (STATS_PERIODS as readonly string[]).includes(rawPeriod) ? rawPeriod : 'all'
   const { datetimeCutoff, dateCutoff } = getPeriodCutoffs(period)
@@ -38,8 +40,8 @@ app.get('/', (c) => {
 
   const baseWhere = buildBaseWhere(archivedFilter)
 
-  // All jobs matching archivedFilter + dateScraped cutoff
-  const scrapedWhere = and(baseWhere, dateCutoff ? gte(jobs.dateScraped, dateCutoff) : undefined)
+  // All jobs matching archivedFilter + dateScraped cutoff + userId
+  const scrapedWhere = and(baseWhere, dateCutoff ? gte(jobs.dateScraped, dateCutoff) : undefined, eq(jobs.userId, userId))
   const viewJobs = db.select().from(jobs).where(scrapedWhere).all()
 
   // ── Jobs section ──
@@ -107,6 +109,7 @@ app.get('/', (c) => {
     eq(jobs.applied, true),
     archivedAppCond,
     dateCutoff ? gte(jobs.dateApplied, dateCutoff) : undefined,
+    eq(jobs.userId, userId),
   )
   const appliedJobs = db.select().from(jobs).where(appWhere).all()
 
@@ -115,7 +118,7 @@ app.get('/', (c) => {
     jobTitle: messages.jobTitle,
     type: messages.type,
     receivedAt: messages.receivedAt,
-  }).from(messages).where(isNotNull(messages.type)).all()
+  }).from(messages).where(and(isNotNull(messages.type), eq(messages.userId, userId))).all()
 
   const latestMessageByKey = new Map<string, { type: string; receivedAt: string }>()
   for (const msg of allMessages) {

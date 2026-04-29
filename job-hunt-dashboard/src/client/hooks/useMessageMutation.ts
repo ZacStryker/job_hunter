@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Message } from '@shared/schemas'
+import { apiFetch } from '../lib/api'
 
 type MessagePatch = {
   type?: string | null
@@ -12,7 +13,7 @@ export function useMessageMutation() {
 
   return useMutation<Message, Error, { id: number; patch: MessagePatch }>({
     mutationFn: async ({ id, patch }) => {
-      const res = await fetch(`/api/messages/${id}`, {
+      const res = await apiFetch(`/api/messages/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),

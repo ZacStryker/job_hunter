@@ -1,12 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { promptSchema } from '@shared/schemas'
 import type { PromptInput, PromptFlow } from '@shared/schemas'
+import { apiFetch } from '../lib/api'
 
 export function usePromptMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ flow, input }: { flow: PromptFlow; input: PromptInput }) => {
-      const res = await fetch(`/api/prompts/${flow}`, {
+      const res = await apiFetch(`/api/prompts/${flow}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),

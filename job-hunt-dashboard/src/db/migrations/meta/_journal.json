@@ -148,6 +148,27 @@
       "when": 1777378107951,
       "tag": "0020_auth_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1777450000000,
+      "tag": "0021_multi_tenancy",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1777450001000,
+      "tag": "0022_per_user_unique_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1777504049579,
+      "tag": "0023_remarkable_ronan",
+      "breakpoints": true
     }
   ]
 }

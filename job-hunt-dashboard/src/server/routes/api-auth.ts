@@ -23,6 +23,8 @@ const loginSchema = z.object({
 
 const resetRequestSchema = z.object({ email: z.string().email() })
 
+const resendActivationSchema = z.object({ email: z.string().email() })
+
 const resetSchema = z.object({
   token: z.string().min(1),
   newPassword: z.string().min(8),
@@ -135,6 +137,11 @@ app.get('/activate', async (c) => {
     httpOnly: true, secure: isSecure(), sameSite: 'Lax', path: '/', maxAge: 30 * 24 * 60 * 60,
   })
 
+  const csrfToken = randomBytes(32).toString('hex')
+  setCookie(c, 'csrf_token', csrfToken, {
+    httpOnly: false, secure: isSecure(), sameSite: 'Lax', path: '/', maxAge: 30 * 24 * 60 * 60,
+  })
+
   return c.redirect(`${process.env.APP_URL}/onboarding`, 302)
 })
 
@@ -174,7 +181,12 @@ app.post('/login', async (c) => {
     httpOnly: true, secure: isSecure(), sameSite: 'Lax', path: '/', maxAge: 30 * 24 * 60 * 60,
   })
 
-  return c.json({ onboardingComplete: false })
+  const csrfToken = randomBytes(32).toString('hex')
+  setCookie(c, 'csrf_token', csrfToken, {
+    httpOnly: false, secure: isSecure(), sameSite: 'Lax', path: '/', maxAge: 30 * 24 * 60 * 60,
+  })
+
+  return c.json({ onboardingComplete: true })
 })
 
 app.post('/logout', async (c) => {
@@ -191,6 +203,60 @@ app.post('/logout', async (c) => {
     path: '/',
     maxAge: 0,
   })
+
+  setCookie(c, 'csrf_token', '', {
+    httpOnly: false,
+    secure: isSecure(),
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: 0,
+  })
+
+  return c.body(null, 204)
+})
+
+app.get('/session', (c) => {
+  const sessionId = getCookie(c, 'session')
+  if (!sessionId) return c.json({ error: 'Unauthorized' }, 401)
+
+  const now = new Date().toISOString()
+  const session = db.select({ userId: sessions.userId }).from(sessions)
+    .where(and(eq(sessions.id, sessionId), gte(sessions.expiresAt, now)))
+    .get()
+  if (!session) return c.json({ error: 'Unauthorized' }, 401)
+
+  const user = db.select({ email: users.email, role: users.role }).from(users)
+    .where(eq(users.id, session.userId))
+    .get()
+  if (!user) return c.json({ error: 'Unauthorized' }, 401)
+
+  return c.json({ userId: session.userId, email: user.email, role: user.role })
+})
+
+app.post('/resend-activation', async (c) => {
+  let body: unknown
+  try { body = await c.req.json() } catch { return c.body(null, 204) }
+
+  const parsed = resendActivationSchema.safeParse(body)
+  if (!parsed.success) return c.body(null, 204)
+
+  const email = parsed.data.email.toLowerCase().trim()
+  const user = db.select().from(users).where(eq(users.email, email)).get()
+
+  if (!user || user.isActive) return c.body(null, 204)
+
+  const activationToken = randomBytes(32).toString('hex')
+  const activationTokenExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+
+  db.update(users).set({ activationToken, activationTokenExpiresAt })
+    .where(eq(users.id, user.id)).run()
+
+  const activationUrl = `${process.env.APP_URL}/auth/activate?token=${activationToken}`
+  sendMail({
+    to: email,
+    subject: 'Activate your account',
+    html: `<p>Click to activate your account: <a href="${activationUrl}">${activationUrl}</a></p>`,
+  }).catch((err: Error) => console.error('[auth] resend activation email failed:', err))
 
   return c.body(null, 204)
 })

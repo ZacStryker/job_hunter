@@ -55,6 +55,23 @@ So that the app can make AI analysis calls and poll my email using credentials t
 **When** `PUT /api/onboarding/imap` is called
 **Then** response is `400 { error: "Connection timed out — check your network and try again" }`
 
+**Given** a user has IMAP credentials stored in `user_secrets`
+**When** `POST /api/messages/sync` is called
+**Then** credentials are read from `user_secrets` (key_names: `imap_host`, `imap_port`, `imap_user`, `imap_pass`) and decrypted via `decrypt()`
+**And** `fetchAndStoreEmails` is called with the decrypted per-user credentials and the authenticated `userId`
+**And** global env var IMAP credentials (`IMAP_HOST`, `IMAP_USER`, `IMAP_PASS`) are no longer used — `user_secrets` is the sole credential source
+
+**Given** a user has no IMAP credentials in `user_secrets`
+**When** `POST /api/messages/sync` is called
+**Then** response is `503 { error: "Email sync not configured — add IMAP credentials in settings" }`
+
+**Given** stored IMAP credentials fail to decrypt
+**When** `POST /api/messages/sync` is called
+**Then** response is `500 { error: "Failed to read email credentials" }`
+**And** the decrypt error is logged via `console.error`
+
+> **Dev note:** `api-messages.ts` `POST /sync` must be updated in this story. Replace the env var block (`IMAP_HOST`/`IMAP_USER`/`IMAP_PASS`) with a `user_secrets` query scoped to the authenticated `userId`. Wrap all `decrypt()` calls in explicit try/catch — GCM decryption throws on tampered ciphertext and will surface as 500 without it.
+
 ## Story 25.2: Onboarding UI — 4-Step Setup Flow
 
 As a newly activated user,

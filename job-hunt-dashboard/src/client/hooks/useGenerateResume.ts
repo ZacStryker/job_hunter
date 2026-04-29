@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { apiFetch } from '../lib/api'
 
 export function useGenerateResume(jobId: number) {
   const queryClient = useQueryClient()
@@ -6,7 +7,7 @@ export function useGenerateResume(jobId: number) {
   return useMutation<void, Error>({
     mutationFn: async () => {
       if (!jobId) throw new Error('No job selected')
-      const res = await fetch(`/api/jobs/${jobId}/generate-resume`, { method: 'POST' })
+      const res = await apiFetch(`/api/jobs/${jobId}/generate-resume`, { method: 'POST' })
       if (!res.ok) {
         let message = `HTTP ${res.status}`
         try {

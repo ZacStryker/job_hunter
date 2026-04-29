@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { apiFetch } from '../lib/api'
 
 export interface WebhookStreamState {
   isPending: boolean
@@ -36,7 +37,7 @@ export function useWebhookStream(url: string): WebhookStreamState {
     let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
 
     try {
-      const response = await fetch(url, { method: 'POST', signal: controller.signal })
+      const response = await apiFetch(url, { method: 'POST', signal: controller.signal })
 
       if (!response.ok) {
         let message = `HTTP ${response.status}`

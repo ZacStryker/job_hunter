@@ -1,6 +1,7 @@
 process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, beforeAll, beforeEach, mock, spyOn } from 'bun:test'
+import { Hono } from 'hono'
 import { Database } from 'bun:sqlite'
 
 // Mock resume-service before any imports — prevents real Anthropic + Playwright calls
@@ -20,9 +21,16 @@ mock.module('node:fs', () => ({
 // Mock Bun.write to avoid writing real files in tests
 const mockBunWrite = spyOn(Bun, 'write').mockResolvedValue(0)
 
-const { default: jobsApp } = await import('./api-jobs')
+const { default: jobsRoute } = await import('./api-jobs')
 const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
+
+const jobsApp = (() => {
+  const w = new Hono()
+  w.use('*', (c, next) => { c.set('userId', 1); return next() })
+  w.route('/', jobsRoute)
+  return w
+})()
 
 const CREATE_JOBS_TABLE = `
   CREATE TABLE IF NOT EXISTS jobs (
@@ -35,8 +43,8 @@ const CREATE_JOBS_TABLE = `
     benefits TEXT, contact_name TEXT, contact_email TEXT, contact_phone TEXT,
     applied INTEGER NOT NULL DEFAULT 0, status TEXT, status_override TEXT,
     cover_letter_sent_at TEXT, date_applied TEXT, archived INTEGER NOT NULL DEFAULT 0,
-    resume_generated_at TEXT,
-    UNIQUE(company, job_title)
+    resume_generated_at TEXT, user_id INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(company, job_title, user_id)
   )
 `
 const CREATE_PROFILE_TABLE = `
@@ -73,7 +81,8 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL, run_at TEXT NOT NULL,
     success INTEGER NOT NULL, item_count INTEGER, error_message TEXT,
-    duration_ms INTEGER, input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL
+    duration_ms INTEGER, input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL,
+    matched_count INTEGER, archived_count INTEGER, source_breakdown TEXT
   )
 `
 

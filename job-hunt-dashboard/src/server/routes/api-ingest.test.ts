@@ -4,6 +4,7 @@
 process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, beforeAll, beforeEach } from 'bun:test'
+import { Hono } from 'hono'
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import * as schema from '../../db/schema'
@@ -22,9 +23,16 @@ const testDb = drizzle(sqlite, { schema })
 
 // Load the real production handler AFTER setting DB_PATH so db/client.ts
 // gets an in-memory database instead of the real file.
-const { default: ingestApp } = await import('../../server/routes/api-ingest')
+const { default: ingestRoute } = await import('../../server/routes/api-ingest')
 const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
+
+const ingestApp = (() => {
+  const w = new Hono()
+  w.use('*', (c, next) => { c.set('userId', 1); return next() })
+  w.route('/', ingestRoute)
+  return w
+})()
 
 // ---------------------------------------------------------------------------
 // Schema DDL (mirrors src/db/schema.ts and the real migration)
@@ -48,6 +56,7 @@ const CREATE_JOBS_TABLE = `
     location TEXT,
     external_job_id TEXT,
     analysis_status TEXT,
+    date_analyzed TEXT,
     salary TEXT,
     benefits TEXT,
     contact_name TEXT,
@@ -60,7 +69,8 @@ const CREATE_JOBS_TABLE = `
     date_applied TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
     resume_generated_at TEXT,
-    UNIQUE(company, job_title)
+    user_id INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(company, job_title, user_id)
   )
 `
 
@@ -95,9 +105,9 @@ function runIngest(db: DbType, rows: JobInput[]): { added: number; updated: numb
     for (const row of rows) {
       tx
         .insert(jobs)
-        .values(row)
+        .values({ ...row, userId: 1 })
         .onConflictDoUpdate({
-          target: [jobs.company, jobs.jobTitle],
+          target: [jobs.company, jobs.jobTitle, jobs.userId],
           set: {
             sourceUrl: sql`excluded.source_url`,
             dateScraped: sql`excluded.date_scraped`,

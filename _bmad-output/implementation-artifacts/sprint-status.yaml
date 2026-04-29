@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-04-28 # story 24.2 done
+last_updated: 2026-04-29 # epic 24 retrospective done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -175,9 +175,9 @@ development_status:
   epic-24: in-progress
   24-1-crypto-module-mailer-module-and-auth-db-schema: done
   24-2-auth-api-routes-registration-activation-login-logout-and-password-reset: done
-  24-3-per-user-data-isolation-migration-auth-middleware-and-query-scoping: backlog
-  24-4-auth-ui-landing-page-registration-check-email-and-login: backlog
-  epic-24-retrospective: optional
+  24-3-per-user-data-isolation-migration-auth-middleware-and-query-scoping: done
+  24-4-auth-ui-landing-page-registration-check-email-and-login: done
+  epic-24-retrospective: done
 
   # Epic 25: User Onboarding
   epic-25: backlog

@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { jobs, profile } from '../../db/schema'
 import { loadEffectivePrompt } from './prompt-defaults'
@@ -34,24 +34,24 @@ function applyAnalysisTemplate(
     .replaceAll('{{JOB_LISTING_JSON}}', jobJson)
 }
 
-export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{ processed: number; failed: number; matched: number; archived: number; inputTokens: number; outputTokens: number }> {
+export async function runAnalysis(onProgress?: (msg: string) => void, userId?: number): Promise<{ processed: number; failed: number; matched: number; archived: number; inputTokens: number; outputTokens: number }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
   const scraperUrl = process.env.SCRAPER_URL
   const scraperToken = process.env.SCRAPER_TOKEN
 
-  // Fetch profile once before the loop
   const profileRow = db.select().from(profile).limit(1).get() ?? null
-
-  // Load prompt config once before the loop
   const promptConfig = loadEffectivePrompt('analysis')
 
-  // Query up to 10 pending jobs
   const pendingJobs = db
     .select()
     .from(jobs)
-    .where(and(eq(jobs.analysisStatus, 'pending'), eq(jobs.archived, false)))
+    .where(and(
+      eq(jobs.analysisStatus, 'pending'),
+      eq(jobs.archived, false),
+      userId !== undefined ? eq(jobs.userId, userId) : sql`1=1`,
+    ))
     .limit(10)
     .all()
 
@@ -67,11 +67,11 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
   for (const job of pendingJobs) {
     i++
     onProgress?.(`Analyzing ${i} / ${pendingJobs.length}: ${job.company} — ${job.jobTitle}`)
-    // Mark as analyzing before any external call
-    db.update(jobs).set({ analysisStatus: 'analyzing' }).where(eq(jobs.id, job.id)).run()
+    db.update(jobs).set({ analysisStatus: 'analyzing' })
+      .where(and(eq(jobs.id, job.id), userId !== undefined ? eq(jobs.userId, userId) : sql`1=1`))
+      .run()
 
     try {
-      // Step 1: Fetch description from scraper — failure is non-fatal, continues with empty description
       let description = ''
       if (scraperUrl && job.sourceUrl) {
         try {
@@ -96,11 +96,9 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
           description = scraperData.description?.replace(/[\r\n]+/g, ' ').trim() ?? ''
         } catch (scraperErr) {
           console.error(`[analysis] scraper failed for job ${job.id}:`, scraperErr instanceof Error ? scraperErr.message : String(scraperErr))
-          // Continue to Anthropic with empty description — scraper failure is not job failure
         }
       }
 
-      // Step 2: Build prompt via template substitution
       const candidateName = profileRow?.name ?? 'a candidate'
       const profileJson = JSON.stringify({
         Name: profileRow?.name ?? null,
@@ -120,7 +118,6 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
       })
       const userMessage = applyAnalysisTemplate(promptConfig.userMessage, candidateName, profileJson, jobJson)
 
-      // Step 3: Call Anthropic (single user message — no system field)
       const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -142,7 +139,6 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
       totalOutputTokens += anthropicData.usage?.output_tokens ?? 0
       const text = anthropicData.content.find((b) => b.type === 'text')?.text ?? ''
 
-      // Parse JSON — try direct parse first, fall back to regex extraction
       let result: AnalysisResult
       try {
         result = JSON.parse(text) as AnalysisResult
@@ -152,7 +148,6 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
         result = JSON.parse(jsonMatch[0]) as AnalysisResult
       }
 
-      // Step 4: Write results to DB
       db.update(jobs)
         .set({
           fitScore: typeof result.score === 'number' ? result.score : null,
@@ -171,14 +166,16 @@ export async function runAnalysis(onProgress?: (msg: string) => void): Promise<{
           dateAnalyzed: new Date().toLocaleDateString('en-CA'),
           ...(result.recommended_action === 'skip' ? { archived: true } : {}),
         })
-        .where(eq(jobs.id, job.id))
+        .where(and(eq(jobs.id, job.id), userId !== undefined ? eq(jobs.userId, userId) : sql`1=1`))
         .run()
 
       if (result.recommended_action === 'skip') archivedInRun++
       processed++
     } catch (err) {
       console.error(`[analysis] job ${job.id} failed:`, err instanceof Error ? err.message : String(err))
-      db.update(jobs).set({ analysisStatus: 'failed' }).where(eq(jobs.id, job.id)).run()
+      db.update(jobs).set({ analysisStatus: 'failed' })
+        .where(and(eq(jobs.id, job.id), userId !== undefined ? eq(jobs.userId, userId) : sql`1=1`))
+        .run()
       failed++
     }
   }

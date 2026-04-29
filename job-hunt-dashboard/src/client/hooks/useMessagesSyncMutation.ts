@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { apiFetch } from '../lib/api'
 
 export function useMessagesSyncMutation() {
   const queryClient = useQueryClient()
 
   return useMutation<{ added: number }, Error>({
     mutationFn: async () => {
-      const res = await fetch('/api/messages/sync', { method: 'POST' })
+      const res = await apiFetch('/api/messages/sync', { method: 'POST' })
       if (!res.ok) {
         let message = `HTTP ${res.status}`
         try {

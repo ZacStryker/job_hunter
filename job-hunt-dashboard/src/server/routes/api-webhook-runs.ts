@@ -2,8 +2,9 @@ import { Hono } from 'hono'
 import { desc } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { webhookRuns } from '../../db/schema'
+import type { AppEnv } from '../types'
 
-const app = new Hono()
+const app = new Hono<AppEnv>()
 
 export function recordRun(params: {
   name: string

@@ -2,8 +2,9 @@ import { Hono } from 'hono'
 import { db } from '../../db/client'
 import { profile } from '../../db/schema'
 import { profileInputSchema } from '../../shared/schemas'
+import type { AppEnv } from '../types'
 
-const app = new Hono()
+const app = new Hono<AppEnv>()
 
 const EMPTY_PROFILE = {
   id: 1,

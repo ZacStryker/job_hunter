@@ -234,6 +234,7 @@ describe('GET /activate', () => {
     expect(cookie).toContain('session=')
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('SameSite=Lax')
+    expect(cookie).toContain('csrf_token=')
 
     const updatedUser = getUser('test@example.com')!
     expect(updatedUser.is_active).toBe(1)
@@ -284,7 +285,7 @@ describe('POST /login', () => {
     expect(body.error).toBe('Account is disabled')
   })
 
-  test('success → 200 { onboardingComplete: false }; set-cookie present', async () => {
+  test('success → 200 { onboardingComplete: true }; set-cookie has session + csrf_token', async () => {
     await registerUser()
     const user = getUser('test@example.com')!
     prodSqlite.run(`UPDATE users SET is_active = 1 WHERE id = ?`, [user.id])
@@ -296,12 +297,13 @@ describe('POST /login', () => {
     })
     expect(res.status).toBe(200)
     const body = await res.json() as Record<string, unknown>
-    expect(body).toEqual({ onboardingComplete: false })
+    expect(body).toEqual({ onboardingComplete: true })
 
     const cookie = res.headers.get('set-cookie')
     expect(cookie).toContain('session=')
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('SameSite=Lax')
+    expect(cookie).toContain('csrf_token=')
   })
 })
 
@@ -337,6 +339,117 @@ describe('POST /logout', () => {
     const logoutCookie = res.headers.get('set-cookie')
     expect(logoutCookie).not.toBeNull()
     expect(logoutCookie).toContain('session=')
+  })
+})
+
+// ---- GET /session tests ----
+
+describe('GET /session', () => {
+  test('no cookie → 401', async () => {
+    const res = await authApp.request('/session')
+    expect(res.status).toBe(401)
+    const body = await res.json() as Record<string, unknown>
+    expect(body.error).toBe('Unauthorized')
+  })
+
+  test('invalid session id → 401', async () => {
+    const res = await authApp.request('/session', {
+      headers: { Cookie: 'session=nonexistent' },
+    })
+    expect(res.status).toBe(401)
+    const body = await res.json() as Record<string, unknown>
+    expect(body.error).toBe('Unauthorized')
+  })
+
+  test('expired session → 401', async () => {
+    await registerUser()
+    const user = getUser('test@example.com')!
+    prodSqlite.run(`UPDATE users SET is_active = 1 WHERE id = ?`, [user.id])
+
+    const loginRes = await authApp.request('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'test@example.com', password: 'password123' }),
+    })
+    const sessionId = extractSessionId(loginRes.headers.get('set-cookie'))!
+    const past = new Date(Date.now() - 1000).toISOString()
+    prodSqlite.run(`UPDATE sessions SET expires_at = ? WHERE id = ?`, [past, sessionId])
+
+    const res = await authApp.request('/session', {
+      headers: { Cookie: `session=${sessionId}` },
+    })
+    expect(res.status).toBe(401)
+    const body = await res.json() as Record<string, unknown>
+    expect(body.error).toBe('Unauthorized')
+  })
+
+  test('valid session → 200 { userId, email, role }', async () => {
+    await registerUser()
+    const user = getUser('test@example.com')!
+    prodSqlite.run(`UPDATE users SET is_active = 1 WHERE id = ?`, [user.id])
+
+    const loginRes = await authApp.request('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'test@example.com', password: 'password123' }),
+    })
+    const sessionId = extractSessionId(loginRes.headers.get('set-cookie'))!
+
+    const res = await authApp.request('/session', {
+      headers: { Cookie: `session=${sessionId}` },
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json() as Record<string, unknown>
+    expect(typeof body.userId).toBe('number')
+    expect(body.email).toBe('test@example.com')
+    expect(body.role).toBe('standard')
+  })
+})
+
+// ---- POST /resend-activation tests ----
+
+describe('POST /resend-activation', () => {
+  test('unknown email → 204 silently', async () => {
+    const res = await authApp.request('/resend-activation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'nobody@example.com' }),
+    })
+    expect(res.status).toBe(204)
+  })
+
+  test('already active user email → 204 silently; no token update', async () => {
+    await registerUser()
+    const user = getUser('test@example.com')!
+    prodSqlite.run(`UPDATE users SET is_active = 1 WHERE id = ?`, [user.id])
+
+    const res = await authApp.request('/resend-activation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'test@example.com' }),
+    })
+    expect(res.status).toBe(204)
+
+    const updated = getUser('test@example.com')!
+    expect(updated.activation_token).toBe(user.activation_token)
+  })
+
+  test('inactive user → 204; new activation token generated', async () => {
+    await registerUser()
+    const user = getUser('test@example.com')!
+    const originalToken = user.activation_token
+
+    const res = await authApp.request('/resend-activation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'test@example.com' }),
+    })
+    expect(res.status).toBe(204)
+
+    const updated = getUser('test@example.com')!
+    expect(updated.activation_token).not.toBe(originalToken)
+    expect(updated.activation_token).toBeTruthy()
+    expect(updated.activation_token_expires_at).toBeTruthy()
   })
 })
 

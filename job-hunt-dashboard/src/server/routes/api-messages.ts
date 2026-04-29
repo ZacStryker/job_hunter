@@ -5,8 +5,9 @@ import { db } from '../../db/client'
 import { messages } from '../../db/schema'
 import { MESSAGE_TYPES } from '../../shared/schemas'
 import { fetchAndStoreEmails } from '../services/email-fetch-service'
+import type { AppEnv } from '../types'
 
-const app = new Hono()
+const app = new Hono<AppEnv>()
 
 const messagePatchSchema = z.object({
   type: z.enum(MESSAGE_TYPES).nullable().optional(),
@@ -15,22 +16,25 @@ const messagePatchSchema = z.object({
 })
 
 app.get('/', (c) => {
+  const userId = c.get('userId')
   const all = db.select().from(messages)
     .where(and(
       notLike(messages.fromAddress, '%zac@zacstryker.com%'),
       notLike(messages.fromAddress, '%indeedapply@indeed.com%'),
+      eq(messages.userId, userId),
     ))
     .orderBy(desc(messages.receivedAt)).all()
   return c.json({ messages: all })
 })
 
 app.post('/sync', async (c) => {
+  const userId = c.get('userId')
   const { IMAP_HOST, IMAP_USER, IMAP_PASS } = process.env
   if (!IMAP_HOST || !IMAP_USER || !IMAP_PASS) {
     return c.json({ error: 'Email sync not configured (IMAP credentials missing)' }, 503)
   }
   try {
-    const result = await fetchAndStoreEmails({ host: IMAP_HOST, user: IMAP_USER, pass: IMAP_PASS })
+    const result = await fetchAndStoreEmails({ host: IMAP_HOST, user: IMAP_USER, pass: IMAP_PASS }, userId)
     return c.json({ added: result.added })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Email sync failed'
@@ -39,6 +43,7 @@ app.post('/sync', async (c) => {
 })
 
 app.patch('/:id', async (c) => {
+  const userId = c.get('userId')
   const idParam = c.req.param('id')
   if (!/^\d+$/.test(idParam)) {
     return c.json({ error: 'Invalid message id' }, 400)
@@ -65,7 +70,7 @@ app.patch('/:id', async (c) => {
     return c.json({ error: 'No updatable fields provided' }, 400)
   }
 
-  const existing = db.select().from(messages).where(eq(messages.id, rawId)).get()
+  const existing = db.select().from(messages).where(and(eq(messages.id, rawId), eq(messages.userId, userId))).get()
   if (!existing) {
     return c.json({ error: 'Message not found' }, 404)
   }
@@ -75,9 +80,9 @@ app.patch('/:id', async (c) => {
   if (patch.company !== undefined) updateFields.company = patch.company
   if (patch.jobTitle !== undefined) updateFields.jobTitle = patch.jobTitle
 
-  db.update(messages).set(updateFields).where(eq(messages.id, rawId)).run()
+  db.update(messages).set(updateFields).where(and(eq(messages.id, rawId), eq(messages.userId, userId))).run()
 
-  const updated = db.select().from(messages).where(eq(messages.id, rawId)).get()
+  const updated = db.select().from(messages).where(and(eq(messages.id, rawId), eq(messages.userId, userId))).get()
   if (!updated) return c.json({ error: 'Message not found' }, 404)
   return c.json({ message: updated })
 })

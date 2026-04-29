@@ -1,6 +1,7 @@
 process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, mock, spyOn, beforeAll, beforeEach } from 'bun:test'
+import { Hono } from 'hono'
 import { Database } from 'bun:sqlite'
 
 // --- Mock cover-letter-service BEFORE dynamic import ---
@@ -25,9 +26,16 @@ mock.module('node:fs', () => ({
 spyOn(Bun, 'write').mockResolvedValue(0)
 
 // --- Import AFTER mock ---
-const { default: jobsApp } = await import('./api-jobs')
+const { default: jobsRoute } = await import('./api-jobs')
 const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
+
+const jobsApp = (() => {
+  const w = new Hono()
+  w.use('*', (c, next) => { c.set('userId', 1); return next() })
+  w.route('/', jobsRoute)
+  return w
+})()
 
 const CREATE_JOBS_TABLE = `
   CREATE TABLE IF NOT EXISTS jobs (
@@ -59,7 +67,8 @@ const CREATE_JOBS_TABLE = `
     date_applied TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
     resume_generated_at TEXT,
-    UNIQUE(company, job_title)
+    user_id INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(company, job_title, user_id)
   )
 `
 const CREATE_COVER_LETTERS_TABLE = `
@@ -67,7 +76,8 @@ const CREATE_COVER_LETTERS_TABLE = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id INTEGER NOT NULL,
     content TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    user_id INTEGER NOT NULL DEFAULT 1
   )
 `
 const CREATE_WEBHOOK_RUNS_TABLE = `
@@ -75,7 +85,8 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL, run_at TEXT NOT NULL,
     success INTEGER NOT NULL, item_count INTEGER, error_message TEXT,
-    duration_ms INTEGER, input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL
+    duration_ms INTEGER, input_tokens INTEGER, output_tokens INTEGER, cost_usd REAL,
+    matched_count INTEGER, archived_count INTEGER, source_breakdown TEXT
   )
 `
 const CREATE_PROFILE_TABLE = `

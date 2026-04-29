@@ -447,3 +447,18 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 - **Migration seed data hard-codes personal search terms** — Required by AC-2 for behavior-unchanged first boot. Will need a strategy when multi-user is introduced (each user should get their own defaults, not shared seeds).
 - **Edit button clickable while `addMutation.isPending`** — Low UX impact; concurrent add + edit state is possible but resolves cleanly via invalidation.
 - **Error messages (save/delete) may be off-screen when table is long** — UX polish; move error rendering to a fixed-position toast or above the table header in a future accessibility pass.
+
+## Deferred from: code review of 24-4-auth-ui-landing-page-registration-check-email-and-login (2026-04-29)
+
+- `apiFetch` drops CSRF header when `csrf_token` cookie is absent — server correctly rejects; task spec says "add header if cookie exists"; intentional behavior. No action unless CSRF silent-skip causes user confusion in practice.
+- `useSessionQuery` hook exported but never called — `fetchSession` is used directly by the router; dead export, not a bug. Remove or use when components need to read session state reactively.
+- `GET /session` executes two separate DB queries (session lookup, then user lookup) — minor TOCTOU; race resolves safely to 401; consider collapsing into a single JOIN when doing an auth-route hardening pass.
+- Network-outage redirect loop — `protectedRoute` error redirects to `/login`; `loginRoute` `beforeLoad` `fetch` may also fail on the same outage, surfacing an error screen instead of the login form. Address when adding robust error boundaries to auth routes.
+- CSRF timing-safe comparison missing in `auth-middleware.ts` — plain string equality is used for CSRF token comparison; vulnerable to timing oracle; `timingSafeEqual` from `node:crypto` would close this. Pre-existing from story 24.3; `auth-middleware.ts` is out of scope until a dedicated security hardening pass.
+- `APP_URL` undefined → broken activation/reset email links — `process.env.APP_URL` has no startup validation; missing value produces relative-path links that don't work in email clients. Pre-existing across all auth handlers; address in Epic 27 deployment configuration.
+- Invite key field shows raw server error string — AC10 doesn't specify text for invite key errors; the email-field error is localized to "Email already in use — sign in instead" but the invite-key error displays the raw server message. UX improvement only; address in a future polish pass.
+
+## Deferred from: code review of 24-3-per-user-data-isolation-migration-auth-middleware-and-query-scoping (2026-04-29)
+
+- **`webhookRuns` table has no `userId` column** — all users see shared pipeline run history in the stats view; webhook_runs user_id scoping was explicitly excluded from story 24.3 scope per spec. Address in a future story within Epic 24 or 26.
+- **`profile` table is not multi-tenant** — `analysis-service` fetches a single shared profile row (`limit(1)`) for all users' job analyses. Profile isolation is deferred to Epic 25 onboarding stories where per-user profile setup will be implemented.

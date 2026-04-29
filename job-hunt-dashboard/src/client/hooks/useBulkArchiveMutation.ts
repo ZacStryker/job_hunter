@@ -1,12 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Job } from '@shared/schemas'
+import { apiFetch } from '../lib/api'
 
 export function useBulkArchiveMutation() {
   const queryClient = useQueryClient()
 
   return useMutation<{ archived: number }, Error, number[], { previousJobs: Job[] | undefined }>({
     mutationFn: async (ids) => {
-      const res = await fetch('/api/jobs/bulk-archive', {
+      const res = await apiFetch('/api/jobs/bulk-archive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids }),

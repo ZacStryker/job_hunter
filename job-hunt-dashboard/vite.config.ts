@@ -17,6 +17,10 @@ export default defineConfig({
         target: 'http://127.0.0.1:3001',
         timeout: 120000,
       },
+      '/auth': {
+        target: 'http://127.0.0.1:3001',
+        timeout: 120000,
+      },
     },
   },
 })

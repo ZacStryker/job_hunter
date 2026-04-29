@@ -1,12 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { profileSchema } from '@shared/schemas'
 import type { ProfileInput } from '@shared/schemas'
+import { apiFetch } from '../lib/api'
 
 export function useProfileMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (input: ProfileInput) => {
-      const res = await fetch('/api/profile', {
+      const res = await apiFetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),

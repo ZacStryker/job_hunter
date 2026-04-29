@@ -38,7 +38,8 @@ const CREATE_JOBS_TABLE = `
     date_applied TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
     resume_generated_at TEXT,
-    UNIQUE(company, job_title)
+    user_id INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(company, job_title, user_id)
   )
 `
 
@@ -145,7 +146,7 @@ describe('runAnalysis()', () => {
     const { id } = insertPendingJob()
     mockFetchSuccess('Job description text.')
 
-    const result = await runAnalysis()
+    const result = await runAnalysis(undefined, 1)
 
     expect(result.processed).toBe(1)
     expect(result.failed).toBe(0)
@@ -187,7 +188,7 @@ describe('runAnalysis()', () => {
       )
     }) as typeof globalThis.fetch
 
-    const result = await runAnalysis()
+    const result = await runAnalysis(undefined, 1)
 
     // Job should still be processed successfully — scraper failure is non-fatal
     expect(result.processed).toBe(1)
@@ -214,7 +215,7 @@ describe('runAnalysis()', () => {
       return Promise.resolve(new Response(null, { status: 500 }))
     }) as typeof globalThis.fetch
 
-    const result = await runAnalysis()
+    const result = await runAnalysis(undefined, 1)
 
     expect(result.failed).toBe(1)
     expect(result.processed).toBe(0)
@@ -243,7 +244,7 @@ describe('runAnalysis()', () => {
       )
     }) as typeof globalThis.fetch
 
-    const result = await runAnalysis()
+    const result = await runAnalysis(undefined, 1)
 
     expect(result.failed).toBe(1)
     const row = prodSqlite.prepare('SELECT analysis_status FROM jobs WHERE id = ?').get(id) as { analysis_status: string }
@@ -255,7 +256,7 @@ describe('runAnalysis()', () => {
     mockFetchSuccess()
     // No profile row inserted
 
-    const result = await runAnalysis()
+    const result = await runAnalysis(undefined, 1)
     expect(result.processed).toBe(1)
     expect(result.failed).toBe(0)
   })
@@ -265,7 +266,7 @@ describe('runAnalysis()', () => {
     delete process.env.ANTHROPIC_API_KEY
     insertPendingJob()
 
-    await expect(runAnalysis()).rejects.toThrow('ANTHROPIC_API_KEY not configured')
+    await expect(runAnalysis(undefined, 1)).rejects.toThrow('ANTHROPIC_API_KEY not configured')
 
     process.env.ANTHROPIC_API_KEY = original
 
@@ -297,7 +298,7 @@ describe('runAnalysis()', () => {
       )
     }) as typeof globalThis.fetch
 
-    const result = await runAnalysis()
+    const result = await runAnalysis(undefined, 1)
 
     expect(result.processed).toBe(1)
     expect(result.failed).toBe(0)
@@ -315,7 +316,7 @@ describe('runAnalysis()', () => {
     const { id } = insertPendingJob()
     mockFetchSuccess()
 
-    await runAnalysis()
+    await runAnalysis(undefined, 1)
 
     const row = prodSqlite
       .prepare('SELECT archived FROM jobs WHERE id = ?')
@@ -330,7 +331,7 @@ describe('runAnalysis()', () => {
     mockFetchSuccess()
 
     const messages: string[] = []
-    await runAnalysis((msg) => messages.push(msg))
+    await runAnalysis((msg) => messages.push(msg), 1)
 
     expect(messages[0]).toBe('Found 2 jobs to analyze')
     expect(messages[1]).toMatch(/^Analyzing 1 \/ 2: /)
@@ -341,7 +342,7 @@ describe('runAnalysis()', () => {
     insertPendingJob()
     mockFetchSuccess('desc', { input_tokens: 150, output_tokens: 75 })
 
-    const result = await runAnalysis()
+    const result = await runAnalysis(undefined, 1)
 
     expect(result.inputTokens).toBe(150)
     expect(result.outputTokens).toBe(75)
@@ -352,7 +353,7 @@ describe('runAnalysis()', () => {
     insertPendingJob({ company: 'Company B', job_title: 'Job B', external_job_id: 'ext-b' })
     mockFetchSuccess('desc', { input_tokens: 100, output_tokens: 50 })
 
-    const result = await runAnalysis()
+    const result = await runAnalysis(undefined, 1)
 
     expect(result.processed).toBe(2)
     expect(result.inputTokens).toBe(200)
@@ -379,7 +380,7 @@ describe('runAnalysis()', () => {
       return Promise.resolve(new Response(null, { status: 500 }))
     }) as typeof globalThis.fetch
 
-    const result = await runAnalysis()
+    const result = await runAnalysis(undefined, 1)
 
     expect(result.processed).toBe(1)
     expect(result.failed).toBe(1)
@@ -397,7 +398,7 @@ describe('runAnalysis()', () => {
     }
     mockFetchSuccess()
 
-    const result = await runAnalysis()
+    const result = await runAnalysis(undefined, 1)
 
     expect(result.processed + result.failed).toBe(10)
     const doneCount = (prodSqlite.prepare("SELECT COUNT(*) as c FROM jobs WHERE analysis_status = 'done'").get() as { c: number }).c

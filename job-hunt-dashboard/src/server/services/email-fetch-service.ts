@@ -20,16 +20,17 @@ const FOLDERS: Array<{ name: string; type: string | null }> = [
   { name: 'INBOX/Interview', type: 'Interview' },
 ]
 
-export async function fetchAndStoreEmails(credentials: ImapCredentials): Promise<{ added: number }> {
+export async function fetchAndStoreEmails(credentials: ImapCredentials, userId: number): Promise<{ added: number }> {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
   const existingUids = new Set(
-    db.select({ uid: messages.uid }).from(messages).all().map((r) => r.uid)
+    db.select({ uid: messages.uid }).from(messages).where(eq(messages.userId, userId)).all().map((r) => r.uid)
   )
 
   const existingByMessageId = new Map(
     db.select({ id: messages.id, messageId: messages.messageId, type: messages.type })
       .from(messages)
+      .where(eq(messages.userId, userId))
       .all()
       .filter((r) => r.messageId !== null)
       .map((r) => [r.messageId as string, { id: r.id, type: r.type }])
@@ -92,7 +93,7 @@ export async function fetchAndStoreEmails(credentials: ImapCredentials): Promise
             const subject = envelope.subject ?? ''
 
             db.insert(messages)
-              .values({ uid: uidStr, messageId: msgId, receivedAt, fromAddress, subject, type: folder.type })
+              .values({ uid: uidStr, messageId: msgId, receivedAt, fromAddress, subject, type: folder.type, userId })
               .onConflictDoNothing()
               .run()
             if (msgId !== null) existingByMessageId.set(msgId, { id: 0, type: folder.type })

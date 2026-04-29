@@ -39,7 +39,8 @@ const CREATE_JOBS_TABLE = `
     date_applied TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
     resume_generated_at TEXT,
-    UNIQUE(company, job_title)
+    user_id INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(company, job_title, user_id)
   )
 `
 
@@ -49,7 +50,8 @@ const CREATE_SEARCH_CONFIGS_TABLE = `
     source TEXT NOT NULL,
     query TEXT NOT NULL,
     location TEXT,
-    enabled INTEGER NOT NULL DEFAULT 1
+    enabled INTEGER NOT NULL DEFAULT 1,
+    user_id INTEGER NOT NULL DEFAULT 1
   )
 `
 
@@ -82,7 +84,7 @@ describe('runDiscovery()', () => {
       ))
     )
 
-    const { inserted } = await runDiscovery()
+    const { inserted } = await runDiscovery(undefined, 1)
     // 6 searches × 1 result = 6 total, but job-1 is deduplicated within batch → 1 inserted
     expect(inserted).toBe(1)
     const rows = prodSqlite.prepare('SELECT * FROM jobs').all() as Array<Record<string, unknown>>
@@ -107,7 +109,7 @@ describe('runDiscovery()', () => {
       ))
     )
 
-    const { inserted } = await runDiscovery()
+    const { inserted } = await runDiscovery(undefined, 1)
     expect(inserted).toBe(1) // only job-2
     const rows = prodSqlite.prepare('SELECT external_job_id FROM jobs ORDER BY id').all() as Array<{ external_job_id: string }>
     expect(rows.map(r => r.external_job_id)).toContain('job-1')
@@ -119,13 +121,13 @@ describe('runDiscovery()', () => {
       Promise.resolve(new Response(null, { status: 500 }))
     )
 
-    await expect(runDiscovery()).rejects.toThrow()
+    await expect(runDiscovery(undefined, 1)).rejects.toThrow()
   })
 
   test('missing SCRAPER_URL: throws', async () => {
     const original = process.env.SCRAPER_URL
     delete process.env.SCRAPER_URL
-    await expect(runDiscovery()).rejects.toThrow('SCRAPER_URL not configured')
+    await expect(runDiscovery(undefined, 1)).rejects.toThrow('SCRAPER_URL not configured')
     process.env.SCRAPER_URL = original
   })
 
@@ -138,7 +140,7 @@ describe('runDiscovery()', () => {
     )
 
     const messages: string[] = []
-    await runDiscovery((msg) => messages.push(msg))
+    await runDiscovery((msg) => messages.push(msg), 1)
 
     const searchMessages = messages.filter((m) => m.startsWith('Searching '))
     expect(searchMessages.length).toBeGreaterThan(0)
@@ -158,7 +160,7 @@ describe('runDiscovery()', () => {
     )
 
     const messages: string[] = []
-    await runDiscovery((msg) => messages.push(msg))
+    await runDiscovery((msg) => messages.push(msg), 1)
 
     const insertMessage = messages.find((m) => m.startsWith('Inserting '))
     expect(insertMessage).toBeUndefined()
@@ -171,7 +173,7 @@ describe('runDiscovery()', () => {
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
     )
-    await runDiscovery()
+    await runDiscovery(undefined, 1)
     const row = prodSqlite.prepare('SELECT analysis_status FROM jobs WHERE external_job_id = ?').get('job-99') as { analysis_status: string }
     expect(row.analysis_status).toBe('pending')
   })

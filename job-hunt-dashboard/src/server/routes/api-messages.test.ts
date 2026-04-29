@@ -1,11 +1,19 @@
 process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, beforeAll, beforeEach } from 'bun:test'
+import { Hono } from 'hono'
 import { Database } from 'bun:sqlite'
 
-const { default: messagesApp } = await import('./api-messages')
+const { default: messagesRoute } = await import('./api-messages')
 const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
+
+const messagesApp = (() => {
+  const w = new Hono()
+  w.use('*', (c, next) => { c.set('userId', 1); return next() })
+  w.route('/', messagesRoute)
+  return w
+})()
 
 const CREATE_MESSAGES_TABLE = `
   CREATE TABLE IF NOT EXISTS messages (
@@ -16,7 +24,8 @@ const CREATE_MESSAGES_TABLE = `
     subject TEXT NOT NULL,
     type TEXT,
     company TEXT,
-    job_title TEXT
+    job_title TEXT,
+    user_id INTEGER NOT NULL DEFAULT 1
   )
 `
 

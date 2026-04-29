@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { apiFetch } from '../lib/api'
 
 export function useWebhookMutation(url: string) {
   const queryClient = useQueryClient()
@@ -6,7 +7,7 @@ export function useWebhookMutation(url: string) {
   return useMutation<void, Error>({
     mutationFn: async () => {
       if (!url) throw new Error('Webhook URL not configured')
-      const res = await fetch(url, { method: 'POST' })
+      const res = await apiFetch(url, { method: 'POST' })
       if (!res.ok) {
         let message = `HTTP ${res.status}`
         try {

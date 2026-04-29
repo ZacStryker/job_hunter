@@ -33,17 +33,22 @@ export const jobs = sqliteTable('jobs', {
   coverLetterSentAt: text('cover_letter_sent_at'),
   dateApplied: text('date_applied'),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+  userId: integer('user_id').notNull().references(() => users.id),
   resumeGeneratedAt: text('resume_generated_at'),
 }, (table) => [
-  uniqueIndex('company_job_title_idx').on(table.company, table.jobTitle),
+  uniqueIndex('company_job_title_idx').on(table.company, table.jobTitle, table.userId),
+  index('jobs_user_id_idx').on(table.userId),
 ])
 
 export const coverLetters = sqliteTable('cover_letters', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   jobId: integer('job_id').notNull().references(() => jobs.id),
+  userId: integer('user_id').notNull().references(() => users.id),
   content: text('content').notNull(),
   createdAt: text('created_at').notNull(),
-})
+}, (table) => [
+  index('cover_letters_user_id_idx').on(table.userId),
+])
 
 export const statusEvents = sqliteTable('status_events', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -94,7 +99,10 @@ export const messages = sqliteTable('messages', {
   type: text('type'),     // null | 'Submitted' | 'Rejected' | 'Screening' | 'Interview' | 'Offer' | 'Other'
   company: text('company'),
   jobTitle: text('job_title'),
-})
+  userId: integer('user_id').notNull().references(() => users.id),
+}, (table) => [
+  index('messages_user_id_idx').on(table.userId),
+])
 
 export const searchConfigs = sqliteTable('search_configs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -102,7 +110,10 @@ export const searchConfigs = sqliteTable('search_configs', {
   query: text('query').notNull(),
   location: text('location'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
-})
+  userId: integer('user_id').notNull().references(() => users.id),
+}, (table) => [
+  index('search_configs_user_id_idx').on(table.userId),
+])
 
 export const prompts = sqliteTable('prompts', {
   flow: text('flow').primaryKey(),
