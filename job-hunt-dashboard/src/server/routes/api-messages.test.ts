@@ -1,4 +1,5 @@
 process.env.DB_PATH = ':memory:'
+process.env.ENCRYPTION_KEY = 'a'.repeat(64)
 
 import { describe, test, expect, beforeAll, beforeEach } from 'bun:test'
 import { Hono } from 'hono'
@@ -29,12 +30,46 @@ const CREATE_MESSAGES_TABLE = `
   )
 `
 
+const CREATE_USER_SECRETS_TABLE = `
+  CREATE TABLE IF NOT EXISTS user_secrets (
+    user_id INTEGER NOT NULL,
+    key_name TEXT NOT NULL,
+    ciphertext TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, key_name)
+  )
+`
+
 beforeAll(() => {
   prodSqlite.run(CREATE_MESSAGES_TABLE)
+  prodSqlite.run(CREATE_USER_SECRETS_TABLE)
 })
 
 beforeEach(() => {
   prodSqlite.run('DELETE FROM messages')
+  prodSqlite.run('DELETE FROM user_secrets')
+})
+
+describe('POST /api/messages/sync', () => {
+  test('no user_secrets → 503 with not configured message', async () => {
+    const res = await messagesApp.request('/sync', { method: 'POST' })
+    expect(res.status).toBe(503)
+    const body = await res.json() as { error: string }
+    expect(body.error).toContain('not configured')
+  })
+
+  test('corrupt/invalid ciphertext → 500 with failed to read message', async () => {
+    prodSqlite.run(`
+      INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES
+        (1, 'imap_host', 'not-valid-ciphertext', '2026-04-30T00:00:00.000Z'),
+        (1, 'imap_user', 'not-valid-ciphertext', '2026-04-30T00:00:00.000Z'),
+        (1, 'imap_pass', 'not-valid-ciphertext', '2026-04-30T00:00:00.000Z')
+    `)
+    const res = await messagesApp.request('/sync', { method: 'POST' })
+    expect(res.status).toBe(500)
+    const body = await res.json() as { error: string }
+    expect(body.error).toBe('Failed to read email credentials')
+  })
 })
 
 describe('GET /api/messages', () => {

@@ -4,6 +4,7 @@ import { db } from '../../db/client'
 import { messages } from '../../db/schema'
 export interface ImapCredentials {
   host: string
+  port?: number
   user: string
   pass: string
 }
@@ -38,7 +39,7 @@ export async function fetchAndStoreEmails(credentials: ImapCredentials, userId: 
 
   const client = new ImapFlow({
     host: credentials.host,
-    port: 993,
+    port: credentials.port ?? 993,
     secure: true,
     auth: { user: credentials.user, pass: credentials.pass },
     logger: false,

@@ -68,6 +68,16 @@ const CREATE_PROMPTS_TABLE = `
   )
 `
 
+const CREATE_USER_SECRETS_TABLE = `
+  CREATE TABLE IF NOT EXISTS user_secrets (
+    user_id INTEGER NOT NULL,
+    key_name TEXT NOT NULL,
+    ciphertext TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, key_name)
+  )
+`
+
 const VALID_ANALYSIS_RESPONSE = {
   score: 85,
   role_fit: 'Strong match for senior dev role',
@@ -89,6 +99,7 @@ beforeAll(() => {
   prodSqlite.run(CREATE_JOBS_TABLE)
   prodSqlite.run(CREATE_PROFILE_TABLE)
   prodSqlite.run(CREATE_PROMPTS_TABLE)
+  prodSqlite.run(CREATE_USER_SECRETS_TABLE)
   process.env.SCRAPER_URL = 'http://test-scraper.invalid'
   process.env.SCRAPER_TOKEN = 'test-token'
   process.env.ANTHROPIC_API_KEY = 'test-key'

@@ -169,6 +169,13 @@
       "when": 1777504049579,
       "tag": "0023_remarkable_ronan",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1777597613567,
+      "tag": "0024_square_rawhide_kid",
+      "breakpoints": true
     }
   ]
 }

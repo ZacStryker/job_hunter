@@ -38,6 +38,16 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
   )
 `
 
+const CREATE_USER_SECRETS_TABLE = `
+  CREATE TABLE IF NOT EXISTS user_secrets (
+    user_id INTEGER NOT NULL,
+    key_name TEXT NOT NULL,
+    ciphertext TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, key_name)
+  )
+`
+
 async function parseNdjson(res: Response): Promise<Array<Record<string, unknown>>> {
   const text = await res.text()
   return text.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as Record<string, unknown>)
@@ -45,10 +55,12 @@ async function parseNdjson(res: Response): Promise<Array<Record<string, unknown>
 
 beforeAll(() => {
   prodSqlite.run(CREATE_WEBHOOK_RUNS_TABLE)
+  prodSqlite.run(CREATE_USER_SECRETS_TABLE)
 })
 
 beforeEach(() => {
   prodSqlite.run('DELETE FROM webhook_runs')
+  prodSqlite.run('DELETE FROM user_secrets')
 })
 
 afterEach(() => {

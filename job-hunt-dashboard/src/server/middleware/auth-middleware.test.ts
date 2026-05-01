@@ -41,7 +41,9 @@ beforeAll(() => {
     activation_token_expires_at TEXT,
     reset_token TEXT,
     reset_token_expires_at TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    name TEXT,
+    last_login_at TEXT
   )`)
   prodSqlite.run(`CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
@@ -221,5 +223,55 @@ describe('adminMiddleware', () => {
       headers: { Cookie: 'session=admin-session' },
     })
     expect(res.status).toBe(200)
+  })
+})
+
+describe('authMiddleware — impersonation', () => {
+  test('session with data.impersonating sets userId to impersonated user', async () => {
+    insertUser(1, 'admin')
+    insertUser(2)
+    const expiresAt = new Date(Date.now() + 3_600_000).toISOString()
+    prodSqlite.run(
+      `INSERT INTO sessions (id, user_id, data, expires_at) VALUES (?, ?, ?, ?)`,
+      ['imp-session', 1, JSON.stringify({ impersonating: 2 }), expiresAt]
+    )
+    const app = makeApp()
+    const res = await app.request('/test', {
+      method: 'GET',
+      headers: { Cookie: 'session=imp-session' },
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json() as { userId: number }
+    expect(body.userId).toBe(2)
+  })
+
+  test('session without impersonating uses session.userId', async () => {
+    insertUser(1)
+    insertSession('normal-session', 1)
+    const app = makeApp()
+    const res = await app.request('/test', {
+      method: 'GET',
+      headers: { Cookie: 'session=normal-session' },
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json() as { userId: number }
+    expect(body.userId).toBe(1)
+  })
+
+  test('malformed session data falls back to session.userId', async () => {
+    insertUser(1)
+    const expiresAt = new Date(Date.now() + 3_600_000).toISOString()
+    prodSqlite.run(
+      `INSERT INTO sessions (id, user_id, data, expires_at) VALUES (?, ?, ?, ?)`,
+      ['bad-data-session', 1, 'not-valid-json', expiresAt]
+    )
+    const app = makeApp()
+    const res = await app.request('/test', {
+      method: 'GET',
+      headers: { Cookie: 'session=bad-data-session' },
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json() as { userId: number }
+    expect(body.userId).toBe(1)
   })
 })

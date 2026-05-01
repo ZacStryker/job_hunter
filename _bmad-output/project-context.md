@@ -145,7 +145,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 **Post-MVP Features (now implemented — do not treat as deferred)**
 - `status_events` table: live with `source` column (`'manual'` | `'email'`); `StatusTimeline` renders events with email indicator
-- IMAP polling: live in `src/server/services/imap-poller.ts`; optional env vars `IMAP_HOST`/`IMAP_USER`/`IMAP_PASS`
+- Email sync: on-demand only via `POST /api/messages/sync`; credentials stored per-user in `user_secrets` (set via onboarding UI); no background poller — `imap-poller.ts` was removed in Epics 9-12
 - n8n webhook, cover letter storage: Epic 7 — not yet implemented
 
 ---

@@ -1,5 +1,8 @@
 import { Hono } from 'hono'
 import { stream } from 'hono/streaming'
+import { and, eq } from 'drizzle-orm'
+import { db } from '../../db/client'
+import { userSecrets } from '../../db/schema'
 import { recordRun } from './api-webhook-runs'
 import { runDiscovery } from '../services/discovery-service'
 import { runAnalysis } from '../services/analysis-service'
@@ -30,9 +33,15 @@ app.post('/discovery', (c) => {
   })
 })
 
-app.post('/analysis', (c) => {
-  if (!process.env.ANTHROPIC_API_KEY) return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 503)
+app.post('/analysis', async (c) => {
   const userId = c.get('userId')
+  if (!process.env.ANTHROPIC_API_KEY) {
+    const row = db.select({ keyName: userSecrets.keyName })
+      .from(userSecrets)
+      .where(and(eq(userSecrets.userId, userId), eq(userSecrets.keyName, 'anthropic_api_key')))
+      .get()
+    if (!row) return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 503)
+  }
   return stream(c, async (s) => {
     const write = (ev: object) => s.writeln(JSON.stringify(ev))
     const startMs = Date.now()

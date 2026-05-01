@@ -19,6 +19,8 @@ import { errorHandler } from './server/middleware/error-handler'
 import { authMiddleware } from './server/middleware/auth-middleware'
 import { adminMiddleware } from './server/middleware/admin-middleware'
 import authRoute from './server/routes/api-auth'
+import onboardingRoute from './server/routes/api-onboarding'
+import adminRoute from './server/routes/api-admin'
 import type { AppEnv } from './server/types'
 
 async function seedAdmin(): Promise<void> {
@@ -85,6 +87,8 @@ app.route('/api/stats', statsRoute)
 app.route('/api/profile', profileRoute)
 app.route('/api/prompts', promptsRoute)
 app.route('/api/search-configs', searchConfigsRoute)
+app.route('/api/onboarding', onboardingRoute)
+app.route('/api/admin', adminRoute)
 app.route('/auth', authRoute)
 app.onError(errorHandler)
 

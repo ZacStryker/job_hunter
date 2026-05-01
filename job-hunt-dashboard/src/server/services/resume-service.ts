@@ -1,5 +1,7 @@
+import { and, eq } from 'drizzle-orm'
 import { db } from '../../db/client'
-import { profile } from '../../db/schema'
+import { profile, userSecrets } from '../../db/schema'
+import { decrypt } from '../lib/crypto'
 import { generatePdf } from './generate-pdf'
 import { loadEffectivePrompt } from './prompt-defaults'
 import type { Job } from '../../shared/schemas'
@@ -319,8 +321,15 @@ function stripCodeFences(text: string): string {
   return html.trim()
 }
 
-export async function generateResume(job: Job): Promise<{ pdf: Buffer; inputTokens: number; outputTokens: number }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+export async function generateResume(job: Job, userId?: number): Promise<{ pdf: Buffer; inputTokens: number; outputTokens: number }> {
+  let apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey && userId !== undefined) {
+    const row = db.select({ ciphertext: userSecrets.ciphertext })
+      .from(userSecrets)
+      .where(and(eq(userSecrets.userId, userId), eq(userSecrets.keyName, 'anthropic_api_key')))
+      .get()
+    if (row) apiKey = decrypt(row.ciphertext)
+  }
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
   const profileRow = db.select().from(profile).limit(1).get() ?? null

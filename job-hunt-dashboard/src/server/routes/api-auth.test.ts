@@ -28,7 +28,9 @@ beforeAll(() => {
       activation_token_expires_at TEXT,
       reset_token TEXT,
       reset_token_expires_at TEXT,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      name TEXT,
+      last_login_at TEXT
     )
   `)
   prodSqlite.run(`
@@ -47,9 +49,19 @@ beforeAll(() => {
       expires_at TEXT NOT NULL
     )
   `)
+  prodSqlite.run(`
+    CREATE TABLE IF NOT EXISTS user_secrets (
+      user_id INTEGER NOT NULL,
+      key_name TEXT NOT NULL,
+      ciphertext TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, key_name)
+    )
+  `)
 })
 
 beforeEach(() => {
+  prodSqlite.run('DELETE FROM user_secrets')
   prodSqlite.run('DELETE FROM sessions')
   prodSqlite.run('DELETE FROM invite_keys')
   prodSqlite.run('DELETE FROM users')
@@ -285,7 +297,7 @@ describe('POST /login', () => {
     expect(body.error).toBe('Account is disabled')
   })
 
-  test('success → 200 { onboardingComplete: true }; set-cookie has session + csrf_token', async () => {
+  test('success → 200 { onboardingComplete: false } when no anthropic key; set-cookie has session + csrf_token', async () => {
     await registerUser()
     const user = getUser('test@example.com')!
     prodSqlite.run(`UPDATE users SET is_active = 1 WHERE id = ?`, [user.id])
@@ -297,7 +309,7 @@ describe('POST /login', () => {
     })
     expect(res.status).toBe(200)
     const body = await res.json() as Record<string, unknown>
-    expect(body).toEqual({ onboardingComplete: true })
+    expect(body).toEqual({ onboardingComplete: false })
 
     const cookie = res.headers.get('set-cookie')
     expect(cookie).toContain('session=')

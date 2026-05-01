@@ -19,6 +19,8 @@ import { fetchSession } from '../hooks/useSessionQuery'
 import { LoginRoute } from '../routes/login'
 import { RegisterRoute } from '../routes/register'
 import { RegisterPendingRoute } from '../routes/register-pending'
+import { OnboardingRoute } from '../routes/onboarding'
+import type { OnboardingStatusResponse } from '@shared/schemas'
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -73,6 +75,23 @@ const registerPendingRoute = createRoute({
   validateSearch: (search: Record<string, unknown>) => ({
     email: typeof search.email === 'string' ? search.email : '',
   }),
+})
+
+const onboardingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/onboarding',
+  component: OnboardingRoute,
+  beforeLoad: async () => {
+    let res: Response
+    try {
+      res = await fetch('/api/onboarding/status')
+    } catch {
+      throw redirect({ to: '/login' })
+    }
+    if (res.status === 401 || !res.ok) throw redirect({ to: '/login' })
+    const status = await res.json() as OnboardingStatusResponse
+    if (status.onboardingComplete) throw redirect({ to: '/' })
+  },
 })
 
 const dashboardRoute = createRoute({
@@ -151,6 +170,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   registerRoute,
   registerPendingRoute,
+  onboardingRoute,
   protectedRoute.addChildren([
     dashboardRoute,
     indexRoute,

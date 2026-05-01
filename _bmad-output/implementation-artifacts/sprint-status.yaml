@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-04-29 # epic 24 retrospective done
+last_updated: 2026-05-01 # story 26.2 ready-for-dev
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -180,15 +180,15 @@ development_status:
   epic-24-retrospective: done
 
   # Epic 25: User Onboarding
-  epic-25: backlog
-  25-1-onboarding-api-status-anthropic-api-key-and-imap-setup: backlog
-  25-2-onboarding-ui-4-step-setup-flow: backlog
-  epic-25-retrospective: optional
+  epic-25: in-progress
+  25-1-onboarding-api-status-anthropic-api-key-and-imap-setup: done
+  25-2-onboarding-ui-4-step-setup-flow: done
+  epic-25-retrospective: done
 
   # Epic 26: Admin User Management
-  epic-26: backlog
-  26-1-admin-api-user-list-update-password-reset-and-impersonation: backlog
-  26-2-admin-ui-user-table-inline-actions-and-impersonation-banner: backlog
+  epic-26: in-progress
+  26-1-admin-api-user-list-update-password-reset-and-impersonation: done
+  26-2-admin-ui-user-table-inline-actions-and-impersonation-banner: ready-for-dev
   26-3-admin-invite-key-management: backlog
   epic-26-retrospective: optional
 

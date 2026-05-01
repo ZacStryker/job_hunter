@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto'
 import { getCookie, setCookie } from 'hono/cookie'
 import argon2 from 'argon2'
 import { db } from '../../db/client'
-import { users, inviteKeys, sessions } from '../../db/schema'
+import { users, inviteKeys, sessions, userSecrets } from '../../db/schema'
 import { sendMail } from '../lib/mailer'
 
 const app = new Hono()
@@ -170,6 +170,9 @@ app.post('/login', async (c) => {
   if (!user || !valid) return c.json({ error: 'Invalid email or password' }, 401)
   if (!user.isActive) return c.json({ error: 'Account is disabled' }, 403)
 
+  const loginAt = new Date().toISOString()
+  db.update(users).set({ lastLoginAt: loginAt }).where(eq(users.id, user.id)).run()
+
   const sessionId = randomBytes(32).toString('hex')
   const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -186,7 +189,12 @@ app.post('/login', async (c) => {
     httpOnly: false, secure: isSecure(), sameSite: 'Lax', path: '/', maxAge: 30 * 24 * 60 * 60,
   })
 
-  return c.json({ onboardingComplete: true })
+  const secret = db.select({ keyName: userSecrets.keyName })
+    .from(userSecrets)
+    .where(and(eq(userSecrets.userId, user.id), eq(userSecrets.keyName, 'anthropic_api_key')))
+    .get()
+  const onboardingComplete = !!secret
+  return c.json({ onboardingComplete })
 })
 
 app.post('/logout', async (c) => {

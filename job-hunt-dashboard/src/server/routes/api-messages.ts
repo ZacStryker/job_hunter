@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { eq, desc, notLike, and } from 'drizzle-orm'
+import { eq, desc, notLike, and, inArray } from 'drizzle-orm'
 import { db } from '../../db/client'
-import { messages } from '../../db/schema'
+import { messages, userSecrets } from '../../db/schema'
 import { MESSAGE_TYPES } from '../../shared/schemas'
 import { fetchAndStoreEmails } from '../services/email-fetch-service'
+import { decrypt } from '../lib/crypto'
 import type { AppEnv } from '../types'
 
 const app = new Hono<AppEnv>()
@@ -29,12 +30,38 @@ app.get('/', (c) => {
 
 app.post('/sync', async (c) => {
   const userId = c.get('userId')
-  const { IMAP_HOST, IMAP_USER, IMAP_PASS } = process.env
-  if (!IMAP_HOST || !IMAP_USER || !IMAP_PASS) {
-    return c.json({ error: 'Email sync not configured (IMAP credentials missing)' }, 503)
+
+  const rows = db.select({ keyName: userSecrets.keyName, ciphertext: userSecrets.ciphertext })
+    .from(userSecrets)
+    .where(and(
+      eq(userSecrets.userId, userId),
+      inArray(userSecrets.keyName, ['imap_host', 'imap_port', 'imap_user', 'imap_pass']),
+    ))
+    .all()
+  const byKey = Object.fromEntries(rows.map((r) => [r.keyName, r.ciphertext]))
+
+  if (!byKey['imap_host'] || !byKey['imap_user'] || !byKey['imap_pass']) {
+    return c.json({ error: 'Email sync not configured — add IMAP credentials in settings' }, 503)
   }
+
+  let host: string, port: number, user: string, pass: string
   try {
-    const result = await fetchAndStoreEmails({ host: IMAP_HOST, user: IMAP_USER, pass: IMAP_PASS }, userId)
+    host = decrypt(byKey['imap_host'])
+    const rawPort = byKey['imap_port'] ? Number(decrypt(byKey['imap_port'])) : 993
+    if (!Number.isInteger(rawPort) || rawPort < 1 || rawPort > 65535) {
+      console.error('[messages/sync] Stored IMAP port is invalid:', rawPort)
+      return c.json({ error: 'Failed to read email credentials' }, 500)
+    }
+    port = rawPort
+    user = decrypt(byKey['imap_user'])
+    pass = decrypt(byKey['imap_pass'])
+  } catch (err) {
+    console.error('[messages/sync] Failed to decrypt IMAP credentials:', err)
+    return c.json({ error: 'Failed to read email credentials' }, 500)
+  }
+
+  try {
+    const result = await fetchAndStoreEmails({ host, port, user, pass }, userId)
     return c.json({ added: result.added })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Email sync failed'

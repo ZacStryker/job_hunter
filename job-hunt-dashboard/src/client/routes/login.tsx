@@ -24,8 +24,7 @@ export function LoginRoute() {
       })
       if (res.status === 200) {
         const data = await res.json() as { onboardingComplete: boolean }
-        // /onboarding added in Story 24.5; cast bypasses router type until then
-        await navigate({ to: (data.onboardingComplete ? '/' : '/onboarding') as '/' })
+        await navigate({ to: data.onboardingComplete ? '/' : '/onboarding' })
       } else if (res.status === 401) {
         setError('Invalid email or password')
       } else if (res.status === 403) {

@@ -328,7 +328,7 @@ app.post('/:id/generate-cover-letter', async (c) => {
   const startMs = Date.now()
   let coverLetterResult: { content: string; pdf: Buffer; inputTokens: number; outputTokens: number }
   try {
-    coverLetterResult = await generateCoverLetter(job as Job)
+    coverLetterResult = await generateCoverLetter(job as Job, userId)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (message === 'ANTHROPIC_API_KEY not configured') {
@@ -405,7 +405,7 @@ app.post('/:id/generate-resume', async (c) => {
   const resumeStartMs = Date.now()
   let resumeResult: { pdf: Buffer; inputTokens: number; outputTokens: number }
   try {
-    resumeResult = await generateResume(job as Job)
+    resumeResult = await generateResume(job as Job, userId)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (message === 'ANTHROPIC_API_KEY not configured') {

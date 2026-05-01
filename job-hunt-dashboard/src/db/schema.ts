@@ -133,6 +133,8 @@ export const users = sqliteTable('users', {
   resetToken: text('reset_token'),
   resetTokenExpiresAt: text('reset_token_expires_at'),
   createdAt: text('created_at').notNull(),
+  name: text('name'),
+  lastLoginAt: text('last_login_at'),
 }, (table) => [
   uniqueIndex('users_activation_token_idx').on(table.activationToken),
   uniqueIndex('users_reset_token_idx').on(table.resetToken),
