@@ -1,5 +1,5 @@
-import { useState, useEffect, Fragment } from 'react'
-import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, CheckCircle, Circle } from 'lucide-react'
+import { useState, useEffect, useRef, Fragment } from 'react'
+import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, CheckCircle, Circle, Pencil } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import type { Job } from '@shared/schemas'
@@ -67,14 +67,49 @@ interface JobDrawerProps {
 
 export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   const [showFullDescription, setShowFullDescription] = useState(false)
+  const [editingDescription, setEditingDescription] = useState(false)
+  const [descriptionDraft, setDescriptionDraft] = useState('')
+  const [descriptionSaveError, setDescriptionSaveError] = useState<string | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { data: events = [] } = useJobEvents(job?.id)
   const { mutate: generateCoverLetter, isPending, isError, error } = useGenerateCoverLetter(job?.id ?? 0)
   const { mutate: generateResume, isPending: isResumePending, isError: isResumeError, error: resumeError } = useGenerateResume(job?.id ?? 0)
-  const { mutate: patchJob, isPending: isArchiving } = useJobMutation(job?.id ?? 0)
+  const { mutate: patchJob, isPending: isPatching } = useJobMutation(job?.id ?? 0)
 
   useEffect(() => {
     setShowFullDescription(false)
+    setEditingDescription(false)
   }, [job?.id])
+
+  useEffect(() => {
+    if (editingDescription) textareaRef.current?.focus()
+  }, [editingDescription])
+
+  function startEdit() {
+    setDescriptionDraft(job?.jobDescription ?? '')
+    setDescriptionSaveError(null)
+    setEditingDescription(true)
+  }
+
+  function saveEdit() {
+    if (!job) return
+    if (descriptionDraft === (job.jobDescription ?? '')) {
+      setEditingDescription(false)
+      return
+    }
+    setDescriptionSaveError(null)
+    patchJob(
+      { id: job.id, patch: { jobDescription: descriptionDraft || null } },
+      {
+        onSuccess: () => setEditingDescription(false),
+        onError: (err) => setDescriptionSaveError(err.message ?? 'Failed to save'),
+      },
+    )
+  }
+
+  function cancelEdit() {
+    setEditingDescription(false)
+  }
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
@@ -115,7 +150,7 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
               )}
               <button
                 onClick={() => patchJob({ id: job.id, patch: { applied: !job.applied, statusOverride: null } })}
-                disabled={isArchiving}
+                disabled={isPatching}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   job.applied
                     ? 'border-emerald-700/60 text-emerald-400 hover:border-zinc-600 hover:text-zinc-400'
@@ -129,7 +164,7 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
               </button>
               <button
                 onClick={() => patchJob({ id: job.id, patch: { archived: !job.archived } })}
-                disabled={isArchiving}
+                disabled={isPatching}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   job.archived
                     ? 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
@@ -137,8 +172,8 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                 }`}
               >
                 {job.archived
-                  ? <><ArchiveRestore size={13} />{isArchiving ? 'Unarchiving…' : 'Unarchive'}</>
-                  : <><Archive size={13} />{isArchiving ? 'Archiving…' : 'Archive'}</>
+                  ? <><ArchiveRestore size={13} />{isPatching ? 'Unarchiving…' : 'Unarchive'}</>
+                  : <><Archive size={13} />{isPatching ? 'Archiving…' : 'Archive'}</>
                 }
               </button>
             </div>
@@ -160,25 +195,67 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
               </div>
             </TabsContent>
             <TabsContent value="description" className="pt-4">
-              {job?.jobDescription ? (
+              {editingDescription ? (
                 <div className="space-y-2">
-                  <p className="text-sm text-zinc-200 leading-relaxed">
-                    {showFullDescription
-                      ? job.jobDescription
-                      : job.jobDescription.slice(0, 300)}
-                    {!showFullDescription && job.jobDescription.length > 300 && '…'}
-                  </p>
-                  {job.jobDescription.length > 300 && (
+                  <textarea
+                    ref={textareaRef}
+                    value={descriptionDraft}
+                    onChange={(e) => setDescriptionDraft(e.target.value)}
+                    maxLength={100000}
+                    className="w-full min-h-[300px] bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-sm text-zinc-200 leading-relaxed resize-y focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  />
+                  <div className="flex items-center gap-2">
                     <button
-                      className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
-                      onClick={() => setShowFullDescription(!showFullDescription)}
+                      onClick={saveEdit}
+                      disabled={isPatching}
+                      className="px-3 py-1.5 rounded-md bg-zinc-700 border border-zinc-600 text-sm text-zinc-100 hover:bg-zinc-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {showFullDescription ? 'Show less' : 'Show more'}
+                      {isPatching ? 'Saving…' : 'Save'}
                     </button>
-                  )}
+                    <button
+                      onClick={cancelEdit}
+                      disabled={isPatching}
+                      className="px-3 py-1.5 rounded-md border border-zinc-700 text-sm text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Cancel
+                    </button>
+                    {descriptionSaveError && (
+                      <p className="text-xs text-red-400">{descriptionSaveError}</p>
+                    )}
+                  </div>
                 </div>
               ) : (
-                <p className="text-sm text-zinc-500 italic">No job description available.</p>
+                <div className="space-y-2">
+                  <div className="flex justify-end">
+                    <button
+                      onClick={startEdit}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-zinc-700 text-xs text-zinc-400 hover:border-zinc-500 hover:text-zinc-200 transition-colors"
+                    >
+                      <Pencil size={11} />
+                      Edit
+                    </button>
+                  </div>
+                  {job?.jobDescription ? (
+                    <>
+                      <p className="text-sm text-zinc-200 leading-relaxed">
+                        {showFullDescription
+                          ? job.jobDescription
+                          : job.jobDescription.slice(0, 300)}
+                        {!showFullDescription && job.jobDescription.length > 300 && '…'}
+                      </p>
+                      {job.jobDescription.length > 300 && (
+                        <button
+                          className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
+                          onClick={() => setShowFullDescription(!showFullDescription)}
+                        >
+                          {showFullDescription ? 'Show less' : 'Show more'}
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-zinc-500 italic">No job description available.</p>
+                  )}
+                </div>
               )}
             </TabsContent>
             <TabsContent value="documents" className="pt-4">

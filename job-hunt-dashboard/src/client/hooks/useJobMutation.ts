@@ -6,6 +6,7 @@ type JobPatch = {
   applied?: boolean
   statusOverride?: string | null
   archived?: boolean
+  jobDescription?: string | null
 }
 
 type MutationInput = { id: number; patch: JobPatch }
