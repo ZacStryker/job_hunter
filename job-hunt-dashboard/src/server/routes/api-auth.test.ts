@@ -416,6 +416,28 @@ describe('GET /session', () => {
     expect(body.email).toBe('test@example.com')
     expect(body.role).toBe('standard')
   })
+
+  test('session with impersonation data → 200 with impersonating field', async () => {
+    prodSqlite.run(
+      `INSERT INTO users (id, email, password_hash, role, is_active, created_at, name)
+       VALUES (1, 'admin@test.com', 'x', 'admin', 1, '2026-01-01T00:00:00.000Z', 'Admin')`,
+    )
+    prodSqlite.run(
+      `INSERT INTO users (id, email, password_hash, role, is_active, created_at, name)
+       VALUES (2, 'target@test.com', 'x', 'standard', 1, '2026-01-01T00:00:00.000Z', 'Target User')`,
+    )
+    const expiresAt = new Date(Date.now() + 3_600_000).toISOString()
+    prodSqlite.run(
+      `INSERT INTO sessions (id, user_id, data, expires_at) VALUES (?, ?, ?, ?)`,
+      ['imp-session', 1, JSON.stringify({ impersonating: 2 }), expiresAt]
+    )
+    const res = await authApp.request('/session', {
+      headers: { Cookie: 'session=imp-session' },
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json() as Record<string, unknown>
+    expect(body.impersonating).toMatchObject({ id: 2, email: 'target@test.com', name: 'Target User' })
+  })
 })
 
 // ---- POST /resend-activation tests ----

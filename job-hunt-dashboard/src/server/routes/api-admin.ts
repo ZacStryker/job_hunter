@@ -112,9 +112,10 @@ app.post('/impersonate/:id', (c) => {
   }
 
   const target = db.select({
-    id: users.id, email: users.email, name: users.name,
+    id: users.id, email: users.email, name: users.name, role: users.role,
   }).from(users).where(eq(users.id, targetId)).get()
   if (!target) return c.json({ error: 'User not found' }, 404)
+  if (target.role === 'admin') return c.json({ error: 'Cannot impersonate an admin user' }, 403)
 
   db.update(sessions)
     .set({ data: JSON.stringify({ impersonating: targetId }) })

@@ -20,7 +20,9 @@ import { LoginRoute } from '../routes/login'
 import { RegisterRoute } from '../routes/register'
 import { RegisterPendingRoute } from '../routes/register-pending'
 import { OnboardingRoute } from '../routes/onboarding'
-import type { OnboardingStatusResponse } from '@shared/schemas'
+import { AdminUsersRoute } from '../routes/admin-users'
+import { fetchAdminUsers } from '../hooks/useAdminUsersQuery'
+import type { OnboardingStatusResponse, SessionResponse } from '@shared/schemas'
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -166,6 +168,17 @@ const configRoute = createRoute({
   ]),
 })
 
+const adminUsersRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/admin/users',
+  component: AdminUsersRoute,
+  beforeLoad: () => {
+    const session = queryClient.getQueryData<SessionResponse>(['session'])
+    if (!session || session.role !== 'admin') throw redirect({ to: '/' })
+  },
+  loader: () => queryClient.ensureQueryData({ queryKey: ['admin-users'], queryFn: fetchAdminUsers }),
+})
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   registerRoute,
@@ -182,6 +195,7 @@ const routeTree = rootRoute.addChildren([
     promptsRoute,
     matchesRoute,
     configRoute,
+    adminUsersRoute,
   ]),
 ])
 

@@ -228,7 +228,7 @@ app.get('/session', (c) => {
   if (!sessionId) return c.json({ error: 'Unauthorized' }, 401)
 
   const now = new Date().toISOString()
-  const session = db.select({ userId: sessions.userId }).from(sessions)
+  const session = db.select({ userId: sessions.userId, data: sessions.data }).from(sessions)
     .where(and(eq(sessions.id, sessionId), gte(sessions.expiresAt, now)))
     .get()
   if (!session) return c.json({ error: 'Unauthorized' }, 401)
@@ -238,7 +238,21 @@ app.get('/session', (c) => {
     .get()
   if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
-  return c.json({ userId: session.userId, email: user.email, role: user.role })
+  let impersonating: { id: number; email: string; name: string | null } | undefined
+  if (session.data) {
+    try {
+      const parsed = JSON.parse(session.data) as { impersonating?: number }
+      if (Number.isInteger(parsed.impersonating) && parsed.impersonating > 0) {
+        const target = db.select({ id: users.id, email: users.email, name: users.name })
+          .from(users).where(eq(users.id, parsed.impersonating)).get()
+        if (target) impersonating = target
+      }
+    } catch (e) {
+      console.error('[auth] Failed to parse session.data in /session:', e)
+    }
+  }
+
+  return c.json({ userId: session.userId, email: user.email, role: user.role, impersonating })
 })
 
 app.post('/resend-activation', async (c) => {

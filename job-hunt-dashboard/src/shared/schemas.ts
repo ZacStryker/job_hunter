@@ -227,7 +227,22 @@ export type Prompt = z.infer<typeof promptSchema>
 export type PromptInput = z.infer<typeof promptInputSchema>
 export type PromptFlow = z.infer<typeof promptFlowSchema>
 
-export type SessionResponse = { userId: number; email: string; role: string }
+export type AdminUser = {
+  id: number
+  email: string
+  name: string | null
+  role: string
+  isActive: boolean
+  createdAt: string
+  lastLoginAt: string | null
+}
+
+export type SessionResponse = {
+  userId: number
+  email: string
+  role: string
+  impersonating?: { id: number; email: string; name: string | null }
+}
 
 export type OnboardingStatusResponse = {
   hasAnthropicKey: boolean

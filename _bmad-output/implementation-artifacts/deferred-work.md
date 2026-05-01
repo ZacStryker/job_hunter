@@ -480,6 +480,17 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 - **`console.error` call not asserted in AC #12 test** — Test verifies the 500 response but does not spy on `console.error` to confirm logging. Test coverage gap only; code is correct. [`api-messages.test.ts`]
 - **No Anthropic API key format validation before outbound call** — Any non-empty string triggers a live fetch to `api.anthropic.com`; spec design choice with no format-validation requirement. [`api-onboarding.ts:38`]
 
+## Deferred from: code review of 26-2-admin-ui-user-table-inline-actions-and-impersonation-banner (2026-05-01)
+
+- Session race after impersonation — brief window where banner isn't visible before session query settles post-navigate; acceptable UX transient [`useImpersonateMutation.ts:12-13`]
+- All switches disabled while one `patchMutation` is in-flight — single shared mutation instance disables every row; UX annoyance; Switch correctly prevents double-submit [`admin-users.tsx`]
+- Deactivating impersonated user leaves banner stale for up to 5 min — target's sessions deleted but admin's session isn't re-validated; `useSessionQuery` staleTime is 5 min [`useSessionQuery.ts:14`]
+- Impersonating deleted user causes silent banner disappear — server silently drops `impersonating` field when target not found; session `data` not cleaned up [`api-auth.ts:246-249`]
+- Reset PW always shows "Reset email sent" for non-existent email — intentional server-side enumeration prevention; admin always sees success toast [`api-auth.ts:310`]
+- Route loader throws raw TanStack Router error boundary — pre-existing pattern across all routes; no `errorComponent` configured [`router.ts:179`]
+- `dialog.tsx` Tailwind CSS variable classes — `bg-background`, `ring-offset-background` etc. require CSS variable definitions in project global CSS; verify when other shadcn components are confirmed working [`dialog.tsx`]
+- Exit mutation doesn't invalidate `['admin-users']` query — user table may be slightly stale after returning from impersonation [`useImpersonateExitMutation.ts:11`]
+
 ## Deferred from: code review of 26-1-admin-api-user-list-update-password-reset-and-impersonation (2026-04-30)
 
 - **Stale impersonation session references deleted or deactivated user** — `auth-middleware.ts` sets `effectiveUserId` from `session.data.impersonating` without re-validating that the target user still exists and is active. A stale impersonation session (target deleted or deactivated after impersonation started) scopes all subsequent requests to a nonexistent or suspended user, producing silent empty responses. Requires design decision: invalidate impersonation, fall back to real userId, or return 401. [`src/server/middleware/auth-middleware.ts`]
