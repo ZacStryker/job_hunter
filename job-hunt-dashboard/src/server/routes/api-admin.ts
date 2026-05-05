@@ -1,12 +1,20 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { asc, eq } from 'drizzle-orm'
+import { asc, desc, eq } from 'drizzle-orm'
 import { getCookie } from 'hono/cookie'
+import { randomBytes } from 'node:crypto'
 import { db } from '../../db/client'
-import { users, sessions } from '../../db/schema'
+import { users, sessions, inviteKeys } from '../../db/schema'
 import type { AppEnv } from '../types'
 
 const app = new Hono<AppEnv>()
+
+function generateInviteKey(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  const bytes = randomBytes(12)
+  const raw = Array.from(bytes).map(b => chars[b % chars.length]).join('')
+  return `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`
+}
 
 app.get('/users', (c) => {
   const allUsers = db.select({
@@ -123,6 +131,68 @@ app.post('/impersonate/:id', (c) => {
     .run()
 
   return c.json({ impersonating: target })
+})
+
+app.get('/invite-keys', (c) => {
+  const rows = db
+    .select({
+      id: inviteKeys.id,
+      key: inviteKeys.key,
+      usedByUserId: inviteKeys.usedByUserId,
+      usedAt: inviteKeys.usedAt,
+      usedByEmail: users.email,
+    })
+    .from(inviteKeys)
+    .leftJoin(users, eq(inviteKeys.usedByUserId, users.id))
+    .orderBy(desc(inviteKeys.id))
+    .all()
+
+  const result = rows.map(r => ({
+    id: r.id,
+    key: r.key,
+    status: r.usedByUserId === null ? 'unused' : 'used' as const,
+    usedByEmail: r.usedByEmail ?? null,
+    usedAt: r.usedAt,
+  }))
+  return c.json(result)
+})
+
+app.post('/invite-keys', (c) => {
+  const key = generateInviteKey()
+  try {
+    const inserted = db
+      .insert(inviteKeys)
+      .values({ key })
+      .returning({ id: inviteKeys.id, key: inviteKeys.key })
+      .get()
+    return c.json(
+      { id: inserted.id, key: inserted.key, status: 'unused', usedByEmail: null, usedAt: null },
+      201,
+    )
+  } catch {
+    return c.json({ error: 'Failed to generate invite key' }, 500)
+  }
+})
+
+app.delete('/invite-keys/:id', (c) => {
+  const id = parseInt(c.req.param('id'), 10)
+  if (isNaN(id)) return c.json({ error: 'Invalid id' }, 400)
+
+  const outcome = { notFound: false, alreadyUsed: false }
+  db.transaction((tx) => {
+    const row = tx
+      .select({ usedByUserId: inviteKeys.usedByUserId })
+      .from(inviteKeys)
+      .where(eq(inviteKeys.id, id))
+      .get()
+    if (!row) { outcome.notFound = true; return }
+    if (row.usedByUserId !== null) { outcome.alreadyUsed = true; return }
+    tx.delete(inviteKeys).where(eq(inviteKeys.id, id)).run()
+  })
+
+  if (outcome.notFound) return c.json({ error: 'Invite key not found' }, 404)
+  if (outcome.alreadyUsed) return c.json({ error: 'Cannot revoke a used invite key' }, 409)
+  return c.body(null, 204)
 })
 
 export default app

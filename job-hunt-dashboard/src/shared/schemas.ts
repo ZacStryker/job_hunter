@@ -244,6 +244,14 @@ export type SessionResponse = {
   impersonating?: { id: number; email: string; name: string | null }
 }
 
+export type InviteKey = {
+  id: number
+  key: string
+  status: 'unused' | 'used'
+  usedByEmail: string | null
+  usedAt: string | null
+}
+
 export type OnboardingStatusResponse = {
   hasAnthropicKey: boolean
   hasImap: boolean

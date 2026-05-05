@@ -496,3 +496,16 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 - **Stale impersonation session references deleted or deactivated user** — `auth-middleware.ts` sets `effectiveUserId` from `session.data.impersonating` without re-validating that the target user still exists and is active. A stale impersonation session (target deleted or deactivated after impersonation started) scopes all subsequent requests to a nonexistent or suspended user, producing silent empty responses. Requires design decision: invalidate impersonation, fall back to real userId, or return 401. [`src/server/middleware/auth-middleware.ts`]
 - **PATCH deactivation does not clear impersonation sessions targeting the deactivated user** — `db.delete(sessions).where(eq(sessions.userId, id))` removes sessions the target user owns, but not sessions belonging to admins that have `data.impersonating = id`. An admin mid-impersonation of a user who then gets deactivated continues operating as that user until they exit manually. [`src/server/routes/api-admin.ts:62`]
 - **`auth-middleware` uses `db.select()` without column restriction on sessions table** — Pre-existing pattern; not introduced by this story. `sessions.data` is required for impersonation parsing so the full select is functionally correct. Address in a future security hardening pass. [`src/server/middleware/auth-middleware.ts`]
+
+## Deferred from: code review of 26-3-admin-invite-key-management (2026-05-05)
+
+- `copiedKeyId` not cleared when key is revoked — cosmetic race: copied checkmark state persists up to 1500ms after row disappears; auto-increment prevents id reuse so no real UI corruption [`admin-users.tsx`]
+- Double-click "Generate Key" may fire two POST requests before `isPending` re-renders — `disabled={isPending}` is the standard pattern; React 18 automatic batching mitigates most scenarios [`admin-users.tsx`]
+- Stale session role check in `beforeLoad` — pre-existing pattern, `queryClient.getQueryData(['session'])` reads cached value; server middleware is the authoritative guard [`router.ts`]
+- Dialog state cleared before query refetch completes — cosmetic ~200ms flicker where revoked key remains visible after dialog closes; inherent to refetch-on-invalidation pattern [`admin-users.tsx`]
+- CSRF expiry causes generic error toast with no session-expiry hint — pre-existing `apiFetch` behavior across all mutations; user gets no "please refresh" guidance
+- No `staleTime` on `useInviteKeysQuery` — causes unnecessary background refetches on window focus; `staleTime: 30_000` would match other queries in the app [`useInviteKeysQuery.ts`]
+- No test covers route loader failure path for `fetchInviteKeys` — if invite-keys fetch throws inside `Promise.all`, only manual testing catches it [`api-admin.test.ts`]
+- AC11: New key appears after refetch latency, not immediately on POST response — optimistic prepend not implemented; refetch-on-invalidation is acceptable for an admin UI
+- AC5: Generate Key button `size="sm"` + explicit `h-7 px-3 text-xs` class overrides may conflict in shadcn depending on `cn()` merge order — verify visually at runtime [`admin-users.tsx`]
+- `insertInviteKey` test helper produces 15-char key for `id ≥ 10000` — `padStart(4, '0')` overflows; unrealistic in test setup but worth noting if large id fixtures are ever added [`api-admin.test.ts`]

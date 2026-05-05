@@ -22,6 +22,7 @@ import { RegisterPendingRoute } from '../routes/register-pending'
 import { OnboardingRoute } from '../routes/onboarding'
 import { AdminUsersRoute } from '../routes/admin-users'
 import { fetchAdminUsers } from '../hooks/useAdminUsersQuery'
+import { fetchInviteKeys } from '../hooks/useInviteKeysQuery'
 import type { OnboardingStatusResponse, SessionResponse } from '@shared/schemas'
 
 const rootRoute = createRootRoute({
@@ -176,7 +177,10 @@ const adminUsersRoute = createRoute({
     const session = queryClient.getQueryData<SessionResponse>(['session'])
     if (!session || session.role !== 'admin') throw redirect({ to: '/' })
   },
-  loader: () => queryClient.ensureQueryData({ queryKey: ['admin-users'], queryFn: fetchAdminUsers }),
+  loader: () => Promise.all([
+    queryClient.ensureQueryData({ queryKey: ['admin-users'], queryFn: fetchAdminUsers }),
+    queryClient.ensureQueryData({ queryKey: ['admin-invite-keys'], queryFn: fetchInviteKeys }).catch(() => []),
+  ]),
 })
 
 const routeTree = rootRoute.addChildren([

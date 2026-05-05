@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { Clipboard, Check } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,14 +14,18 @@ import {
 import { useAdminUsersQuery } from '@/hooks/useAdminUsersQuery'
 import { useAdminUserPatchMutation } from '@/hooks/useAdminUserPatchMutation'
 import { useImpersonateMutation } from '@/hooks/useImpersonateMutation'
+import { useInviteKeysQuery } from '@/hooks/useInviteKeysQuery'
+import { useGenerateInviteKeyMutation } from '@/hooks/useGenerateInviteKeyMutation'
+import { useRevokeInviteKeyMutation } from '@/hooks/useRevokeInviteKeyMutation'
 import { UserEditDrawer } from '@/components/admin/UserEditDrawer'
 import { apiFetch } from '@/lib/api'
 import { toast } from 'sonner'
-import type { AdminUser } from '@shared/schemas'
+import type { AdminUser, InviteKey } from '@shared/schemas'
 
 type DialogState =
   | { type: 'reset-pw'; user: AdminUser }
   | { type: 'impersonate'; user: AdminUser }
+  | { type: 'revoke-key'; keyId: number }
   | null
 
 export function AdminUsersRoute() {
@@ -33,6 +38,11 @@ export function AdminUsersRoute() {
   const [drawerUser, setDrawerUser] = useState<AdminUser | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [resetPending, setResetPending] = useState(false)
+
+  const { data: inviteKeys = [], isLoading: keysLoading } = useInviteKeysQuery()
+  const generateMutation = useGenerateInviteKeyMutation()
+  const revokeMutation = useRevokeInviteKeyMutation()
+  const [copiedKeyId, setCopiedKeyId] = useState<number | null>(null)
 
   function openEditDrawer(user: AdminUser) {
     setDrawerUser(user)
@@ -74,6 +84,33 @@ export function AdminUsersRoute() {
       navigate({ to: '/' })
     } catch {
       toast.error('Failed to start impersonation')
+    }
+  }
+
+  function handleCopyKey(id: number, key: string) {
+    navigator.clipboard.writeText(key).then(() => {
+      setCopiedKeyId(id)
+      setTimeout(() => setCopiedKeyId(null), 1500)
+    })
+  }
+
+  async function handleGenerateKey() {
+    try {
+      await generateMutation.mutateAsync()
+      toast('Invite key generated')
+    } catch {
+      toast.error('Failed to generate invite key')
+    }
+  }
+
+  async function handleRevokeKey() {
+    if (!dialog || dialog.type !== 'revoke-key') return
+    try {
+      await revokeMutation.mutateAsync(dialog.keyId)
+      setDialog(null)
+      toast('Invite key revoked')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to revoke invite key')
     }
   }
 
@@ -158,6 +195,85 @@ export function AdminUsersRoute() {
         </table>
       </div>
 
+      {/* Invite Keys section */}
+      <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+          <h2 className="text-sm font-medium text-zinc-100">Invite Keys</h2>
+          <Button
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs h-7 px-3"
+            size="sm"
+            onClick={handleGenerateKey}
+            disabled={generateMutation.isPending}
+          >
+            {generateMutation.isPending ? 'Generating…' : 'Generate Key'}
+          </Button>
+        </div>
+
+        {keysLoading ? (
+          <div className="px-4 py-6 text-zinc-400 text-sm">Loading…</div>
+        ) : inviteKeys.length === 0 ? (
+          <div className="px-4 py-6 text-center text-zinc-500 text-sm">
+            No invite keys. Click Generate Key to invite a new user.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-zinc-800 text-zinc-400 text-xs">
+                <th className="text-left px-4 py-3 font-medium">Key</th>
+                <th className="text-left px-4 py-3 font-medium">Status</th>
+                <th className="text-left px-4 py-3 font-medium">Used By</th>
+                <th className="text-left px-4 py-3 font-medium">Used At</th>
+                <th className="text-left px-4 py-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inviteKeys.map((ik: InviteKey) => (
+                <tr key={ik.id} className="border-b border-zinc-800/50">
+                  <td className="px-4 py-3 font-mono text-zinc-100 text-xs">{ik.key}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      ik.status === 'unused'
+                        ? 'bg-zinc-700 text-zinc-300'
+                        : 'bg-zinc-600 text-zinc-400'
+                    }`}>
+                      {ik.status === 'unused' ? 'Unused' : 'Used'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-zinc-400 text-xs">{ik.usedByEmail ?? '—'}</td>
+                  <td className="px-4 py-3 text-zinc-400 text-xs">
+                    {ik.usedAt ? ik.usedAt.slice(0, 10) : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    {ik.status === 'unused' && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyKey(ik.id, ik.key)}
+                          className="p-1 text-zinc-400 hover:text-zinc-100 transition-colors"
+                          aria-label={`Copy invite key ${ik.key}`}
+                        >
+                          {copiedKeyId === ik.id
+                            ? <Check size={14} className="text-green-400" />
+                            : <Clipboard size={14} />
+                          }
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDialog({ type: 'revoke-key', keyId: ik.id })}
+                          className="text-xs text-red-400 hover:text-red-300"
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
       {/* Reset PW dialog */}
       <Dialog open={dialog?.type === 'reset-pw'} onOpenChange={(v) => { if (!v) { setDialog(null); setResetPending(false) } }}>
         <DialogContent>
@@ -195,6 +311,28 @@ export function AdminUsersRoute() {
               className="border-amber-700 bg-amber-900/50 text-amber-300 hover:bg-amber-900"
             >
               {impersonateMutation.isPending ? 'Starting…' : 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Revoke Key dialog */}
+      <Dialog open={dialog?.type === 'revoke-key'} onOpenChange={(v) => { if (!v) setDialog(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke Invite Key</DialogTitle>
+            <DialogDescription>
+              This invite key will be permanently deleted and cannot be used to register.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button
+              onClick={handleRevokeKey}
+              disabled={revokeMutation.isPending}
+              className="bg-red-700 hover:bg-red-600 text-white border-0"
+            >
+              {revokeMutation.isPending ? 'Revoking…' : 'Confirm'}
             </Button>
           </DialogFooter>
         </DialogContent>

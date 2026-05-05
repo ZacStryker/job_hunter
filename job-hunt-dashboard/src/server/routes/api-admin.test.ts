@@ -62,9 +62,18 @@ beforeAll(() => {
       expires_at TEXT NOT NULL
     )
   `)
+  prodSqlite.run(`
+    CREATE TABLE IF NOT EXISTS invite_keys (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT NOT NULL UNIQUE,
+      used_by_user_id INTEGER REFERENCES users(id),
+      used_at TEXT
+    )
+  `)
 })
 
 beforeEach(() => {
+  prodSqlite.run('DELETE FROM invite_keys')
   prodSqlite.run('DELETE FROM sessions')
   prodSqlite.run('DELETE FROM users')
 })
@@ -83,6 +92,13 @@ function insertSession(sessionId: string, userId: number, data: string | null = 
   prodSqlite.run(
     `INSERT INTO sessions (id, user_id, data, expires_at) VALUES (?, ?, ?, ?)`,
     [sessionId, userId, data, expiresAt]
+  )
+}
+
+function insertInviteKey(id: number, opts: { key?: string; usedByUserId?: number | null; usedAt?: string | null } = {}) {
+  prodSqlite.run(
+    `INSERT INTO invite_keys (id, key, used_by_user_id, used_at) VALUES (?, ?, ?, ?)`,
+    [id, opts.key ?? `ABCD-EFGH-${String(id).padStart(4, '0')}`, opts.usedByUserId ?? null, opts.usedAt ?? null]
   )
 }
 
@@ -372,6 +388,109 @@ describe('POST /api/admin/impersonate/:id — new guards', () => {
     expect(res.status).toBe(409)
     const body = await res.json() as { error: string }
     expect(body.error).toContain('exit first')
+  })
+})
+
+describe('GET /api/admin/invite-keys', () => {
+  test('empty table returns []', async () => {
+    const app = makeAdminApp()
+    const res = await request(app, '/invite-keys')
+    expect(res.status).toBe(200)
+    const body = await res.json() as unknown[]
+    expect(body).toEqual([])
+  })
+
+  test('unused key → status unused, usedByEmail null', async () => {
+    insertInviteKey(1, { key: 'AAAA-BBBB-CCCC' })
+    const app = makeAdminApp()
+    const res = await request(app, '/invite-keys')
+    expect(res.status).toBe(200)
+    const body = await res.json() as Array<Record<string, unknown>>
+    expect(body).toHaveLength(1)
+    expect(body[0].key).toBe('AAAA-BBBB-CCCC')
+    expect(body[0].status).toBe('unused')
+    expect(body[0].usedByEmail).toBeNull()
+    expect(body[0].usedAt).toBeNull()
+  })
+
+  test('used key → status used, usedByEmail populated', async () => {
+    insertUser(2, { email: 'user@test.com' })
+    insertInviteKey(1, { key: 'AAAA-BBBB-CCCC', usedByUserId: 2, usedAt: '2026-05-01T00:00:00.000Z' })
+    const app = makeAdminApp()
+    const res = await request(app, '/invite-keys')
+    expect(res.status).toBe(200)
+    const body = await res.json() as Array<Record<string, unknown>>
+    expect(body[0].status).toBe('used')
+    expect(body[0].usedByEmail).toBe('user@test.com')
+    expect(body[0].usedAt).toBe('2026-05-01T00:00:00.000Z')
+  })
+
+  test('keys ordered newest first (desc id)', async () => {
+    insertInviteKey(1, { key: 'AAAA-AAAA-0001' })
+    insertInviteKey(2, { key: 'BBBB-BBBB-0002' })
+    const app = makeAdminApp()
+    const res = await request(app, '/invite-keys')
+    const body = await res.json() as Array<Record<string, unknown>>
+    expect(body[0].id).toBe(2)
+    expect(body[1].id).toBe(1)
+  })
+})
+
+describe('POST /api/admin/invite-keys', () => {
+  test('generates key → 201 with XXXX-XXXX-XXXX format', async () => {
+    const app = makeAdminApp()
+    const res = await request(app, '/invite-keys', { method: 'POST' })
+    expect(res.status).toBe(201)
+    const body = await res.json() as Record<string, unknown>
+    expect(body.id).toBeTypeOf('number')
+    expect(typeof body.key).toBe('string')
+    expect((body.key as string)).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/)
+    expect(body.status).toBe('unused')
+    expect(body.usedByEmail).toBeNull()
+    expect(body.usedAt).toBeNull()
+  })
+
+  test('key is persisted in DB', async () => {
+    const app = makeAdminApp()
+    const res = await request(app, '/invite-keys', { method: 'POST' })
+    const body = await res.json() as Record<string, unknown>
+    const row = prodSqlite.query('SELECT * FROM invite_keys WHERE id = ?').get(body.id as number) as Record<string, unknown> | null
+    expect(row).not.toBeNull()
+    expect(row!.key).toBe(body.key)
+    expect(row!.used_by_user_id).toBeNull()
+  })
+})
+
+describe('DELETE /api/admin/invite-keys/:id', () => {
+  test('unused key → 204, row deleted', async () => {
+    insertInviteKey(1)
+    const app = makeAdminApp()
+    const res = await request(app, '/invite-keys/1', { method: 'DELETE' })
+    expect(res.status).toBe(204)
+    const row = prodSqlite.query('SELECT * FROM invite_keys WHERE id = 1').get()
+    expect(row).toBeNull()
+  })
+
+  test('used key → 409', async () => {
+    insertUser(2, { email: 'user@test.com' })
+    insertInviteKey(1, { usedByUserId: 2, usedAt: '2026-05-01T00:00:00.000Z' })
+    const app = makeAdminApp()
+    const res = await request(app, '/invite-keys/1', { method: 'DELETE' })
+    expect(res.status).toBe(409)
+    const body = await res.json() as { error: string }
+    expect(body.error).toBe('Cannot revoke a used invite key')
+  })
+
+  test('key not found → 404', async () => {
+    const app = makeAdminApp()
+    const res = await request(app, '/invite-keys/999', { method: 'DELETE' })
+    expect(res.status).toBe(404)
+  })
+
+  test('invalid id → 400', async () => {
+    const app = makeAdminApp()
+    const res = await request(app, '/invite-keys/notanid', { method: 'DELETE' })
+    expect(res.status).toBe(400)
   })
 })
 
