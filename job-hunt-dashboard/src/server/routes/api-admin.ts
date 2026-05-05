@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { asc, desc, eq } from 'drizzle-orm'
+import { asc, desc, eq, inArray } from 'drizzle-orm'
 import { getCookie } from 'hono/cookie'
 import { randomBytes } from 'node:crypto'
 import { db } from '../../db/client'
-import { users, sessions, inviteKeys } from '../../db/schema'
+import { users, sessions, inviteKeys, jobs, coverLetters, statusEvents, messages, searchConfigs, userSecrets } from '../../db/schema'
 import type { AppEnv } from '../types'
 
 const app = new Hono<AppEnv>()
@@ -90,6 +90,40 @@ app.patch('/users/:id', async (c) => {
 
   if (!updated) return c.json({ error: 'User not found' }, 404)
   return c.json(updated)
+})
+
+app.delete('/users/:id', (c) => {
+  const id = parseInt(c.req.param('id'), 10)
+  if (isNaN(id)) return c.json({ error: 'Invalid id' }, 400)
+
+  if (id === c.get('sessionUserId')) {
+    return c.json({ error: 'Cannot delete your own account' }, 403)
+  }
+
+  const target = db.select({ id: users.id, role: users.role }).from(users).where(eq(users.id, id)).get()
+  if (!target) return c.json({ error: 'User not found' }, 404)
+
+  if (target.role === 'admin') {
+    const adminCount = db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).all().length
+    if (adminCount === 1) return c.json({ error: 'Cannot delete the last admin' }, 409)
+  }
+
+  db.transaction((tx) => {
+    tx.delete(sessions).where(eq(sessions.userId, id)).run()
+    tx.delete(userSecrets).where(eq(userSecrets.userId, id)).run()
+    tx.delete(messages).where(eq(messages.userId, id)).run()
+    tx.delete(searchConfigs).where(eq(searchConfigs.userId, id)).run()
+    tx.delete(coverLetters).where(eq(coverLetters.userId, id)).run()
+    const jobIds = tx.select({ id: jobs.id }).from(jobs).where(eq(jobs.userId, id)).all().map(r => r.id)
+    if (jobIds.length > 0) {
+      tx.delete(statusEvents).where(inArray(statusEvents.jobId, jobIds)).run()
+    }
+    tx.delete(jobs).where(eq(jobs.userId, id)).run()
+    tx.update(inviteKeys).set({ usedByUserId: null }).where(eq(inviteKeys.usedByUserId, id)).run()
+    tx.delete(users).where(eq(users.id, id)).run()
+  })
+
+  return c.body(null, 204)
 })
 
 // Exit FIRST — prevents "exit" from being captured as :id

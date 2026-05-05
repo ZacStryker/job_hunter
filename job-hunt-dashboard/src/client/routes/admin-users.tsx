@@ -17,6 +17,7 @@ import { useImpersonateMutation } from '@/hooks/useImpersonateMutation'
 import { useInviteKeysQuery } from '@/hooks/useInviteKeysQuery'
 import { useGenerateInviteKeyMutation } from '@/hooks/useGenerateInviteKeyMutation'
 import { useRevokeInviteKeyMutation } from '@/hooks/useRevokeInviteKeyMutation'
+import { useDeleteAdminUserMutation } from '@/hooks/useDeleteAdminUserMutation'
 import { UserEditDrawer } from '@/components/admin/UserEditDrawer'
 import { apiFetch } from '@/lib/api'
 import { toast } from 'sonner'
@@ -25,6 +26,7 @@ import type { AdminUser, InviteKey } from '@shared/schemas'
 type DialogState =
   | { type: 'reset-pw'; user: AdminUser }
   | { type: 'impersonate'; user: AdminUser }
+  | { type: 'delete-user'; user: AdminUser }
   | { type: 'revoke-key'; keyId: number }
   | null
 
@@ -42,6 +44,7 @@ export function AdminUsersRoute() {
   const { data: inviteKeys = [], isLoading: keysLoading } = useInviteKeysQuery()
   const generateMutation = useGenerateInviteKeyMutation()
   const revokeMutation = useRevokeInviteKeyMutation()
+  const deleteMutation = useDeleteAdminUserMutation()
   const [copiedKeyId, setCopiedKeyId] = useState<number | null>(null)
 
   function openEditDrawer(user: AdminUser) {
@@ -114,6 +117,17 @@ export function AdminUsersRoute() {
     }
   }
 
+  async function handleDeleteUser() {
+    if (!dialog || dialog.type !== 'delete-user') return
+    try {
+      await deleteMutation.mutateAsync(dialog.user.id)
+      setDialog(null)
+      toast('User deleted')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to delete user')
+    }
+  }
+
   if (isLoading) return (
     <div className="p-8 text-zinc-400 text-sm">Loading…</div>
   )
@@ -179,6 +193,15 @@ export function AdminUsersRoute() {
                       onClick={() => setDialog({ type: 'impersonate', user })}
                     >
                       Impersonate
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-400 hover:text-red-300 text-xs h-7"
+                      onClick={() => setDialog({ type: 'delete-user', user })}
+                      disabled={deleteMutation.isPending}
+                    >
+                      Delete
                     </Button>
                   </div>
                 </td>
@@ -333,6 +356,29 @@ export function AdminUsersRoute() {
               className="bg-red-700 hover:bg-red-600 text-white border-0"
             >
               {revokeMutation.isPending ? 'Revoking…' : 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User dialog */}
+      <Dialog open={dialog?.type === 'delete-user'} onOpenChange={(v) => { if (!v) setDialog(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete User</DialogTitle>
+            <DialogDescription>
+              {dialog?.type === 'delete-user' &&
+                `Permanently delete ${dialog.user.name ?? dialog.user.email} and all their data. This cannot be undone.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button
+              onClick={handleDeleteUser}
+              disabled={deleteMutation.isPending}
+              className="bg-red-700 hover:bg-red-600 text-white border-0"
+            >
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

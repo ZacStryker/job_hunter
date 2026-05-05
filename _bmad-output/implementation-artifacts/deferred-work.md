@@ -497,6 +497,12 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 - **PATCH deactivation does not clear impersonation sessions targeting the deactivated user** — `db.delete(sessions).where(eq(sessions.userId, id))` removes sessions the target user owns, but not sessions belonging to admins that have `data.impersonating = id`. An admin mid-impersonation of a user who then gets deactivated continues operating as that user until they exit manually. [`src/server/routes/api-admin.ts:62`]
 - **`auth-middleware` uses `db.select()` without column restriction on sessions table** — Pre-existing pattern; not introduced by this story. `sessions.data` is required for impersonation parsing so the full select is functionally correct. Address in a future security hardening pass. [`src/server/middleware/auth-middleware.ts`]
 
+## Deferred from: code review of admin-delete-user (2026-05-05)
+
+- **Invite key becomes reusable after user delete** — nulling `usedByUserId` makes `status: 'unused'` since the field is the sole status discriminant; the `usedAt` value is preserved. Spec explicitly mandates this for audit trail; registration flow may accept the nulled key. Consider also nulling `usedAt` or adding a separate `invalidated` flag if key recycling is undesired. [`api-admin.ts`]
+- **Stale impersonation session when impersonation target is deleted** — if admin A is impersonating user B and admin C deletes user B, admin A's session retains `{ impersonating: B }`. Auth middleware will silently return empty data for user B until admin A exits impersonation. Pre-existing design gap in the impersonation architecture. [`auth-middleware.ts`]
+- **statusEvents deletion uses in-app job ID fetch** — `tx.select({ id: jobs.id }).from(jobs)...all().map()` fetches job IDs into application memory before deleting statusEvents. For users with very large job counts this round-trips unnecessarily; a SQL subquery would be more efficient. Optimization only; not a correctness issue. [`api-admin.ts`]
+
 ## Deferred from: code review of 26-3-admin-invite-key-management (2026-05-05)
 
 - `copiedKeyId` not cleared when key is revoked — cosmetic race: copied checkmark state persists up to 1500ms after row disappears; auto-increment prevents id reuse so no real UI corruption [`admin-users.tsx`]
