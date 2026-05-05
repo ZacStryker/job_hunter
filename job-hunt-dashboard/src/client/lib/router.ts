@@ -48,12 +48,14 @@ const loginRoute = createRoute({
   path: '/login',
   component: LoginRoute,
   beforeLoad: async () => {
+    let res: Response
     try {
-      const res = await fetch('/auth/session')
-      if (res.ok) throw redirect({ to: '/' })
-    } catch (err) {
-      if (err && typeof err === 'object' && '__isRedirect' in err) throw err
+      res = await fetch('/auth/session')
+    } catch {
+      return
     }
+    if (res.ok) throw redirect({ to: '/' })
+    if (res.status !== 401) throw new Error(`Unexpected session response: ${res.status}`)
   },
 })
 
@@ -62,12 +64,14 @@ const registerRoute = createRoute({
   path: '/register',
   component: RegisterRoute,
   beforeLoad: async () => {
+    let res: Response
     try {
-      const res = await fetch('/auth/session')
-      if (res.ok) throw redirect({ to: '/' })
-    } catch (err) {
-      if (err && typeof err === 'object' && '__isRedirect' in err) throw err
+      res = await fetch('/auth/session')
+    } catch {
+      return
     }
+    if (res.ok) throw redirect({ to: '/' })
+    if (res.status !== 401) throw new Error(`Unexpected session response: ${res.status}`)
   },
 })
 
@@ -91,7 +95,8 @@ const onboardingRoute = createRoute({
     } catch {
       throw redirect({ to: '/login' })
     }
-    if (res.status === 401 || !res.ok) throw redirect({ to: '/login' })
+    if (res.status === 401) throw redirect({ to: '/login' })
+    if (!res.ok) throw new Error(`Unexpected onboarding status response: ${res.status}`)
     const status = await res.json() as OnboardingStatusResponse
     if (status.onboardingComplete) throw redirect({ to: '/' })
   },
