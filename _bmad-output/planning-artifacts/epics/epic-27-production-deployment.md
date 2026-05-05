@@ -37,8 +37,10 @@ So that deployment to Linode is a `docker compose up` away.
 
 **Given** `.env.example` in the repo
 **When** it is read
-**Then** it documents ALL required env vars including: existing (`PORT`, `DB_PATH`, `SCRAPER_URL`, `SCRAPER_TOKEN`) and all new (`SESSION_SECRET`, `ENCRYPTION_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `APP_URL`, `INVITE_KEY_SEED`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`)
+**Then** it documents ALL required env vars including: existing (`PORT`, `DB_PATH`, `SCRAPER_URL`, `SCRAPER_TOKEN`) and all new (`SESSION_SECRET`, `ENCRYPTION_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `APP_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`)
 **And** all values are placeholder strings — no real credentials committed
+
+> **Note:** `INVITE_KEY_SEED` is intentionally omitted — invite keys are generated with `crypto.randomBytes(32).toString('hex')` at runtime and stored directly in the database; there is no seed env var.
 
 ## Story 27.2: Nginx Reverse Proxy & Deployment Runbook
 
