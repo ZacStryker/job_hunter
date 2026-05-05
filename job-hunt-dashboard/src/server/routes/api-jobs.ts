@@ -11,6 +11,8 @@ import { recordRun } from './api-webhook-runs'
 import type { Job } from '../../shared/schemas'
 import type { AppEnv } from '../types'
 
+const DATA_DIR = join(import.meta.dirname, '../../../data')
+
 // USD per token (per-million prices / 1_000_000)
 const SONNET_4_6_INPUT = 3 / 1_000_000
 const SONNET_4_6_OUTPUT = 15 / 1_000_000
@@ -344,7 +346,7 @@ app.post('/:id/generate-cover-letter', async (c) => {
   const clCostUsd = clInputTokens * SONNET_4_6_INPUT + clOutputTokens * SONNET_4_6_OUTPUT
   const now = new Date().toISOString()
 
-  const clDir = join(process.cwd(), 'data', 'cover-letters')
+  const clDir = join(DATA_DIR, 'cover-letters')
   const finalPath = join(clDir, `${rawId}.pdf`)
   const tmpPath = join(clDir, `${rawId}.pdf.tmp`)
   try {
@@ -427,7 +429,7 @@ app.post('/:id/generate-resume', async (c) => {
 
   // Persist PDF to disk (atomic: write to temp then rename)
   try {
-    const resumesDir = join(process.cwd(), 'data', 'resumes')
+    const resumesDir = join(DATA_DIR, 'resumes')
     mkdirSync(resumesDir, { recursive: true })
     const finalPath = join(resumesDir, `${rawId}.pdf`)
     const tmpPath = join(resumesDir, `${rawId}.pdf.tmp`)
@@ -465,7 +467,7 @@ app.get('/:id/resume', async (c) => {
     return c.json({ error: 'Job not found' }, 404)
   }
 
-  const resumePath = join(process.cwd(), 'data', 'resumes', `${rawId}.pdf`)
+  const resumePath = join(DATA_DIR, 'resumes', `${rawId}.pdf`)
   let pdfBuffer: ArrayBuffer
   try {
     pdfBuffer = await Bun.file(resumePath).arrayBuffer()
@@ -530,7 +532,7 @@ app.get('/:id/cover-letter/pdf', async (c) => {
     return c.json({ error: 'Job not found' }, 404)
   }
 
-  const pdfPath = join(process.cwd(), 'data', 'cover-letters', `${rawId}.pdf`)
+  const pdfPath = join(DATA_DIR, 'cover-letters', `${rawId}.pdf`)
   let pdfBuffer: ArrayBuffer
   try {
     pdfBuffer = await Bun.file(pdfPath).arrayBuffer()
