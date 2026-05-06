@@ -57,7 +57,7 @@ function EmptyState() {
         <div className="flex items-center justify-center py-16 px-4">
           <div className="text-center space-y-3">
             <p className="text-sm text-zinc-400">
-              No jobs pending analysis. Run the scraper to discover new jobs.
+              No jobs pending analysis. Click Discover Jobs to add more.
             </p>
           </div>
         </div>
