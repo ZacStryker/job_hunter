@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-05-05 # epic 26 retrospective done
+last_updated: 2026-05-06 # story 27.2 review
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -193,7 +193,7 @@ development_status:
   epic-26-retrospective: done
 
   # Epic 27: Production Deployment
-  epic-27: backlog
-  27-1-dockerfile-and-docker-compose-configuration: backlog
-  27-2-nginx-reverse-proxy-and-deployment-runbook: backlog
+  epic-27: in-progress
+  27-1-dockerfile-and-docker-compose-configuration: done
+  27-2-nginx-reverse-proxy-and-deployment-runbook: review
   epic-27-retrospective: optional
