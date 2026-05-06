@@ -1,5 +1,17 @@
 # Deferred Work
 
+## Deferred from: code review of 27-2-nginx-reverse-proxy-and-deployment-runbook (2026-05-06)
+
+- DOMAIN placeholder in nginx.conf crashes nginx on first boot if not replaced — by design; runbook Step 4 explicitly calls it a required manual step.
+- Nginx starts before TLS certs exist → restart loop — operator error scenario; runbook Step 4 prevents it with "do not start docker compose yet" instruction.
+- `server_name _` catch-all in nginx.conf — deliberately chosen per dev notes; specific domain hardening is post-story scope.
+- `/etc/letsencrypt` symlink resolution after cert renewal — Docker may not follow updated symlinks; subsumed by the cert renewal lifecycle gap (P1).
+- `nginx:alpine` floating tag — image pinning recommended for production stability; out of scope for initial deployment story.
+- No volume backup guidance — `docker compose down -v` destroys SQLite data permanently; backup strategy is out of scope for this story.
+- X-Real-IP/X-Forwarded-For trust model — nginx config is correct (uses $remote_addr); app-layer trust model concern.
+- ADMIN_PASSWORD rotation enforcement — no complexity requirement or rotation mechanism; app-level concern; runbook warning is appropriate.
+- ENCRYPTION_KEY startup validation — app should validate ENCRYPTION_KEY is set before starting; app-level concern, pre-existing.
+
 ## Deferred from: code review of 27-1-dockerfile-and-docker-compose-configuration (2026-05-06)
 
 - `seedAdmin` runs before `REQUIRED_ENV_VARS` validation in `src/index.ts` — pre-existing ordering; DB state is mutated before env check fires.

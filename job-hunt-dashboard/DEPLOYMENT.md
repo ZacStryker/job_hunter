@@ -26,9 +26,17 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Add your user to the docker group (re-login after this)
+# Add your user to the docker group
 sudo usermod -aG docker $USER
+
+# Configure firewall — allow only HTTP and HTTPS inbound
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow OpenSSH
+sudo ufw --force enable
 ```
+
+> **Re-login required:** The `docker` group change doesn't take effect until you start a new session. Log out and reconnect (or run `newgrp docker`) before continuing to Step 2.
 
 ---
 
@@ -56,7 +64,7 @@ AUTH_DIR=                          # Optional: path to scraper auth dir
 
 ANTHROPIC_API_KEY=                 # Required for AI analysis, cover letter, and resume features
 
-ENCRYPTION_KEY=                    # Generate with: openssl rand -hex 32
+ENCRYPTION_KEY=                    # Generate with: openssl rand -hex 32  ⚠ save this value securely — see note below
 APP_URL=https://yourdomain.com     # MUST be your real domain — used in activation and password-reset email links
 
 SMTP_HOST=
@@ -76,6 +84,8 @@ openssl rand -hex 32
 ```
 
 > **Important:** `DB_PATH` must be `/app/data/jobs.db` in production. The dev default (`./data/jobs.db`) is a relative path that breaks inside Docker. The `job_hunt_data` named volume is mounted at `/app/data`.
+
+> **Critical — save your ENCRYPTION_KEY:** This key encrypts stored credentials (IMAP passwords, API keys). If you regenerate or lose it on a future redeploy, all existing encrypted data becomes permanently unreadable. Store the value in a password manager or secure vault before deploying.
 
 > **Security reminder:** `ADMIN_EMAIL` and `ADMIN_PASSWORD` create the seed admin account on first boot only. Remove or rotate these values after initial setup.
 
@@ -143,17 +153,33 @@ Expected: HTTP 200 from `curl`, application loads in browser at `https://yourdom
 
 ## Certificate Renewal
 
-Certbot on the host can auto-renew certificates. Add a cron job or use the systemd timer installed by certbot:
+Certbot installs a systemd timer for automatic renewal. Because renewal uses standalone mode (which needs port 80 free), nginx must be stopped during the challenge and restarted after. Set up pre/post hooks once after initial deployment:
 
 ```bash
-# Test renewal (dry run)
-sudo certbot renew --dry-run
+# Set the path to your repo checkout (update if you cloned elsewhere)
+REPO_DIR="$HOME/job-hunt-dashboard"
+
+sudo mkdir -p /etc/letsencrypt/renewal-hooks/pre /etc/letsencrypt/renewal-hooks/post
+
+# Stop nginx before renewal to free port 80
+sudo tee /etc/letsencrypt/renewal-hooks/pre/stop-nginx.sh > /dev/null << EOF
+#!/bin/sh
+cd $REPO_DIR && docker compose stop nginx
+EOF
+sudo chmod +x /etc/letsencrypt/renewal-hooks/pre/stop-nginx.sh
+
+# Restart nginx after renewal (picks up the new certificate)
+sudo tee /etc/letsencrypt/renewal-hooks/post/start-nginx.sh > /dev/null << EOF
+#!/bin/sh
+cd $REPO_DIR && docker compose start nginx
+EOF
+sudo chmod +x /etc/letsencrypt/renewal-hooks/post/start-nginx.sh
 ```
 
-After renewal, reload Nginx to pick up new certificates:
+Test the full renewal flow (dry run — verifies the hooks fire correctly):
 
 ```bash
-docker compose exec nginx nginx -s reload
+sudo certbot renew --dry-run
 ```
 
 ---

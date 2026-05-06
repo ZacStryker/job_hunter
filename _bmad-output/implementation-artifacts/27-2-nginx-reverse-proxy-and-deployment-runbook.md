@@ -1,6 +1,6 @@
 # Story 27.2: Nginx Reverse Proxy & Deployment Runbook
 
-Status: review
+Status: done
 
 ## Story
 
@@ -226,6 +226,26 @@ job-hunt-dashboard/docker-compose.yml    ← remove ports from app, add nginx se
 - Admin invite key route: `job-hunt-dashboard/src/server/routes/api-admin.ts:194`
 - Architecture deployment notes: `_bmad-output/planning-artifacts/architecture-distillate.md#development--production-workflow`
 - Epic 27 spec: `_bmad-output/planning-artifacts/epics/epic-27-production-deployment.md#story-272`
+
+### Review Findings
+
+- [x] [Review][Patch] P1: Cert renewal lifecycle broken — certbot standalone conflicts with nginx holding port 80; no deploy hook configured for auto-reload after systemd timer renewal [job-hunt-dashboard/DEPLOYMENT.md:Certificate Renewal]
+- [x] [Review][Patch] P2: No firewall instructions — Docker bypasses UFW; port 3000 could be exposed directly to internet; runbook missing `ufw allow 80/tcp`, `ufw allow 443/tcp`, `ufw enable` [job-hunt-dashboard/DEPLOYMENT.md:Step1]
+- [x] [Review][Patch] P3: `depends_on: app` has no health condition — nginx starts before Node is ready; 502s served to clients during cold start / migrations [job-hunt-dashboard/docker-compose.yml]
+- [x] [Review][Patch] P4: No `proxy_read_timeout`/`proxy_connect_timeout` in nginx.conf — AI-heavy requests silently killed at nginx default 60s [job-hunt-dashboard/nginx/nginx.conf]
+- [x] [Review][Patch] P5: No `client_max_body_size` directive — oversized resume/file uploads reach app unchecked; OOM risk on single VPS [job-hunt-dashboard/nginx/nginx.conf]
+- [x] [Review][Patch] P6: No TLS hardening — missing `ssl_protocols TLSv1.2 TLSv1.3`, `ssl_ciphers`, and HSTS header [job-hunt-dashboard/nginx/nginx.conf]
+- [x] [Review][Patch] P7: `ENCRYPTION_KEY` stability warning missing — regenerating the key on redeploy silently corrupts all existing encrypted data; runbook must warn explicitly [job-hunt-dashboard/DEPLOYMENT.md:Step3]
+- [x] [Review][Patch] P8: `usermod -aG docker` requires logout/login — runbook flows straight into Step 2 without an explicit session-break step [job-hunt-dashboard/DEPLOYMENT.md:Step1]
+- [x] [Review][Defer] D1: DOMAIN placeholder crashes nginx on first boot — by design per spec and explicitly called out in runbook Step 4 as a required manual step; deferred, pre-existing
+- [x] [Review][Defer] D2: Nginx starts before TLS certs exist → restart loop — operator error scenario covered by runbook Step 4 ("do not start docker compose yet"); deferred, pre-existing
+- [x] [Review][Defer] D3: `server_name _` catch-all — explicitly chosen per dev notes; hardening to a specific domain is out of scope for this story; deferred, pre-existing
+- [x] [Review][Defer] D4: `/etc/letsencrypt` symlink resolution after renewal — edge case subsumed by P1 (renewal lifecycle); deferred, pre-existing
+- [x] [Review][Defer] D5: `nginx:alpine` floating tag — image pinning is out of scope for initial deployment story; deferred, pre-existing
+- [x] [Review][Defer] D6: No volume backup guidance — backup strategy is out of scope for this story; deferred, pre-existing
+- [x] [Review][Defer] D7: X-Real-IP/X-Forwarded-For trust model — nginx config is correct; app-layer concern; deferred, pre-existing
+- [x] [Review][Defer] D8: ADMIN_PASSWORD rotation enforcement — app-level concern; runbook warning is the appropriate response; deferred, pre-existing
+- [x] [Review][Defer] D9: ENCRYPTION_KEY startup validation — app-level validation, pre-existing, out of story scope; deferred, pre-existing
 
 ## Dev Agent Record
 
