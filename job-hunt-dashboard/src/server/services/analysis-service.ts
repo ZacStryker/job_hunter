@@ -49,7 +49,7 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
   const scraperUrl = process.env.SCRAPER_URL
   const scraperToken = process.env.SCRAPER_TOKEN
 
-  const profileRow = db.select().from(profile).limit(1).get() ?? null
+  const profileRow = (userId !== undefined ? db.select().from(profile).where(eq(profile.userId, userId)).get() : null) ?? null
   const promptConfig = loadEffectivePrompt('analysis')
 
   const pendingJobs = db

@@ -50,9 +50,11 @@ const CREATE_JOBS_TABLE = `
 const CREATE_PROFILE_TABLE = `
   CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL DEFAULT 1,
     name TEXT, email TEXT, phone TEXT, location TEXT,
     linkedin_url TEXT, github_url TEXT, summary TEXT,
-    experience TEXT, skills TEXT, education TEXT
+    experience TEXT, skills TEXT, education TEXT,
+    UNIQUE(user_id)
   )
 `
 const CREATE_STATUS_EVENTS_TABLE = `

@@ -1,15 +1,24 @@
 process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, beforeAll, beforeEach } from 'bun:test'
+import { Hono } from 'hono'
 import { Database } from 'bun:sqlite'
 
-const { default: profileApp } = await import('./api-profile')
+const { default: profileRoute } = await import('./api-profile')
 const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
+
+const profileApp = (() => {
+  const w = new Hono()
+  w.use('*', (c, next) => { c.set('userId', 1); return next() })
+  w.route('/', profileRoute)
+  return w
+})()
 
 const CREATE_PROFILE_TABLE = `
   CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL DEFAULT 1,
     name TEXT,
     email TEXT,
     phone TEXT,
@@ -19,7 +28,8 @@ const CREATE_PROFILE_TABLE = `
     summary TEXT,
     experience TEXT,
     skills TEXT,
-    education TEXT
+    education TEXT,
+    UNIQUE(user_id)
   )
 `
 
@@ -41,7 +51,7 @@ describe('getProfile (business logic)', () => {
 
   test('returns stored profile after upsert', () => {
     prodSqlite.run(
-      `INSERT INTO profile (id, name, email) VALUES (1, 'Alice', 'alice@example.com')`
+      `INSERT INTO profile (user_id, name, email) VALUES (1, 'Alice', 'alice@example.com')`
     )
     const { db } = require('../../db/client')
     const { profile } = require('../../db/schema')
@@ -51,7 +61,7 @@ describe('getProfile (business logic)', () => {
   })
 
   test('second upsert updates row via PUT handler', async () => {
-    prodSqlite.run(`INSERT INTO profile (id, name) VALUES (1, 'Alice')`)
+    prodSqlite.run(`INSERT INTO profile (user_id, name) VALUES (1, 'Alice')`)
     const res = await profileApp.request('/', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -60,7 +70,6 @@ describe('getProfile (business logic)', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.name).toBe('Bob')
-    expect(body.id).toBe(1)
     const { db } = require('../../db/client')
     const { profile } = require('../../db/schema')
     const rows = db.select().from(profile).limit(1).all()
@@ -74,7 +83,7 @@ describe('GET /api/profile (HTTP contract)', () => {
     const res = await profileApp.request('/', { method: 'GET' })
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.id).toBe(1)
+    expect(body.id).toBeNull()
     expect(body.name).toBeNull()
     expect(body.email).toBeNull()
     expect(body.phone).toBeNull()
@@ -89,7 +98,7 @@ describe('GET /api/profile (HTTP contract)', () => {
 
   test('returns 200 with stored profile data', async () => {
     prodSqlite.run(
-      `INSERT INTO profile (id, name, email, phone) VALUES (1, 'Alice', 'alice@example.com', '555-1234')`
+      `INSERT INTO profile (user_id, name, email, phone) VALUES (1, 'Alice', 'alice@example.com', '555-1234')`
     )
     const res = await profileApp.request('/', { method: 'GET' })
     expect(res.status).toBe(200)
@@ -121,14 +130,14 @@ describe('PUT /api/profile (HTTP contract)', () => {
     })
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.id).toBe(1)
+    expect(body.id).toBeDefined()
     expect(body.name).toBe('Alice')
     expect(body.email).toBe('alice@example.com')
     expect(body.linkedinUrl).toBe('https://linkedin.com/in/alice')
   })
 
   test('second PUT updates existing row', async () => {
-    prodSqlite.run(`INSERT INTO profile (id, name) VALUES (1, 'Alice')`)
+    prodSqlite.run(`INSERT INTO profile (user_id, name) VALUES (1, 'Alice')`)
     const res = await profileApp.request('/', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -137,7 +146,7 @@ describe('PUT /api/profile (HTTP contract)', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.name).toBe('Bob')
-    expect(body.id).toBe(1)
+    expect(body.id).toBeDefined()
   })
 
   test('returns 400 with error key for invalid payload', async () => {

@@ -54,7 +54,7 @@ export async function generateCoverLetter(job: Job, userId?: number): Promise<{ 
   }
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
-  const profileRow = db.select().from(profile).limit(1).get() ?? null
+  const profileRow = (userId !== undefined ? db.select().from(profile).where(eq(profile.userId, userId)).get() : null) ?? null
   const promptConfig = loadEffectivePrompt('cover_letter')
 
   const profileText =

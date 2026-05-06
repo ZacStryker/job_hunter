@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { eq } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { profile } from '../../db/schema'
 import { profileInputSchema } from '../../shared/schemas'
@@ -7,7 +8,7 @@ import type { AppEnv } from '../types'
 const app = new Hono<AppEnv>()
 
 const EMPTY_PROFILE = {
-  id: 1,
+  id: null,
   name: null,
   email: null,
   phone: null,
@@ -21,12 +22,13 @@ const EMPTY_PROFILE = {
 }
 
 app.get('/', (c) => {
-  const rows = db.select().from(profile).limit(1).all()
-  const row = rows[0] ?? EMPTY_PROFILE
-  return c.json(row)
+  const userId = c.get('userId')
+  const row = db.select().from(profile).where(eq(profile.userId, userId)).get()
+  return c.json(row ?? EMPTY_PROFILE)
 })
 
 app.put('/', async (c) => {
+  const userId = c.get('userId')
   let body: unknown
   try {
     body = await c.req.json()
@@ -39,12 +41,13 @@ app.put('/', async (c) => {
   }
 
   const input = parsed.data
-  db.insert(profile)
-    .values({ id: 1, ...input })
-    .onConflictDoUpdate({ target: profile.id, set: input })
-    .run()
+  const row = db.insert(profile)
+    .values({ userId, ...input })
+    .onConflictDoUpdate({ target: profile.userId, set: input })
+    .returning()
+    .get()
 
-  return c.json({ id: 1, ...input })
+  return c.json(row)
 })
 
 export default app
