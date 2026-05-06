@@ -22,12 +22,12 @@ app.post('/discovery', (c) => {
     const startMs = Date.now()
     try {
       const { inserted, bySource } = await runDiscovery((msg) => write({ status: msg }), userId)
-      recordRun({ name: 'Discovery', success: true, itemCount: inserted, errorMessage: null, durationMs: Date.now() - startMs, sourceBreakdown: Object.keys(bySource).length > 0 ? bySource : null })
+      recordRun({ userId, name: 'Discovery', success: true, itemCount: inserted, errorMessage: null, durationMs: Date.now() - startMs, sourceBreakdown: Object.keys(bySource).length > 0 ? bySource : null })
       write({ done: true, inserted })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       console.error('[discovery] run failed:', message)
-      recordRun({ name: 'Discovery', success: false, itemCount: null, errorMessage: message, durationMs: Date.now() - startMs })
+      recordRun({ userId, name: 'Discovery', success: false, itemCount: null, errorMessage: message, durationMs: Date.now() - startMs })
       write({ error: message })
     }
   })
@@ -48,13 +48,13 @@ app.post('/analysis', async (c) => {
     try {
       const { processed, failed, matched, archived, inputTokens, outputTokens } = await runAnalysis((msg) => write({ status: msg }), userId)
       const costUsd = inputTokens * OPUS_4_7_INPUT + outputTokens * OPUS_4_7_OUTPUT
-      recordRun({ name: 'Analysis', success: true, itemCount: processed, errorMessage: null,
+      recordRun({ userId, name: 'Analysis', success: true, itemCount: processed, errorMessage: null,
         durationMs: Date.now() - startMs, inputTokens, outputTokens, costUsd, matchedCount: matched, archivedCount: archived })
       write({ done: true, processed, failed, matched, archived })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       console.error('[analysis] run failed:', message)
-      recordRun({ name: 'Analysis', success: false, itemCount: null, errorMessage: message,
+      recordRun({ userId, name: 'Analysis', success: false, itemCount: null, errorMessage: message,
         durationMs: Date.now() - startMs, inputTokens: 0, outputTokens: 0, costUsd: 0 })
       write({ error: message })
     }

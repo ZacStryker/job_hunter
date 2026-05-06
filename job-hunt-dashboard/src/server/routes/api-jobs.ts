@@ -338,7 +338,7 @@ app.post('/:id/generate-cover-letter', async (c) => {
     if (message === 'ANTHROPIC_API_KEY not configured') {
       return c.json({ error: 'Cover letter generation is not configured' }, 503)
     }
-    recordRun({ name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - startMs })
+    recordRun({ userId, name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - startMs })
     return c.json({ error: 'Cover letter generation failed' }, 502)
   }
 
@@ -354,7 +354,7 @@ app.post('/:id/generate-cover-letter', async (c) => {
     await Bun.write(tmpPath, coverLetterPdf)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    recordRun({ name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - startMs })
+    recordRun({ userId, name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - startMs })
     return c.json({ error: 'Cover letter generation failed' }, 502)
   }
 
@@ -382,7 +382,7 @@ app.post('/:id/generate-cover-letter', async (c) => {
     .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.createdAt, now), eq(coverLetters.userId, userId)))
     .get()
 
-  recordRun({ name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
+  recordRun({ userId, name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
     durationMs: Date.now() - startMs, inputTokens: clInputTokens, outputTokens: clOutputTokens, costUsd: clCostUsd })
   return c.json({ coverLetter: inserted })
 })
@@ -415,7 +415,7 @@ app.post('/:id/generate-resume', async (c) => {
     if (message === 'ANTHROPIC_API_KEY not configured') {
       return c.json({ error: 'Resume generation is not configured' }, 503)
     }
-    recordRun({ name: `Resume - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - resumeStartMs })
+    recordRun({ userId, name: `Resume - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - resumeStartMs })
     return c.json({ error: 'Resume generation failed' }, 502)
   }
 
@@ -441,7 +441,7 @@ app.post('/:id/generate-resume', async (c) => {
     // Non-fatal — user still gets their download
   }
 
-  recordRun({ name: `Resume - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
+  recordRun({ userId, name: `Resume - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
     durationMs: Date.now() - resumeStartMs, inputTokens: resumeInputTokens, outputTokens: resumeOutputTokens, costUsd: resumeCostUsd })
   return new Response(pdfBuffer, {
     headers: {

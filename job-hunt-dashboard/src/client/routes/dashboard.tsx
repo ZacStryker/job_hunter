@@ -354,7 +354,6 @@ export function DashboardRoute() {
                 </ResponsiveContainer>
               </ChartCard>
             )}
-            {data.jobs.perDay.length > 0 && (
             <ChartCard
               title="Source Breakdown"
               tableHeaders={['Source', 'Count']}
@@ -377,7 +376,6 @@ export function DashboardRoute() {
                 </ResponsiveContainer>
               )}
             </ChartCard>
-            )}
           </section>
 
           {/* ── Q03 Matches ── */}

@@ -65,7 +65,8 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
     cost_usd REAL,
     matched_count INTEGER,
     archived_count INTEGER,
-    source_breakdown TEXT
+    source_breakdown TEXT,
+    user_id INTEGER NOT NULL DEFAULT 1
   )
 `
 

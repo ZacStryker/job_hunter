@@ -72,7 +72,10 @@ export const webhookRuns = sqliteTable('webhook_runs', {
   matchedCount: integer('matched_count'),
   archivedCount: integer('archived_count'),
   sourceBreakdown: text('source_breakdown'),
-})
+  userId: integer('user_id').notNull().references(() => users.id).default(1),
+}, (table) => [
+  index('webhook_runs_user_id_idx').on(table.userId),
+])
 
 export const profile = sqliteTable('profile', {
   id: integer('id').primaryKey({ autoIncrement: true }),

@@ -1,11 +1,19 @@
 process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, beforeAll, beforeEach } from 'bun:test'
+import { Hono } from 'hono'
 import { Database } from 'bun:sqlite'
 
-const { default: webhookRunsApp, recordRun } = await import('./api-webhook-runs')
+const { default: webhookRunsRoute, recordRun } = await import('./api-webhook-runs')
 const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
+
+const webhookRunsApp = (() => {
+  const w = new Hono()
+  w.use('*', (c, next) => { c.set('userId', 1); return next() })
+  w.route('/', webhookRunsRoute)
+  return w
+})()
 
 const CREATE_WEBHOOK_RUNS_TABLE = `
   CREATE TABLE IF NOT EXISTS webhook_runs (
@@ -21,7 +29,8 @@ const CREATE_WEBHOOK_RUNS_TABLE = `
     cost_usd REAL,
     matched_count INTEGER,
     archived_count INTEGER,
-    source_breakdown TEXT
+    source_breakdown TEXT,
+    user_id INTEGER NOT NULL DEFAULT 1
   )
 `
 
@@ -35,7 +44,7 @@ beforeEach(() => {
 
 describe('recordRun utility', () => {
   test('inserts a successful run with item count', () => {
-    recordRun({ name: 'Discovery', success: true, itemCount: 5 })
+    recordRun({ userId: 1, name: 'Discovery', success: true, itemCount: 5 })
     const row = prodSqlite.query('SELECT * FROM webhook_runs WHERE name = ?').get('Discovery') as {
       name: string; success: number; item_count: number | null; error_message: string | null
     }
@@ -47,7 +56,7 @@ describe('recordRun utility', () => {
   })
 
   test('inserts a failed run with error message', () => {
-    recordRun({ name: 'Analysis', success: false, itemCount: null, errorMessage: 'HTTP 500' })
+    recordRun({ userId: 1, name: 'Analysis', success: false, itemCount: null, errorMessage: 'HTTP 500' })
     const row = prodSqlite.query('SELECT * FROM webhook_runs WHERE name = ?').get('Analysis') as {
       name: string; success: number; item_count: number | null; error_message: string | null
     }
@@ -58,7 +67,7 @@ describe('recordRun utility', () => {
   })
 
   test('defaults itemCount and errorMessage to null when omitted', () => {
-    recordRun({ name: 'Test', success: true })
+    recordRun({ userId: 1, name: 'Test', success: true })
     const row = prodSqlite.query('SELECT * FROM webhook_runs WHERE name = ?').get('Test') as {
       item_count: number | null; error_message: string | null
     }
@@ -67,7 +76,7 @@ describe('recordRun utility', () => {
   })
 
   test('persists durationMs, inputTokens, outputTokens, costUsd when provided', () => {
-    recordRun({ name: 'Analysis', success: true, itemCount: 5, durationMs: 1234, inputTokens: 100, outputTokens: 200, costUsd: 0.0042 })
+    recordRun({ userId: 1, name: 'Analysis', success: true, itemCount: 5, durationMs: 1234, inputTokens: 100, outputTokens: 200, costUsd: 0.0042 })
     const row = prodSqlite.query('SELECT * FROM webhook_runs WHERE name = ?').get('Analysis') as {
       duration_ms: number | null; input_tokens: number | null; output_tokens: number | null; cost_usd: number | null
     }

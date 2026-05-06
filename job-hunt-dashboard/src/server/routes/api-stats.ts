@@ -174,9 +174,9 @@ app.get('/', (c) => {
   const byStatus = STATUS_KEYS.map(k => ({ status: k, count: statusCounts[k] }))
 
   // ── Automation section (period cutoff on runAt, no archivedFilter) ──
-  const runRows = datetimeCutoff
-    ? db.select().from(webhookRuns).where(gte(webhookRuns.runAt, datetimeCutoff)).all()
-    : db.select().from(webhookRuns).all()
+  const runRows = db.select().from(webhookRuns).where(
+    and(eq(webhookRuns.userId, userId), datetimeCutoff ? gte(webhookRuns.runAt, datetimeCutoff) : undefined)
+  ).all()
 
   const totalRuns = runRows.length
   const totalTokens = runRows.reduce((s, r) => s + (r.inputTokens ?? 0) + (r.outputTokens ?? 0), 0)

@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { desc } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { webhookRuns } from '../../db/schema'
 import type { AppEnv } from '../types'
@@ -7,6 +7,7 @@ import type { AppEnv } from '../types'
 const app = new Hono<AppEnv>()
 
 export function recordRun(params: {
+  userId: number
   name: string
   success: boolean
   itemCount?: number | null
@@ -21,6 +22,7 @@ export function recordRun(params: {
 }) {
   try {
     db.insert(webhookRuns).values({
+      userId: params.userId,
       name: params.name,
       runAt: new Date().toISOString(),
       success: params.success,
@@ -40,7 +42,8 @@ export function recordRun(params: {
 }
 
 app.get('/', (c) => {
-  const rows = db.select().from(webhookRuns).orderBy(desc(webhookRuns.runAt)).all()
+  const userId = c.get('userId')
+  const rows = db.select().from(webhookRuns).where(eq(webhookRuns.userId, userId)).orderBy(desc(webhookRuns.runAt)).all()
   const runs = rows.map((r) => ({
     ...r,
     sourceBreakdown: r.sourceBreakdown ? (() => { try { return JSON.parse(r.sourceBreakdown!) as Record<string, number> } catch { return null } })() : null,

@@ -176,6 +176,13 @@
       "when": 1777597613567,
       "tag": "0024_square_rawhide_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1778070376246,
+      "tag": "0025_woozy_maelstrom",
+      "breakpoints": true
     }
   ]
 }
