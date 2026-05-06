@@ -18,8 +18,12 @@ export const DEFAULT_PROMPTS: Record<PromptFlow, PromptConfig> = {
       'CANDIDATE BACKGROUND:\n{{CANDIDATE_PROFILE_JSON}}\n\n' +
       'JOB PREFERENCES: full-time, English-speaking environment\n\n' +
       'JOB LISTING:\n{{JOB_LISTING_JSON}}\n\n' +
-      'Analyze this job for {{CANDIDATE_NAME}}. Respond with ONLY valid JSON \u2014 no markdown, no code blocks, no explanation:\n' +
-      '{ "score": <integer 1-99>, "role_fit": "<string>", "red_flags": "<string>", "requirements_met": "<string>", "requirements_missed": "<string>", "salary": "<string or null>", "benefits": "<string or null>", "contact_name": "<string or null>", "contact_email": "<string or null>", "contact_phone": "<string or null>", "recommended_action": "<apply|investigate|skip>" }',
+      'Analyze this job for {{CANDIDATE_NAME}}. First, score the match on a <1-99> scale. \n\n' +
+      'If the score is less than 50, respond with this JSON structure:\n' +
+      '{ "score": <integer 1-49>, "role_fit": null, "red_flags": null, "requirements_met": null, "requirements_missed": null,  "salary": null, "benefits": null, "contact_name": null, "contact_email": null, "contact_phone": null, "recommended_action": "<skip>" } \n\n' +
+      'If the score is 50 or more, respond with this JSON structure:\n' +
+      '{ "score": <integer 50-99>, "role_fit": "<string>", "red_flags": "<string>", "requirements_met": "<string>", "requirements_missed": "<string>", "salary": "<string or null>", "benefits": "<string or null>", "contact_name": "<string or null>", "contact_email": "<string or null>", "contact_phone": "<string or null>", "recommended_action": "<apply|investigate|skip>" } \n\n' +
+      'Respond with ONLY valid JSON \u2014 no markdown, no code blocks, no explanation.',
   },
   cover_letter: {
     systemPrompt:

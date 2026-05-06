@@ -11,15 +11,15 @@ interface AnthropicMessage {
 
 interface AnalysisResult {
   score: number
-  role_fit: string
-  red_flags: string
-  requirements_met: string
-  requirements_missed: string
-  salary: string
-  benefits: string
-  contact_name: string
-  contact_email: string
-  contact_phone: string
+  role_fit: string | null
+  red_flags: string | null
+  requirements_met: string | null
+  requirements_missed: string | null
+  salary: string | null
+  benefits: string | null
+  contact_name: string | null
+  contact_email: string | null
+  contact_phone: string | null
   recommended_action: string
 }
 
