@@ -117,7 +117,7 @@ if (isNaN(port)) throw new Error(`Invalid PORT env var: "${process.env.PORT}"`)
 
 export default {
   port,
-  hostname: '127.0.0.1',
+  hostname: process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1',
   fetch: app.fetch,
   idleTimeout: 120,
 }

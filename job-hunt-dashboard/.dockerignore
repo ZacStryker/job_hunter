@@ -1,0 +1,14 @@
+node_modules/
+scraper/node_modules/
+scraper/sessions/
+scraper/auth/
+dist/
+data/
+.env
+dev.db
+*.log
+screenshots/
+screenshot.py
+screenshot.sh
+screenshot.ts
+get-refresh-token.ts

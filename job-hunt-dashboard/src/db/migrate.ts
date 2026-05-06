@@ -1,8 +1,9 @@
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
+import { join } from 'node:path'
 import { db } from './client'
 
 export function runMigrations(): void {
-  migrate(db, { migrationsFolder: './src/db/migrations' })
+  migrate(db, { migrationsFolder: join(import.meta.dir, 'migrations') })
   console.log('[db] Migrations complete')
 }
 
