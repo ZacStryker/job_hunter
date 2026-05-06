@@ -37,3 +37,6 @@ screenshot.py
 screenshot.sh
 screenshot.ts
 screenshots/
+
+# Local dev database
+dev.db

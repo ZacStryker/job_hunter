@@ -4,3 +4,6 @@
 # Scraper session cookies (contain auth tokens)
 job-hunt-dashboard/scraper/sessions/
 .aider*
+
+# Python virtual environment
+venv/

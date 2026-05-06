@@ -1,5 +1,15 @@
 # Deferred Work
 
+## Deferred from: code review of 27-1-dockerfile-and-docker-compose-configuration (2026-05-06)
+
+- `seedAdmin` runs before `REQUIRED_ENV_VARS` validation in `src/index.ts` — pre-existing ordering; DB state is mutated before env check fires.
+- `DB_PATH` fallback in `client.ts` is CWD-relative (`./data/jobs.db`) while `DATA_DIR` in `api-jobs.ts` is `import.meta`-relative — inconsistent resolution strategy, harmless in Docker but confusing in dev.
+- Scraper `sessions/` files use `process.cwd()`-relative paths (e.g., `indeed.js`) — not covered by any volume mount, so sessions are lost on container restart.
+- Duplicate SMTP block in `.env.example` — `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` appear twice; second block shadows first in most dotenv parsers.
+- No healthcheck in Dockerfile or Compose — container appears healthy during crash loops; operator visibility limited without `docker compose ps` showing actual health.
+- `argon2.hash` can throw an unhandled rejection if `ADMIN_PASSWORD` is invalid, crashing the process before env validation in `seedAdmin` (`src/index.ts:35`).
+- `ADMIN_PASSWORD` persists in container env indefinitely — no enforcement of "remove or rotate after setup" comment; intentional design per spec for MVP scope.
+
 ## Deferred from: code review of 24-1-crypto-module-mailer-module-and-auth-db-schema (2026-04-27)
 
 - ✅ **RESOLVED in 24.2** — Email normalization: `.toLowerCase().trim()` applied in registration and login handlers before all DB inserts and lookups.
