@@ -23,7 +23,7 @@ export function MatchesRoute() {
       <div className="p-4">
         <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
           <div className="flex items-center justify-center py-16 px-4">
-            <p className="text-sm text-zinc-400">No matches yet. Run analysis to populate matches.</p>
+            <p className="text-sm text-zinc-400">No matches yet. Click Analyze Jobs on the Jobs page to populate matches.</p>
           </div>
         </div>
       </div>
