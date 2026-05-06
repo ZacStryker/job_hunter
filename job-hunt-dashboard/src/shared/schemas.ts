@@ -159,7 +159,7 @@ export const statsSchema = z.object({
 export type Stats = z.infer<typeof statsSchema>
 
 export const profileSchema = z.object({
-  id: z.number().int(),
+  id: z.number().int().nullable(),
   name: z.string().nullable(),
   email: z.string().nullable(),
   phone: z.string().nullable(),
