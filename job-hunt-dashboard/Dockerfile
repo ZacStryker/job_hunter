@@ -34,7 +34,7 @@ ENV NODE_ENV=production
 # Install Playwright Chromium + system packages (needed for PDF generation and scraper)
 # bunx finds playwright in node_modules; --with-deps installs apt packages
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN bunx playwright install --with-deps chromium
+RUN bunx playwright install --with-deps chromium firefox
 
 EXPOSE 3000
 
