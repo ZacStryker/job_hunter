@@ -255,5 +255,6 @@ export type InviteKey = {
 export type OnboardingStatusResponse = {
   hasAnthropicKey: boolean
   hasImap: boolean
+  hasLinkedinAuth: boolean
   onboardingComplete: boolean
 }

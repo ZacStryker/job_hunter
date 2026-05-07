@@ -18,8 +18,9 @@ app.get('/status', (c) => {
   const keys = new Set(rows.map((r) => r.keyName))
   const hasAnthropicKey = keys.has('anthropic_api_key')
   const hasImap = keys.has('imap_host') && keys.has('imap_user') && keys.has('imap_pass')
+  const hasLinkedinAuth = keys.has('linkedin_storage_state')
   const onboardingComplete = hasAnthropicKey
-  return c.json({ hasAnthropicKey, hasImap, onboardingComplete })
+  return c.json({ hasAnthropicKey, hasImap, hasLinkedinAuth, onboardingComplete })
 })
 
 const anthropicSchema = z.object({ apiKey: z.string().min(1) })
@@ -71,6 +72,30 @@ app.put('/anthropic', async (c) => {
   const ciphertext = encrypt(parsed.data.apiKey)
   db.insert(userSecrets)
     .values({ userId, keyName: 'anthropic_api_key', ciphertext, updatedAt: now })
+    .onConflictDoUpdate({
+      target: [userSecrets.userId, userSecrets.keyName],
+      set: { ciphertext, updatedAt: now },
+    })
+    .run()
+
+  return c.json({ ok: true })
+})
+
+const linkedinSchema = z.object({ content: z.string().min(1) })
+
+app.put('/linkedin', async (c) => {
+  const userId = c.get('userId')
+
+  let body: unknown
+  try { body = await c.req.json() } catch { return c.json({ error: 'Invalid JSON body' }, 400) }
+
+  const parsed = linkedinSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body' }, 400)
+
+  const now = new Date().toISOString()
+  const ciphertext = encrypt(parsed.data.content)
+  db.insert(userSecrets)
+    .values({ userId, keyName: 'linkedin_storage_state', ciphertext, updatedAt: now })
     .onConflictDoUpdate({
       target: [userSecrets.userId, userSecrets.keyName],
       set: { ciphertext, updatedAt: now },

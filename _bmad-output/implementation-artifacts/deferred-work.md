@@ -1,5 +1,22 @@
 # Deferred Work
 
+## Deferred from: code review of 29-3-api-and-discovery-linkedin-session-storage-and-temp-file (2026-05-07)
+
+- Process crash between `writeFileSync` and `try` block entry leaves cleartext LinkedIn session temp file on disk — OS-level failure scenario; tmpdir is cleaned on reboot; low practical risk for Linode deployment.
+- SQL template literals in test fixtures embed `VALID_LINKEDIN_CIPHERTEXT` directly into SQL strings — controlled ciphertext format (hex/base64 without single quotes) makes injection impractical; spec-specified pattern; use parameterized queries in a future test quality pass.
+- Callers that only inspect `inserted`/`bySource` silently miss LinkedIn skip — Epic 29.4 will wire `errors` into the UI feedback channel, making this visible to users.
+- No test for temp file cleanup when `Promise.all` throws — `try/finally` semantics guarantee cleanup regardless of throw path; spec does not require this test.
+- Unknown scraper source maps to raw string in DB `source` column — pre-existing from story 13.3; not introduced by this change.
+
+## Deferred from: code review of 29-1-linkedin-discovery-graceful-skip-stopgap (2026-05-07)
+
+- `errors` field not consumed by `api-webhooks.ts` caller — by design for stopgap scope; 29.4 will wire errors into the UI pipeline feedback channel.
+- `api-webhooks.test.ts` mock return type missing `errors` field — type drift outside 2-file story scope; TypeScript would catch this at compile time.
+- `inserted: 0` when `userId` is undefined — pre-existing behavior; not introduced by this change.
+- AC 3 (scraper not called when LinkedIn skipped) not explicitly asserted via fetch call count — implicitly verified by `inserted: 0` and zero network errors in the skip path.
+- Positive AC 3 (scraper IS called when auth present) not verified via fetch call count — implicitly covered by `errors.toHaveLength(0)` and insert assertions.
+- Stale test name `'happy path: inserts new jobs from all 6 searches'` (only 1 search config exists in beforeAll) — pre-existing before this story.
+
 ## Deferred from: code review of 28-3-migrate-docker-volume-to-new-name (2026-05-07)
 
 - Step 4 verify uses only `ls -la`, no checksum to confirm data integrity — adding `md5sum/sha256sum` would be stronger but the spec explicitly specifies `ls -la`.

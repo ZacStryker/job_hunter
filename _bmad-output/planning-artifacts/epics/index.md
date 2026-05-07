@@ -69,3 +69,8 @@
     - [Story 28.1: Update Display Name in UI](./epic-28-hitlobster-rebrand.md#story-281-update-display-name-in-ui)
     - [Story 28.2: Rename Internal Package and localStorage Key](./epic-28-hitlobster-rebrand.md#story-282-rename-internal-package-and-localstorage-key)
     - [Story 28.3: Migrate Docker Volume to New Name](./epic-28-hitlobster-rebrand.md#story-283-migrate-docker-volume-to-new-name)
+  - [Epic 29: Per-User LinkedIn Authentication](./epic-29-per-user-linkedin-authentication.md)
+    - [Story 29.1: LinkedIn Discovery — Graceful Skip (Stopgap)](./epic-29-per-user-linkedin-authentication.md#story-291-linkedin-discovery--graceful-skip-stopgap)
+    - [Story 29.2: Scraper — Per-Request storageStatePath](./epic-29-per-user-linkedin-authentication.md#story-292-scraper--per-request-storagestatepath)
+    - [Story 29.3: API & Discovery — LinkedIn Session Storage & Temp File](./epic-29-per-user-linkedin-authentication.md#story-293-api--discovery--linkedin-session-storage--temp-file)
+    - [Story 29.4: UI — Config > Connections: LinkedIn Upload & Status](./epic-29-per-user-linkedin-authentication.md#story-294-ui--config--connections-linkedin-upload--status)
