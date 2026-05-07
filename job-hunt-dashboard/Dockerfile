@@ -8,7 +8,7 @@ RUN bun install --frozen-lockfile
 
 # Install scraper Node.js deps (separate cache layer)
 COPY scraper/package.json scraper/package-lock.json ./scraper/
-RUN cd scraper && npm install --omit=dev
+RUN cd scraper && bun install --production
 
 # Build frontend
 COPY . .
