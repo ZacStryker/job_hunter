@@ -1,5 +1,12 @@
 # Deferred Work
 
+## Deferred from: code review of 28-3-migrate-docker-volume-to-new-name (2026-05-07)
+
+- Step 4 verify uses only `ls -la`, no checksum to confirm data integrity — adding `md5sum/sha256sum` would be stronger but the spec explicitly specifies `ls -la`.
+- No minimum Docker/Compose version stated in runbook — V1/V2 CLI differences could cause operator confusion; pre-existing documentation gap.
+- hitlobster_data pre-existing with wrong permissions could block app writes — pre-existing operational concern not introduced by the volume rename.
+- docker-compose.yml healthcheck hits root `/` not a dedicated `/health` endpoint — static SPA is served regardless of DB/API health; pre-existing issue, out of scope for this story.
+
 ## Deferred from: code review of 27-2-nginx-reverse-proxy-and-deployment-runbook (2026-05-06)
 
 - DOMAIN placeholder in nginx.conf crashes nginx on first boot if not replaced — by design; runbook Step 4 explicitly calls it a required manual step.

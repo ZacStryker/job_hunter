@@ -35,7 +35,7 @@ const STATUS_OPTIONS = [
 ]
 
 const PAGE_SIZE = 20
-const VISIBILITY_KEY = 'job-hunt-column-visibility'
+const VISIBILITY_KEY = 'hitlobster-column-visibility'
 
 function loadVisibility(): VisibilityState {
   try {

@@ -1,5 +1,5 @@
 {
-  "name": "job-hunt-dashboard",
+  "name": "hitlobster",
   "private": true,
   "scripts": {
     "dev": "bun run --bun concurrently \"bun run dev:client\" \"bun run dev:api\"",

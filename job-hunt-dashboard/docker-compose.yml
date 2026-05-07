@@ -3,7 +3,7 @@ services:
     build: .
     env_file: .env
     volumes:
-      - job_hunt_data:/app/data
+      - hitlobster_data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:3000/ || exit 1"]
@@ -26,4 +26,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  job_hunt_data:
+  hitlobster_data:

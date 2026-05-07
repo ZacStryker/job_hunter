@@ -1,6 +1,6 @@
 # Deployment Runbook
 
-Deploy the job-hunt-dashboard on a fresh Linode VPS with TLS in under an hour.
+Deploy HITLOBSTER on a fresh Linode VPS with TLS in under an hour.
 
 ---
 
@@ -71,7 +71,7 @@ SMTP_HOST=
 SMTP_PORT=587
 SMTP_USER=
 SMTP_PASS=
-SMTP_FROM=                         # e.g., "Job Hunt <noreply@yourdomain.com>"
+SMTP_FROM=                         # e.g., "HITLOBSTER <noreply@yourdomain.com>"
 
 ADMIN_EMAIL=                       # First-deploy only — creates the seed admin account
 ADMIN_PASSWORD=                    # First-deploy only — rotate or remove after setup
@@ -83,7 +83,7 @@ Generate `ENCRYPTION_KEY`:
 openssl rand -hex 32
 ```
 
-> **Important:** `DB_PATH` must be `/app/data/jobs.db` in production. The dev default (`./data/jobs.db`) is a relative path that breaks inside Docker. The `job_hunt_data` named volume is mounted at `/app/data`.
+> **Important:** `DB_PATH` must be `/app/data/jobs.db` in production. The dev default (`./data/jobs.db`) is a relative path that breaks inside Docker. The `hitlobster_data` named volume is mounted at `/app/data`.
 
 > **Critical — save your ENCRYPTION_KEY:** This key encrypts stored credentials (IMAP passwords, API keys). If you regenerate or lose it on a future redeploy, all existing encrypted data becomes permanently unreadable. Store the value in a password manager or secure vault before deploying.
 
@@ -192,3 +192,54 @@ sudo certbot renew --dry-run
 | App not reachable | Check `docker compose logs app`; confirm `DB_PATH=/app/data/jobs.db` in `.env` |
 | Port 80/443 in use | Stop any host-level nginx/apache before running certbot or docker compose |
 | Email links broken | Confirm `APP_URL=https://yourdomain.com` (no trailing slash) |
+
+---
+
+## Volume Migration — `job_hunt_data` → `hitlobster_data`
+
+**One-time migration for existing deployments.** Fresh deploys using the updated `docker-compose.yml` already reference `hitlobster_data` — skip this section if standing up a new instance.
+
+If you have an existing production container with data stored in the `job_hunt_data` volume, follow these steps in order:
+
+```bash
+# 0. Pull the latest code — the updated docker-compose.yml must be on disk before restarting
+git pull
+
+# 1. Stop all running containers
+#    WARNING: do NOT add --volumes — that flag permanently deletes named volumes including job_hunt_data
+docker compose down
+
+# 2. Pre-flight: confirm the source volume exists and contains your data
+docker run --rm -v job_hunt_data:/data alpine ls -la /data
+#    You should see jobs.db here. If the volume is empty or missing, stop and investigate.
+
+# 3. Create the new volume (idempotent — safe to run even if volume already exists)
+docker volume inspect hitlobster_data 2>/dev/null && \
+  echo "WARNING: hitlobster_data already exists — re-running copy over existing volume. Verify step 5 carefully."
+docker volume create hitlobster_data
+
+# 4. Copy all data from old volume to new — exits immediately on any copy error
+docker run --rm -v job_hunt_data:/from -v hitlobster_data:/to alpine sh -c "cp -av /from/. /to/ || exit 1"
+
+# 5. Verify the copy — you should see jobs.db and any other data files
+docker run --rm -v hitlobster_data:/data alpine ls -la /data
+
+# 6. Start containers with the new config
+docker compose up -d
+
+# 7. Confirm the app container is healthy (health check polls every 10s; allow up to 60s)
+docker compose ps
+#    The 'app' container must report 'healthy' before proceeding to step 8.
+
+# 8. Remove the old volume ONLY after step 7 shows healthy status
+docker volume rm job_hunt_data
+```
+
+> **Critical:** Do NOT remove `job_hunt_data` until step 7 confirms `healthy`. The old volume is your rollback path.
+>
+> **Rollback** — if the app fails to reach `healthy` state after step 6:
+> ```bash
+> docker compose down
+> git checkout -- job-hunt-dashboard/docker-compose.yml   # revert to job_hunt_data reference
+> docker compose up -d
+> ```
