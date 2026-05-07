@@ -35,6 +35,7 @@ ENV NODE_ENV=production
 # bunx finds playwright in node_modules; --with-deps installs apt packages
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN bunx playwright install --with-deps chromium firefox
+RUN cd scraper && bunx playwright install --with-deps chromium firefox
 
 EXPOSE 3000
 
