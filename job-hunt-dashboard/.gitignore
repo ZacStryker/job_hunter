@@ -31,6 +31,7 @@ npm-debug.log*
 
 # Scraper auth (LinkedIn session tokens — do not commit)
 scraper/auth/
+linkedin.json
 
 # Screenshots / dev utilities
 screenshot.py

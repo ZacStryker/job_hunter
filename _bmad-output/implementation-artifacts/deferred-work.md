@@ -1,5 +1,12 @@
 # Deferred Work
 
+## Deferred from: code review of 29-4-ui-config-connections-linkedin-upload-and-status (2026-05-07)
+
+- Client-side file size not bounded — `FileReader.readAsText()` reads the full file into memory with no `selectedFile.size` guard; LinkedIn storageState files are tiny in practice but there is no upper bound enforced. Add a size check if large-file uploads cause issues. [`config.tsx`, `handleUpload`]
+- No JSON/structural validation of uploaded content before sending — content is read as text and sent directly; server only checks `z.string().min(1)`, not valid JSON or Playwright storageState shape. Failure surfaces at scraper runtime rather than upload time. Address with a `JSON.parse` check at upload time or server-side Zod refinement in a future hardening pass. [`config.tsx`, `api-onboarding.ts`]
+- Component unmount between FileReader and `uploadMutation.mutate` — if user navigates away after clicking Upload but before `reader.onload` fires, the callback executes after unmount. React 18+ does not crash on this; low practical impact. [`config.tsx`, `handleUpload`]
+- Status query loading/error state not surfaced in UI — `isConnected` defaults to `false` while `useOnboardingStatusQuery` is loading or has errored; user briefly sees "Not connected" before data arrives, and permanently sees "Not connected" on query failure with no error indicator. Beyond spec AC requirements. [`config.tsx`, `ConnectionsCard`]
+
 ## Deferred from: code review of 29-3-api-and-discovery-linkedin-session-storage-and-temp-file (2026-05-07)
 
 - Process crash between `writeFileSync` and `try` block entry leaves cleartext LinkedIn session temp file on disk — OS-level failure scenario; tmpdir is cleaned on reboot; low practical risk for Linode deployment.

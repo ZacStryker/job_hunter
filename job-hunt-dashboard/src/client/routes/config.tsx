@@ -1,5 +1,11 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { useLinkedinAuthMutation } from '@/hooks/useLinkedinAuthMutation'
+import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useWebhookRunsQuery } from '@/hooks/useWebhookRunsQuery'
 import { useProfileQuery } from '@/hooks/useProfileQuery'
@@ -8,6 +14,98 @@ import { useSearchConfigsQuery } from '@/hooks/useSearchConfigsQuery'
 import { useAddSearchConfigMutation, useDeleteSearchConfigMutation, useUpdateSearchConfigMutation } from '@/hooks/useSearchConfigMutations'
 import { SCRAPER_SOURCES } from '@shared/schemas'
 import type { PromptFlow, ScraperSource } from '@shared/schemas'
+
+function ConnectionsCard() {
+  const { data: status } = useOnboardingStatusQuery()
+  const uploadMutation = useLinkedinAuthMutation()
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [showHowTo, setShowHowTo] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const isConnected = status?.hasLinkedinAuth ?? false
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setSelectedFile(e.target.files?.[0] ?? null)
+    uploadMutation.reset()
+  }
+
+  function handleUpload() {
+    if (!selectedFile) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const content = e.target?.result as string
+      uploadMutation.mutate(content, {
+        onSuccess: () => {
+          toast.success('LinkedIn session uploaded')
+          setSelectedFile(null)
+          if (fileInputRef.current) fileInputRef.current.value = ''
+        },
+      })
+    }
+    reader.onerror = () => {
+      toast.error('Failed to read file')
+    }
+    reader.readAsText(selectedFile)
+  }
+
+  return (
+    <div className="border border-zinc-800 rounded-lg p-4">
+      <h2 className="text-base font-semibold text-zinc-100 mb-3">Connections</h2>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-zinc-300">LinkedIn</span>
+          <span className={`text-xs ${isConnected ? 'text-emerald-500' : 'text-zinc-500'}`}>
+            {isConnected ? 'Connected' : 'Not connected'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {selectedFile ? selectedFile.name : 'Choose file'}
+          </Button>
+          <Button
+            size="sm"
+            disabled={!selectedFile || uploadMutation.isPending}
+            onClick={handleUpload}
+          >
+            {uploadMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Upload'}
+          </Button>
+        </div>
+      </div>
+
+      {uploadMutation.isError && (
+        <Alert variant="destructive" className="mt-3">
+          <AlertDescription>{uploadMutation.error.message}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="mt-3">
+        <button
+          className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+          onClick={() => setShowHowTo(h => !h)}
+        >
+          {showHowTo ? '▾' : '▸'} How to generate linkedin.json
+        </button>
+        {showHowTo && (
+          <div className="mt-2 text-xs text-zinc-400 bg-zinc-900 rounded p-3">
+            <p className="mb-2">Run this command from the <code>job-hunt-dashboard/</code> directory to open a browser and log in to LinkedIn. The session file will be saved as <code>linkedin.json</code>.</p>
+            <code className="text-zinc-200">node scripts/generate-linkedin-auth.js</code>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function parseName(name: string): { workflow: string; job: string } {
   if (name.startsWith('Cover Letter - ')) return { workflow: 'Cover Letter', job: name.slice(15) }
@@ -402,6 +500,7 @@ export function ConfigRoute() {
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-semibold text-zinc-100">Config</h1>
+      <ConnectionsCard />
       <SearchConfigCard />
       <div className="grid grid-cols-2 gap-6">
         <ProfilePreviewCard />
