@@ -66,4 +66,9 @@ The app runs on Linode behind Nginx with TLS, reachable from the internet; Docke
 **NFRs addressed:** NFR-A4, NFR-A6
 **Architecture:** Dockerfile, docker-compose.yml, Nginx config, .env.example update, import.meta.dirname path fix, first-deploy bootstrap script
 
+## Epic 28: HITLOBSTER Rebrand
+Every surface where the app was called "Job Hunt Dashboard" — the UI, browser tab, package metadata, localStorage, and production infrastructure — now reads "HITLOBSTER."
+**FRs covered:** (rebrand — display name, package name, localStorage key, Docker volume)
+**NFRs addressed:** non-destructive volume migration, operator migration checklist
+
 ---

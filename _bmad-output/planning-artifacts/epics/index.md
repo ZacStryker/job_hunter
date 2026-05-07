@@ -65,3 +65,7 @@
   - [Epic 27: Production Deployment](./epic-27-production-deployment.md)
     - [Story 27.1: Dockerfile & Docker Compose Configuration](./epic-27-production-deployment.md#story-271-dockerfile--docker-compose-configuration)
     - [Story 27.2: Nginx Reverse Proxy & Deployment Runbook](./epic-27-production-deployment.md#story-272-nginx-reverse-proxy--deployment-runbook)
+  - [Epic 28: HITLOBSTER Rebrand](./epic-28-hitlobster-rebrand.md)
+    - [Story 28.1: Update Display Name in UI](./epic-28-hitlobster-rebrand.md#story-281-update-display-name-in-ui)
+    - [Story 28.2: Rename Internal Package and localStorage Key](./epic-28-hitlobster-rebrand.md#story-282-rename-internal-package-and-localstorage-key)
+    - [Story 28.3: Migrate Docker Volume to New Name](./epic-28-hitlobster-rebrand.md#story-283-migrate-docker-volume-to-new-name)
