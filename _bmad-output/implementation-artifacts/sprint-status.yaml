@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-05-06 # story 27.2 done
+last_updated: 2026-05-07 # story 28.1 review
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -197,3 +197,9 @@ development_status:
   27-1-dockerfile-and-docker-compose-configuration: done
   27-2-nginx-reverse-proxy-and-deployment-runbook: done
   epic-27-retrospective: optional
+
+  # Epic 28: HITLOBSTER Rebrand
+  epic-28: in-progress
+  28-1-update-display-name-in-ui: review
+  28-2-rename-internal-package-and-localstorage-key: backlog
+  28-3-migrate-docker-volume-to-new-name: backlog
