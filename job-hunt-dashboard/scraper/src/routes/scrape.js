@@ -9,16 +9,19 @@ const SearchSchema = z.object({
   query: z.string().min(1),
   location: z.string().optional(),
   maxResults: z.number().int().min(1).max(50).optional().default(25),
+  storageStatePath: z.string().optional(),
 });
 
 const ListingSchema = z.object({
   source: z.enum(['indeed', 'indeed_nl', 'linkedin']),
   url: z.string().url(),
+  storageStatePath: z.string().optional(),
 });
 
 const JobDetailsSchema = z.object({
   source: z.enum(['linkedin', 'indeed', 'indeed_nl']),
   url: z.string().url(),
+  storageStatePath: z.string().optional(),
 });
 
 export async function scrapeRoutes(fastify) {
@@ -26,9 +29,9 @@ export async function scrapeRoutes(fastify) {
     const body = SearchSchema.safeParse(request.body);
     if (!body.success) return reply.status(400).send(body.error);
 
-    const { source, query, location, maxResults } = body.data;
+    const { source, query, location, maxResults, storageStatePath } = body.data;
     const scrapers = { indeed: searchIndeed, indeed_nl: searchIndeedNl, linkedin: searchLinkedIn, arc: searchArc };
-    const results = await scrapers[source]({ query, location, maxResults });
+    const results = await scrapers[source]({ query, location, maxResults, storageStatePath });
     return { source, query, results, scrapedAt: new Date().toISOString() };
   });
 
@@ -36,9 +39,9 @@ export async function scrapeRoutes(fastify) {
     const body = ListingSchema.safeParse(request.body);
     if (!body.success) return reply.status(400).send(body.error);
 
-    const { source, url } = body.data;
+    const { source, url, storageStatePath } = body.data;
     const fetchers = { indeed: fetchIndeedListing, indeed_nl: fetchIndeedNlListing, linkedin: fetchLinkedInListing };
-    const description = await fetchers[source](url);
+    const description = await fetchers[source](url, storageStatePath);
     return { source, url, description, extractedAt: new Date().toISOString() };
   });
 
@@ -46,13 +49,13 @@ export async function scrapeRoutes(fastify) {
     const body = JobDetailsSchema.safeParse(request.body);
     if (!body.success) return reply.status(400).send(body.error);
 
-    const { source, url } = body.data;
+    const { source, url, storageStatePath } = body.data;
     const fetchers = {
       linkedin: fetchLinkedInJobDetails,
       indeed: fetchIndeedJobDetails,
       indeed_nl: fetchIndeedNlJobDetails,
     };
-    const result = await fetchers[source](url);
+    const result = await fetchers[source](url, storageStatePath);
     return { source, url, ...result, extractedAt: new Date().toISOString() };
   });
 }

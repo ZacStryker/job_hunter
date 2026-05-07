@@ -28,10 +28,9 @@ const MAX_RESTART_DELAY = 30_000
 
 function startChild(port: number): void {
   intentionalStop = false
-  const authDir = process.env.AUTH_DIR ?? join(SCRAPER_DIR, 'auth')
 
   child = spawn('node', [join(SCRAPER_DIR, 'src', 'server.js')], {
-    env: { ...process.env, PORT: String(port), AUTH_DIR: authDir, LOG_LEVEL: 'warn' },
+    env: { ...process.env, PORT: String(port), LOG_LEVEL: 'warn' },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 
