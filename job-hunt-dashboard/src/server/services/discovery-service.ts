@@ -24,12 +24,17 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
   const scraperToken = process.env.SCRAPER_TOKEN
   if (!scraperUrl) throw new Error('SCRAPER_URL not configured')
 
+  const _debugStart = Date.now()
+  console.log(`[DISCOVERY] start — userId=${userId ?? 'none'} scraperUrl=${scraperUrl}`)
+
   const searches = db.select().from(searchConfigs)
     .where(and(
       eq(searchConfigs.enabled, true),
       userId !== undefined ? eq(searchConfigs.userId, userId) : sql`1=1`,
     ))
     .all()
+
+  console.log(`[DISCOVERY] ${searches.length} enabled search config(s): ${searches.map((s) => `${s.source}:"${s.query}"`).join(', ') || '(none)'}`)
 
   const errors: Array<{ source: string; error: string }> = []
 
@@ -83,6 +88,8 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
         if (s.source === 'linkedin' && storageStatePath) {
           requestBody.storageStatePath = storageStatePath
         }
+        const _fetchStart = Date.now()
+        console.log(`[DISCOVERY] → fetch ${s.source} query="${s.query}" location="${s.location ?? ''}"`)
         return fetch(`${scraperUrl}/scrape/search`, {
           method: 'POST',
           headers: {
@@ -92,9 +99,20 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
           body: JSON.stringify(requestBody),
           signal: AbortSignal.timeout(60_000),
         }).then(async (res) => {
-          if (!res.ok) throw new Error(`Scraper error ${res.status} for "${s.query}"`)
+          const elapsed = Date.now() - _fetchStart
+          console.log(`[DISCOVERY] ← ${s.source} HTTP ${res.status} (${elapsed}ms)`)
+          if (!res.ok) {
+            const body = await res.text().catch(() => '')
+            console.error(`[DISCOVERY] ← ${s.source} error body: ${body.slice(0, 200)}`)
+            throw new Error(`Scraper error ${res.status} for "${s.query}"`)
+          }
           const data = await res.json() as { results?: ScraperResult[] }
+          console.log(`[DISCOVERY] ← ${s.source} results: ${data.results?.length ?? 0} jobs`)
           return { source: DB_SOURCE[s.source as ScraperSource] ?? s.source, results: data.results ?? [] }
+        }).catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err)
+          console.error(`[DISCOVERY] ← ${s.source} fetch threw: ${msg} (after ${Date.now() - _fetchStart}ms)`)
+          throw err
         })
       })
     )
@@ -120,7 +138,11 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
       return true
     })
 
-    if (newJobs.length === 0) return { inserted: 0, bySource: {}, errors }
+    console.log(`[DISCOVERY] scraped total=${allResults.length}, after dedup new=${newJobs.length}`)
+    if (newJobs.length === 0) {
+      console.log(`[DISCOVERY] done — 0 new jobs, ${Date.now() - _debugStart}ms total`)
+      return { inserted: 0, bySource: {}, errors }
+    }
 
     onProgress?.(`Inserting ${newJobs.length} new jobs…`)
 
@@ -154,7 +176,9 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
       bySource[job.source] = (bySource[job.source] ?? 0) + 1
     }
 
-    return { inserted: userId !== undefined ? newJobs.length : 0, bySource, errors }
+    const inserted = userId !== undefined ? newJobs.length : 0
+    console.log(`[DISCOVERY] done — inserted=${inserted} bySource=${JSON.stringify(bySource)} errors=${errors.length} total=${Date.now() - _debugStart}ms`)
+    return { inserted, bySource, errors }
   } finally {
     if (storageStatePath) {
       try { unlinkSync(storageStatePath) } catch { /* best-effort cleanup */ }
