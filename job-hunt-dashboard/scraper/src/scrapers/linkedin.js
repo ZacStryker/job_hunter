@@ -1,9 +1,9 @@
-import { withPage, scrapeWithRetry } from './base.js';
+import { withPage, withFirefoxPage, scrapeWithRetry } from './base.js';
 
 export async function searchLinkedIn({ query, location = 'Remote', maxResults = 25, storageStatePath = null }) {
   return scrapeWithRetry('linkedin', () => {
     const url = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}&sortBy=DD&f_TPR=r86400`;
-    return withPage(storageStatePath, async (page) => {
+    return withFirefoxPage(storageStatePath, async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('div[data-job-id]', { timeout: 20000 });
       await page.waitForTimeout(2000 + Math.random() * 2000);
