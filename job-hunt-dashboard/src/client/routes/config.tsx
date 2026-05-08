@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { useLinkedinAuthMutation } from '@/hooks/useLinkedinAuthMutation'
+import { useQueryClient } from '@tanstack/react-query'
+import { useLinkedinBrowserSession } from '@/hooks/useLinkedinBrowserSession'
+import { LinkedInBrowserModal } from '@/components/linkedin/LinkedInBrowserModal'
 import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useWebhookRunsQuery } from '@/hooks/useWebhookRunsQuery'
@@ -17,35 +18,29 @@ import type { PromptFlow, ScraperSource } from '@shared/schemas'
 
 function ConnectionsCard() {
   const { data: status } = useOnboardingStatusQuery()
-  const uploadMutation = useLinkedinAuthMutation()
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [showHowTo, setShowHowTo] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const queryClient = useQueryClient()
+  const { status: sessionStatus, error, startSession, sendClick, sendKey, sendCancel, onFrameRef } = useLinkedinBrowserSession()
+  const [modalOpen, setModalOpen] = useState(false)
 
   const isConnected = status?.hasLinkedinAuth ?? false
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setSelectedFile(e.target.files?.[0] ?? null)
-    uploadMutation.reset()
+  useEffect(() => {
+    if (sessionStatus === 'captured' && modalOpen) {
+      setModalOpen(false)
+      toast.success('LinkedIn connected')
+      queryClient.invalidateQueries({ queryKey: ['onboarding-status'] })
+    } else if ((sessionStatus === 'timeout' || sessionStatus === 'error') && modalOpen) {
+      setModalOpen(false)
+    }
+  }, [sessionStatus, modalOpen, queryClient])
+
+  function handleConnect() {
+    startSession()
+    setModalOpen(true)
   }
 
-  function handleUpload() {
-    if (!selectedFile) return
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const content = e.target?.result as string
-      uploadMutation.mutate(content, {
-        onSuccess: () => {
-          toast.success('LinkedIn session uploaded')
-          setSelectedFile(null)
-          if (fileInputRef.current) fileInputRef.current.value = ''
-        },
-      })
-    }
-    reader.onerror = () => {
-      toast.error('Failed to read file')
-    }
-    reader.readAsText(selectedFile)
+  function handleModalClose() {
+    setModalOpen(false)
   }
 
   return (
@@ -58,51 +53,26 @@ function ConnectionsCard() {
             {isConnected ? 'Connected' : 'Not connected'}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {selectedFile ? selectedFile.name : 'Choose file'}
-          </Button>
-          <Button
-            size="sm"
-            disabled={!selectedFile || uploadMutation.isPending}
-            onClick={handleUpload}
-          >
-            {uploadMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Upload'}
-          </Button>
-        </div>
+        <Button size="sm" disabled={modalOpen} onClick={handleConnect}>
+          Connect LinkedIn
+        </Button>
       </div>
 
-      {uploadMutation.isError && (
+      {(sessionStatus === 'error' || sessionStatus === 'timeout') && error && (
         <Alert variant="destructive" className="mt-3">
-          <AlertDescription>{uploadMutation.error.message}</AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      <div className="mt-3">
-        <button
-          className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-          onClick={() => setShowHowTo(h => !h)}
-        >
-          {showHowTo ? '▾' : '▸'} How to generate linkedin.json
-        </button>
-        {showHowTo && (
-          <div className="mt-2 text-xs text-zinc-400 bg-zinc-900 rounded p-3">
-            <p className="mb-2">Run this command from the <code>job-hunt-dashboard/</code> directory to open a browser and log in to LinkedIn. The session file will be saved as <code>linkedin.json</code>.</p>
-            <code className="text-zinc-200">node scripts/generate-linkedin-auth.js</code>
-          </div>
-        )}
-      </div>
+      <LinkedInBrowserModal
+        open={modalOpen}
+        onClose={handleModalClose}
+        status={sessionStatus}
+        sendClick={sendClick}
+        sendKey={sendKey}
+        sendCancel={sendCancel}
+        onFrameRef={onFrameRef}
+      />
     </div>
   )
 }

@@ -71,4 +71,16 @@ Every surface where the app was called "Job Hunt Dashboard" — the UI, browser 
 **FRs covered:** (rebrand — display name, package name, localStorage key, Docker volume)
 **NFRs addressed:** non-destructive volume migration, operator migration checklist
 
+## Epic 29: Per-User LinkedIn Authentication
+Users store their own LinkedIn Playwright session state encrypted in `user_secrets`. Discovery decrypts it at runtime, writes it to a temp file per-request, and passes `storageStatePath` to the scraper. Users without LinkedIn auth configured see a clear error instead of a 500. A Config > Connections upload section lets users provide their session file.
+**FRs covered:** (net-new — multi-user LinkedIn auth)
+**NFRs addressed:** NFR-A1 (per-user secrets isolation), NFR-A6 (graceful degradation)
+**Architecture:** Extends `user_secrets` pattern; removes `AUTH_DIR` global constant; adds `PUT /api/onboarding/linkedin`; discovery-service writes temp file per-request
+
+## Epic 30: LinkedIn In-App Browser Authentication
+Users can connect their LinkedIn account entirely within the browser — no local tools, no file downloads, no server access required. "Connect LinkedIn" in Config > Connections opens a modal with a live remote browser; the server detects login completion and captures the session automatically. Replaces the file-upload flow from Epic 29.4.
+**FRs covered:** FR1–FR10 (net-new — replaces Epic 29.4 file-upload)
+**NFRs addressed:** NFR1 (session isolation), NFR2 (process cleanup), NFR3 (screenshot rate)
+**Architecture:** `linkedin-browser-service.ts` (in-memory session Map, Playwright lifecycle); WebSocket screenshot streaming at ≤5fps; 960×1200 viewport with coordinate mapping; `encrypt()` / `user_secrets` pattern from Epic 29.3
+
 ---

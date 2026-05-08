@@ -2,9 +2,11 @@ import { Hono } from 'hono'
 import { serveStatic } from 'hono/bun'
 import { join } from 'node:path'
 import argon2 from 'argon2'
+import type { Server, ServerWebSocket } from 'bun'
+import { and, eq, gte } from 'drizzle-orm'
 import { runMigrations } from './db/migrate'
 import { db } from './db/client'
-import { users } from './db/schema'
+import { users, sessions } from './db/schema'
 import { startScraperProcess, stopScraperProcess } from './server/services/scraper-process'
 import ingestRoute from './server/routes/api-ingest'
 import jobsRoute from './server/routes/api-jobs'
@@ -19,6 +21,9 @@ import { errorHandler } from './server/middleware/error-handler'
 import { authMiddleware } from './server/middleware/auth-middleware'
 import { adminMiddleware } from './server/middleware/admin-middleware'
 import authRoute from './server/routes/api-auth'
+import linkedInBrowserRoute from './server/routes/api-linkedin-browser'
+import * as linkedInBrowserService from './server/services/linkedin-browser-service'
+import type { WsData } from './server/services/linkedin-browser-service'
 import onboardingRoute from './server/routes/api-onboarding'
 import adminRoute from './server/routes/api-admin'
 import type { AppEnv } from './server/types'
@@ -87,6 +92,7 @@ app.route('/api/stats', statsRoute)
 app.route('/api/profile', profileRoute)
 app.route('/api/prompts', promptsRoute)
 app.route('/api/search-configs', searchConfigsRoute)
+app.route('/api/onboarding/linkedin/browser', linkedInBrowserRoute)
 app.route('/api/onboarding', onboardingRoute)
 app.route('/api/admin', adminRoute)
 app.route('/auth', authRoute)
@@ -105,19 +111,69 @@ await startScraperProcess().catch((err: Error) => {
 
 process.on('SIGTERM', () => {
   stopScraperProcess()
-  process.exit(0)
+  linkedInBrowserService.closeAllSessions().finally(() => process.exit(0))
 })
 process.on('SIGINT', () => {
   stopScraperProcess()
-  process.exit(0)
+  linkedInBrowserService.closeAllSessions().finally(() => process.exit(0))
 })
 
 const port = parseInt(process.env.PORT ?? '3000', 10)
 if (isNaN(port)) throw new Error(`Invalid PORT env var: "${process.env.PORT}"`)
 
+function getSessionUserId(req: Request): number | null {
+  const cookieHeader = req.headers.get('cookie') ?? ''
+  const match = cookieHeader.match(/(?:^|;\s*)session=([^;]+)/)
+  if (!match) return null
+  const sessionId = decodeURIComponent(match[1])
+  const now = new Date().toISOString()
+  const session = db.select().from(sessions)
+    .where(and(eq(sessions.id, sessionId), gte(sessions.expiresAt, now)))
+    .get()
+  if (!session) return null
+  if (session.data) {
+    try {
+      const data = JSON.parse(session.data) as { impersonating?: number }
+      if (Number.isInteger(data.impersonating) && (data.impersonating as number) > 0) {
+        return data.impersonating as number
+      }
+    } catch { }
+  }
+  return session.userId
+}
+
 export default {
   port,
   hostname: process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1',
-  fetch: app.fetch,
+  fetch(req: Request, server: Server<WsData>) {
+    const url = new URL(req.url)
+    const wsMatch = url.pathname.match(
+      /^\/api\/onboarding\/linkedin\/browser\/([^/]+)\/ws$/
+    )
+    if (wsMatch) {
+      const sessionId = wsMatch[1]
+      const userId = getSessionUserId(req)
+      if (!userId) return new Response('Unauthorized', { status: 401 })
+      const session = linkedInBrowserService.getSession(sessionId)
+      if (!session || session.userId !== userId) {
+        return new Response('Forbidden', { status: 403 })
+      }
+      const upgraded = server.upgrade(req, { data: { userId, sessionId } })
+      if (upgraded) return undefined
+      return new Response('WebSocket upgrade failed', { status: 500 })
+    }
+    return app.fetch(req, server)
+  },
+  websocket: {
+    open(ws: ServerWebSocket<WsData>) {
+      void linkedInBrowserService.attachWebSocket(ws)
+    },
+    message(ws: ServerWebSocket<WsData>, message: string | Buffer) {
+      void linkedInBrowserService.handleMessage(ws, message)
+    },
+    close(ws: ServerWebSocket<WsData>) {
+      linkedInBrowserService.handleClose(ws)
+    },
+  },
   idleTimeout: 120,
 }

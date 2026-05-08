@@ -1,5 +1,19 @@
 # Deferred Work
 
+## Deferred from: code review of 30-2-ui-in-app-linkedin-browser-modal-and-connectionscard-update (2026-05-08)
+
+- Sync DB query in `getSessionUserId` blocks Bun event loop — `db.select().get()` is synchronous and runs on every WebSocket upgrade request in the `fetch` hot path; stalls event loop under concurrent upgrades. Story 30.1 server-side scope. [`index.ts:getSessionUserId`]
+- `getSessionUserId` returns impersonated userId with no admin check — any session whose `data` contains `{ impersonating: N }` is treated as user N with no verification the caller is an admin; could allow a corrupted session to access another user's LinkedIn browser session. Story 30.1 server-side scope; impersonation auth pattern pre-existing. [`index.ts:getSessionUserId`]
+- `createImageBitmap` decode errors silently swallowed — `.catch(() => {})` leaves no trace when a frame fails to decode; canvas stays frozen on the last valid frame with no debug signal. Minor debugging concern; not production-impactful. [`LinkedInBrowserModal.tsx`]
+- Canvas briefly blank during first frame decode — `status='active'` is set on frame receipt but `createImageBitmap` is async; a mousedown in this sub-frame window sends coordinates to a blank canvas. Sub-frame timing edge case; minor UX only. [`LinkedInBrowserModal.tsx`]
+
+## Deferred from: code review of 30-1-server-linkedin-browser-session-api (2026-05-07)
+
+- `handleClose` does not close the browser session on WS disconnect — browser runs unattended for up to 5 minutes if the client navigates away; only the 5-minute timeout provides cleanup. Intentional per the timeout model; close-on-disconnect was not specified. [`linkedin-browser-service.ts:122–127`]
+- `attachWebSocket` old WS ref not closed/notified when a second WS connects to the same session — dropped without a close frame. Reconnect scenario is an edge case not covered by spec. [`linkedin-browser-service.ts:93`]
+- `keydown` messages pass arbitrary key strings to `page.keyboard.press` with no allowlist — authenticated user can inject arbitrary key combos into their own session. Self-harm only (auth-gated). [`linkedin-browser-service.ts:114`]
+- `getSessionUserId` first-match cookie regex — if a `Cookie` header contains multiple `session=` values (e.g., crafted request), the first match wins and may not be the real session. Requires client header manipulation to exploit; low practical risk. [`src/index.ts:128`]
+
 ## Deferred from: code review of 29-4-ui-config-connections-linkedin-upload-and-status (2026-05-07)
 
 - Client-side file size not bounded — `FileReader.readAsText()` reads the full file into memory with no `selectedFile.size` guard; LinkedIn storageState files are tiny in practice but there is no upper bound enforced. Add a size check if large-file uploads cause issues. [`config.tsx`, `handleUpload`]

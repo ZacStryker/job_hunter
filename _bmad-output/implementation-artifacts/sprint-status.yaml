@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-05-07 # story 29.4 done
+last_updated: 2026-05-08 # stories 28.1, 28.2, 29.2, 30.2 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -200,13 +200,18 @@ development_status:
 
   # Epic 28: HITLOBSTER Rebrand
   epic-28: in-progress
-  28-1-update-display-name-in-ui: review
-  28-2-rename-internal-package-and-localstorage-key: review
+  28-1-update-display-name-in-ui: done
+  28-2-rename-internal-package-and-localstorage-key: done
   28-3-migrate-docker-volume-to-new-name: done
 
   # Epic 29: Per-User LinkedIn Authentication
   epic-29: in-progress
   29-1-linkedin-discovery-graceful-skip-stopgap: done
-  29-2-scraper-per-request-storage-state-path: review
+  29-2-scraper-per-request-storage-state-path: done
   29-3-api-and-discovery-linkedin-session-storage-and-temp-file: done
   29-4-ui-config-connections-linkedin-upload-and-status: done
+
+  # Epic 30: LinkedIn In-App Browser Authentication
+  epic-30: in-progress
+  30-1-server-linkedin-browser-session-api: done
+  30-2-ui-in-app-linkedin-browser-modal-and-connectionscard-update: done

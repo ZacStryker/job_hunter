@@ -74,3 +74,6 @@
     - [Story 29.2: Scraper — Per-Request storageStatePath](./epic-29-per-user-linkedin-authentication.md#story-292-scraper--per-request-storagestatepath)
     - [Story 29.3: API & Discovery — LinkedIn Session Storage & Temp File](./epic-29-per-user-linkedin-authentication.md#story-293-api--discovery--linkedin-session-storage--temp-file)
     - [Story 29.4: UI — Config > Connections: LinkedIn Upload & Status](./epic-29-per-user-linkedin-authentication.md#story-294-ui--config--connections-linkedin-upload--status)
+  - [Epic 30: LinkedIn In-App Browser Authentication](./epic-30-linkedin-in-app-browser-authentication.md)
+    - [Story 30.1: Server — LinkedIn Browser Session API](./epic-30-linkedin-in-app-browser-authentication.md#story-301-server--linkedin-browser-session-api)
+    - [Story 30.2: UI — In-App LinkedIn Browser Modal & ConnectionsCard Update](./epic-30-linkedin-in-app-browser-authentication.md#story-302-ui--in-app-linkedin-browser-modal--connectionscard-update)
