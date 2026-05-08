@@ -83,4 +83,17 @@ Users can connect their LinkedIn account entirely within the browser — no loca
 **NFRs addressed:** NFR1 (session isolation), NFR2 (process cleanup), NFR3 (screenshot rate)
 **Architecture:** `linkedin-browser-service.ts` (in-memory session Map, Playwright lifecycle); WebSocket screenshot streaming at ≤5fps; 960×1200 viewport with coordinate mapping; `encrypt()` / `user_secrets` pattern from Epic 29.3
 
+## Epic 31: Scraper Reliability & Bot Detection Hardening
+Operators can run discovery across LinkedIn, Indeed, and Arc without bot-detection failures, locale fingerprinting signals, or concurrency bottlenecks. All scrapers use a consistent Firefox-first browser strategy with a properly pooled Firefox instance.
+**FRs covered:** FR1 (LinkedIn fetchers → Firefox), FR2 (locale parameterization), FR3 (Firefox pool), FR4 (temp file race + retry reduction), FR6 (Arc → Firefox)
+**NFRs addressed:** NFR1–3, NFR5
+**Source:** Scraper Bot Detection & Reliability Investigation Report, 2026-05-08
+
+## Epic 32: Webhook Run Recording Hotfix
+Webhook-triggered discovery runs are recorded correctly in the database. The `input_tokens` schema drift is resolved and the startup migration runner is verified to catch future drift.
+**FRs covered:** FR5 (webhook_runs schema drift)
+**NFRs addressed:** NFR4 (idempotent migration)
+**Source:** Scraper Bot Detection & Reliability Investigation Report, 2026-05-08
+**Priority:** Currently broken in production — fix immediately
+
 ---
