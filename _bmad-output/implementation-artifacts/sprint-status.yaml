@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-05-08 # stories 28.1, 28.2, 29.2, 30.2 done
+last_updated: 2026-05-09 # story 31.1 ready-for-dev
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -215,3 +215,15 @@ development_status:
   epic-30: in-progress
   30-1-server-linkedin-browser-session-api: done
   30-2-ui-in-app-linkedin-browser-modal-and-connectionscard-update: done
+
+  # Epic 31: Scraper Reliability & Bot Detection Hardening
+  epic-31: in-progress
+  31-1-switch-linkedin-listing-detail-fetchers-to-firefox: ready-for-dev
+  31-2-parameterize-firefox-pool-locale-and-timezone: backlog
+  31-3-firefox-browser-pool-2-instances: backlog
+  31-4-fix-discovery-temp-file-race-and-reduce-retries: backlog
+  31-5-switch-arc-scraper-to-firefox: backlog
+
+  # Epic 32: Webhook Run Recording Hotfix
+  epic-32: in-progress
+  32-1-apply-webhook-runs-input-tokens-migration-and-harden-startup-runner: done
