@@ -1,10 +1,7 @@
-import { writeFileSync, unlinkSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { jobs, searchConfigs, userSecrets } from '../../db/schema'
-import { decrypt } from '../lib/crypto'
+import { decrypt, encrypt } from '../lib/crypto'
 import type { ScraperSource } from '../../shared/schemas'
 
 interface ScraperResult {
@@ -38,7 +35,7 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
 
   const errors: Array<{ source: string; error: string }> = []
 
-  let storageStatePath: string | undefined
+  let storageStateContent: string | undefined
 
   if (userId !== undefined) {
     const linkedinSecret = db
@@ -66,9 +63,7 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
           onProgress?.(`LinkedIn skipped: ${errMsg}`)
         }
         if (decrypted !== undefined) {
-          const tempPath = join(tmpdir(), `linkedin-${userId}-${Date.now()}.json`)
-          writeFileSync(tempPath, decrypted, 'utf-8')
-          storageStatePath = tempPath
+          storageStateContent = decrypted
         }
       }
     }
@@ -78,15 +73,14 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
     ? searches.filter((s) => s.source !== 'linkedin')
     : searches
 
-  try {
-    const responses = await Promise.all(
+  const responses = await Promise.all(
       activeSearches.map((s) => {
         onProgress?.(`Searching ${s.source}: ${s.query}…`)
         const requestBody: Record<string, unknown> = {
           source: s.source, query: s.query, location: s.location,
         }
-        if (s.source === 'linkedin' && storageStatePath) {
-          requestBody.storageStatePath = storageStatePath
+        if (s.source === 'linkedin' && storageStateContent) {
+          requestBody.storageStateContent = storageStateContent
         }
         const _fetchStart = Date.now()
         console.log(`[DISCOVERY] → fetch ${s.source} query="${s.query}" location="${s.location ?? ''}"`)
@@ -97,7 +91,7 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
             ...(scraperToken ? { Authorization: `Bearer ${scraperToken}` } : {}),
           },
           body: JSON.stringify(requestBody),
-          signal: AbortSignal.timeout(60_000),
+          signal: AbortSignal.timeout(120_000),
         }).then(async (res) => {
           const elapsed = Date.now() - _fetchStart
           console.log(`[DISCOVERY] ← ${s.source} HTTP ${res.status} (${elapsed}ms)`)
@@ -106,9 +100,9 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
             console.error(`[DISCOVERY] ← ${s.source} error body: ${body.slice(0, 200)}`)
             throw new Error(`Scraper error ${res.status} for "${s.query}"`)
           }
-          const data = await res.json() as { results?: ScraperResult[] }
+          const data = await res.json() as { results?: ScraperResult[]; updatedStorageStateContent?: string }
           console.log(`[DISCOVERY] ← ${s.source} results: ${data.results?.length ?? 0} jobs`)
-          return { source: DB_SOURCE[s.source as ScraperSource] ?? s.source, results: data.results ?? [] }
+          return { source: DB_SOURCE[s.source as ScraperSource] ?? s.source, results: data.results ?? [], updatedStorageStateContent: data.updatedStorageStateContent }
         }).catch((err: unknown) => {
           const msg = err instanceof Error ? err.message : String(err)
           console.error(`[DISCOVERY] ← ${s.source} fetch threw: ${msg} (after ${Date.now() - _fetchStart}ms)`)
@@ -120,6 +114,23 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
     const allResults = responses.flatMap((r) =>
       r.results.map((job) => ({ ...job, source: r.source }))
     )
+
+    if (userId !== undefined) {
+      const linkedinResponse = responses.find((r) => r.source === 'linkedin')
+      if (linkedinResponse?.updatedStorageStateContent) {
+        try {
+          const ciphertext = encrypt(linkedinResponse.updatedStorageStateContent)
+          const updatedAt = new Date().toISOString()
+          db.insert(userSecrets)
+            .values({ userId, keyName: 'linkedin_storage_state', ciphertext, updatedAt })
+            .onConflictDoUpdate({
+              target: [userSecrets.userId, userSecrets.keyName],
+              set: { ciphertext, updatedAt },
+            })
+            .run()
+        } catch { /* best-effort */ }
+      }
+    }
 
     const existing = db
       .select({ externalJobId: jobs.externalJobId })
@@ -179,9 +190,4 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
     const inserted = userId !== undefined ? newJobs.length : 0
     console.log(`[DISCOVERY] done — inserted=${inserted} bySource=${JSON.stringify(bySource)} errors=${errors.length} total=${Date.now() - _debugStart}ms`)
     return { inserted, bySource, errors }
-  } finally {
-    if (storageStatePath) {
-      try { unlinkSync(storageStatePath) } catch { /* best-effort cleanup */ }
-    }
-  }
 }

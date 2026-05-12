@@ -5,7 +5,7 @@ export async function searchLinkedIn({ query, location = 'Remote', maxResults = 
     const url = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}&sortBy=DD&f_TPR=r86400`;
     return withFirefoxPage(storageStatePath, async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForSelector('div[data-job-id]', { timeout: 20000 });
+      await page.waitForSelector('div[data-job-id]', { timeout: 80000 });
       await page.waitForTimeout(2000 + Math.random() * 2000);
 
       return page.evaluate((max) => {
@@ -24,7 +24,7 @@ export async function searchLinkedIn({ query, location = 'Remote', maxResults = 
         });
       }, maxResults);
     });
-  });
+  }, 1);
 }
 
 export async function fetchLinkedInListing(url, storageStatePath = null) {

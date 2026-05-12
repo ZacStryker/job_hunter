@@ -1,4 +1,4 @@
-import { chromium } from 'playwright'
+import { firefox } from 'playwright'
 import type { Browser, BrowserContext, Page } from 'playwright'
 import type { ServerWebSocket } from 'bun'
 import { db } from '../../db/client'
@@ -31,9 +31,13 @@ export async function createSession(userId: number): Promise<string> {
   }
 
   const sessionId = crypto.randomUUID()
-  const browser = await chromium.launch({ headless: true })
+  const browser = await firefox.launch({ headless: true })
   try {
-    const context = await browser.newContext({ viewport: { width: 960, height: 1200 } })
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      locale: 'en-US',
+      timezoneId: 'America/New_York',
+    })
     const page = await context.newPage()
 
     const timeout = setTimeout(() => { void closeSession(sessionId, 'timeout') }, 5 * 60 * 1000)

@@ -34,7 +34,9 @@ export const queues = {
 export async function withFirefoxPage(storageStatePath, fn, contextOverrides = {}) {
   const { page, context } = await getFirefoxPage(storageStatePath, contextOverrides);
   try {
-    return await fn(page);
+    const result = await fn(page);
+    if (storageStatePath) await context.storageState({ path: storageStatePath });
+    return result;
   } finally {
     await releasePage(context);
   }

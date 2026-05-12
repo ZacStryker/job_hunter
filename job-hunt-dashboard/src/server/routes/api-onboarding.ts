@@ -81,30 +81,6 @@ app.put('/anthropic', async (c) => {
   return c.json({ ok: true })
 })
 
-const linkedinSchema = z.object({ content: z.string().min(1) })
-
-app.put('/linkedin', async (c) => {
-  const userId = c.get('userId')
-
-  let body: unknown
-  try { body = await c.req.json() } catch { return c.json({ error: 'Invalid JSON body' }, 400) }
-
-  const parsed = linkedinSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body' }, 400)
-
-  const now = new Date().toISOString()
-  const ciphertext = encrypt(parsed.data.content)
-  db.insert(userSecrets)
-    .values({ userId, keyName: 'linkedin_storage_state', ciphertext, updatedAt: now })
-    .onConflictDoUpdate({
-      target: [userSecrets.userId, userSecrets.keyName],
-      set: { ciphertext, updatedAt: now },
-    })
-    .run()
-
-  return c.json({ ok: true })
-})
-
 const imapSchema = z.object({
   host: z.string().min(1),
   port: z.number().int().min(1).max(65535),

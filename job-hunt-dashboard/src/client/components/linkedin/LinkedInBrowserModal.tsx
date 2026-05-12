@@ -56,8 +56,8 @@ export function LinkedInBrowserModal({ open, onClose, status, sendClick, sendKey
   function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
     const canvas = canvasRef.current!
     if (!canvas.clientWidth || !canvas.clientHeight) return
-    const x = (e.nativeEvent.offsetX / canvas.clientWidth) * 960
-    const y = (e.nativeEvent.offsetY / canvas.clientHeight) * 1200
+    const x = (e.nativeEvent.offsetX / canvas.clientWidth) * 1280
+    const y = (e.nativeEvent.offsetY / canvas.clientHeight) * 800
     sendClick(x, y)
     canvas.focus()
   }
@@ -73,7 +73,7 @@ export function LinkedInBrowserModal({ open, onClose, status, sendClick, sendKey
         <DialogHeader className="p-4 pb-0">
           <DialogTitle>Connect to LinkedIn</DialogTitle>
         </DialogHeader>
-        <div className="flex items-center justify-center" style={{ minHeight: 600 }}>
+        <div className="flex items-center justify-center" style={{ minHeight: 360 }}>
           {status === 'loading' && (
             <div className="flex flex-col items-center gap-3 text-zinc-400">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -84,9 +84,9 @@ export function LinkedInBrowserModal({ open, onClose, status, sendClick, sendKey
             <canvas
               ref={canvasRef}
               width={480}
-              height={600}
+              height={300}
               tabIndex={0}
-              style={{ width: 480, height: 600, display: 'block' }}
+              style={{ width: 480, height: 300, display: 'block' }}
               onMouseDown={handleMouseDown}
               onKeyDown={handleKeyDown}
             />
