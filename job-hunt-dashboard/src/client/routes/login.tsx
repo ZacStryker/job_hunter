@@ -50,7 +50,7 @@ export function LoginRoute() {
           Human in the Loop Organized Business<br />Search, Track, &amp; Evaluation Resource
         </p>
         <p className="text-sm text-zinc-400 mt-3 leading-relaxed">
-          AI-assisted job search command center — track applications, analyze fit, and stay in control of your pipeline.
+          AI-assisted job search command center — find openings, analyze matches, tailor applications, track correspondence, and more. Closed beta coming soon.
         </p>
       </div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
