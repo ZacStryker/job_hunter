@@ -1,4 +1,4 @@
-import { withPage, withFirefoxPage, scrapeWithRetry } from './base.js';
+import { withFirefoxPage, scrapeWithRetry } from './base.js';
 
 export async function searchLinkedIn({ query, location = 'Remote', maxResults = 25, storageStatePath = null }) {
   return scrapeWithRetry('linkedin', () => {
@@ -29,7 +29,7 @@ export async function searchLinkedIn({ query, location = 'Remote', maxResults = 
 
 export async function fetchLinkedInListing(url, storageStatePath = null) {
   return scrapeWithRetry('linkedin', () =>
-    withPage(storageStatePath, async (page) => {
+    withFirefoxPage(storageStatePath, async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('[data-testid="expandable-text-box"]', { timeout: 20000 });
       return page.evaluate(() =>
@@ -41,7 +41,7 @@ export async function fetchLinkedInListing(url, storageStatePath = null) {
 
 export async function fetchLinkedInJobDetails(url, storageStatePath = null) {
   return scrapeWithRetry('linkedin', () =>
-    withPage(storageStatePath, async (page) => {
+    withFirefoxPage(storageStatePath, async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector(
         '.job-details-jobs-unified-top-card__job-title, h1.topcard__title',

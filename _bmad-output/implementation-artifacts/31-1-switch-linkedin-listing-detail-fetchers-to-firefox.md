@@ -20,14 +20,14 @@ so that the analysis flow is not blocked by LinkedIn's bot detection.
 
 ## Tasks / Subtasks
 
-- [ ] Switch `fetchLinkedInListing` to Firefox (AC: 1, 4)
-  - [ ] In `linkedin.js` line 32: change `withPage(storageStatePath, async (page) => {` to `withFirefoxPage(storageStatePath, async (page) => {`
+- [x] Switch `fetchLinkedInListing` to Firefox (AC: 1, 4)
+  - [x] In `linkedin.js` line 32: change `withPage(storageStatePath, async (page) => {` to `withFirefoxPage(storageStatePath, async (page) => {`
 
-- [ ] Switch `fetchLinkedInJobDetails` to Firefox (AC: 2, 4)
-  - [ ] In `linkedin.js` line 44: change `withPage(storageStatePath, async (page) => {` to `withFirefoxPage(storageStatePath, async (page) => {`
+- [x] Switch `fetchLinkedInJobDetails` to Firefox (AC: 2, 4)
+  - [x] In `linkedin.js` line 44: change `withPage(storageStatePath, async (page) => {` to `withFirefoxPage(storageStatePath, async (page) => {`
 
-- [ ] Clean up import (AC: 4)
-  - [ ] In `linkedin.js` line 1: remove `withPage` from the import — after this change only `withFirefoxPage` and `scrapeWithRetry` are used; `withPage` is dead code
+- [x] Clean up import (AC: 4)
+  - [x] In `linkedin.js` line 1: remove `withPage` from the import — after this change only `withFirefoxPage` and `scrapeWithRetry` are used; `withPage` is dead code
 
 - [ ] Manual verification
   - [ ] Trigger a discovery run with LinkedIn enabled; confirm no `TimeoutError` from LinkedIn listing/detail fetches in the scraper console
@@ -147,7 +147,7 @@ The main app calls the scraper over HTTP. `discovery-service.ts` calls `POST /sc
 
 ### Agent Model Used
 
-_to be filled in_
+claude-sonnet-4-6
 
 ### Debug Log References
 
@@ -155,8 +155,16 @@ _none_
 
 ### Completion Notes List
 
-_to be filled in_
+- Switched `fetchLinkedInListing` (line 32) from `withPage` to `withFirefoxPage` — two-word swap, body unchanged
+- Switched `fetchLinkedInJobDetails` (line 44) from `withPage` to `withFirefoxPage` — two-word swap, body unchanged; `, 0` retry override preserved
+- Removed `withPage` from the import on line 1; `withPage` is still exported from `base.js` and used by `arc.js` — only the dead import in `linkedin.js` was removed
+- AC 3 (storageStatePath threading) satisfied automatically — both functions already accepted and forwarded the parameter
+- No automated tests exist in the scraper service; manual verification required before marking story complete
 
 ### File List
 
-_to be filled in_
+- `job-hunt-dashboard/scraper/src/scrapers/linkedin.js`
+
+### Change Log
+
+- 2026-05-12: Switched `fetchLinkedInListing` and `fetchLinkedInJobDetails` to `withFirefoxPage`; removed `withPage` from import
