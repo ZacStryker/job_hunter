@@ -4,7 +4,7 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
 chromium.use(StealthPlugin());
 
-const POOL_SIZE = 2; // Chromium — used by arc.js; revisit after Story 31.5 (Arc → Firefox)
+const POOL_SIZE = 2; // Chromium pool — no active callers after Story 31.5; withPage/getPage are dead code
 const FIREFOX_POOL_SIZE = 2;
 let browsers = [];
 let firefoxBrowsers = [];

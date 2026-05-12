@@ -1,6 +1,6 @@
 # Story 31.5: Switch Arc Scraper to Firefox
 
-Status: review
+Status: done
 
 ## Story
 
@@ -24,6 +24,16 @@ So that it is consistent with the Firefox-first strategy and resilient to future
 
 - [x] Manual verification (AC: 3)
   - [x] Trigger a discovery run with Arc enabled; confirm job cards are returned without errors in the scraper console
+
+### Review Findings
+
+- [x] [Review][Patch] Stale `POOL_SIZE` comment in pool.js still references arc.js after Story 31.5 has landed [`job-hunt-dashboard/scraper/src/browser/pool.js:7`]
+- [x] [Review][Defer] Non-async callback in `scrapeWithRetry` returns a promise — pre-existing pattern, identical to old `withPage` usage [`arc.js:4`] — deferred, pre-existing
+- [x] [Review][Defer] Retry count reduction (story 31.4) + 2-instance Firefox pool leaves no headroom for pool-contention failures — deferred, pre-existing cross-story design concern
+- [x] [Review][Defer] No Firefox-specific launch failure handling in `withFirefoxPage` — deferred, pre-existing
+- [x] [Review][Defer] `getFirefoxPage` called before `initPool` completes — empty `firefoxBrowsers` array crashes with TypeError — deferred, pre-existing (same risk existed for LinkedIn/Indeed)
+- [x] [Review][Defer] `waitForSelector('.job-card')` throws on zero results or CAPTCHA page — no empty-result guard [`arc.js:8`] — deferred, pre-existing
+- [x] [Review][Defer] `getAttribute('href')` constructs double-domain URL if arc.dev ever returns an absolute href [`arc.js`] — deferred, pre-existing
 
 ## Dev Notes
 

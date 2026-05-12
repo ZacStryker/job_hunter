@@ -1,5 +1,14 @@
 # Deferred Work
 
+## Deferred from: code review of 31-5-switch-arc-scraper-to-firefox (2026-05-12)
+
+- Non-async callback in `scrapeWithRetry` returns a promise — pre-existing pattern identical to old `withPage` usage; `scrapeWithRetry` must await the callback return. [`arc.js:4`]
+- Retry count reduction (story 31.4) + 2-instance Firefox pool leaves no headroom for pool-contention failures; a single pool-acquisition failure surfaces as a permanent scrape failure. Cross-story design concern from stories 31.3 and 31.4.
+- No Firefox-specific launch failure handling in `withFirefoxPage` — Firefox cold-start / crash errors are not typed distinctly from other errors, so `scrapeWithRetry` cannot selectively retry them. Pre-existing.
+- `getFirefoxPage` called before `initPool` completes — empty `firefoxBrowsers` array causes `Math.random() * 0 = 0`, indexing `undefined`, crashing with TypeError. Pre-existing (same risk existed for LinkedIn/Indeed on Firefox path). [`pool.js:getFirefoxPage`]
+- `waitForSelector('.job-card')` throws on zero results or CAPTCHA page — no distinction between "no jobs found" and "page failed to load". Pre-existing. [`arc.js:8`]
+- `getAttribute('href')` constructs double-domain URL if arc.dev ever returns an absolute href instead of a root-relative path. Pre-existing. [`arc.js`]
+
 ## Deferred from: code review of 31-2-parameterize-firefox-pool-locale-and-timezone (2026-05-12)
 
 - `fetchIndeedNlJobDetails` passes `retries=0` to `scrapeWithRetry` — suppresses all retry protection; any single transient failure propagates immediately. Pre-existing before this story; the diff preserved but did not introduce it. [`indeed_nl.js:84`]
