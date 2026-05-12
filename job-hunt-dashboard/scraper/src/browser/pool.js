@@ -50,8 +50,8 @@ export async function releasePage(context) {
 export async function getFirefoxPage(storageStatePath = null, contextOverrides = {}) {
   const contextOptions = {
     viewport: { width: 1280, height: 800 },
-    locale: 'nl-NL',
-    timezoneId: 'Europe/Amsterdam',
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
     ...contextOverrides,
   };
   if (storageStatePath) contextOptions.storageState = storageStatePath;

@@ -46,7 +46,7 @@ export async function searchIndeedNl({ query, location = '', maxResults = 25 }) 
         ...job,
         postedAt: parseRelativeDate(_postedText),
       }));
-    });
+    }, { locale: 'nl-NL', timezoneId: 'Europe/Amsterdam' });
   });
 }
 
@@ -58,7 +58,7 @@ export async function fetchIndeedNlListing(url) {
       return page.evaluate(() =>
         document.querySelector('#jobDescriptionText')?.innerText?.trim() ?? ''
       );
-    })
+    }, { locale: 'nl-NL', timezoneId: 'Europe/Amsterdam' })
   );
 }
 
@@ -81,5 +81,5 @@ export async function fetchIndeedNlJobDetails(url) {
           ?? null;
         return { jobTitle, company, location };
       });
-    }), 0);
+    }, { locale: 'nl-NL', timezoneId: 'Europe/Amsterdam' }), 0);
 }
