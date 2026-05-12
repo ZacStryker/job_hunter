@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-05-12 # story 31.2 done
+last_updated: 2026-05-12 # stories 31.1, 31.2, 31.3 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -218,9 +218,9 @@ development_status:
 
   # Epic 31: Scraper Reliability & Bot Detection Hardening
   epic-31: in-progress
-  31-1-switch-linkedin-listing-detail-fetchers-to-firefox: in-progress
+  31-1-switch-linkedin-listing-detail-fetchers-to-firefox: done
   31-2-parameterize-firefox-pool-locale-and-timezone: done
-  31-3-firefox-browser-pool-2-instances: backlog
+  31-3-firefox-browser-pool-2-instances: done
   31-4-fix-discovery-temp-file-race-and-reduce-retries: backlog
   31-5-switch-arc-scraper-to-firefox: backlog
 

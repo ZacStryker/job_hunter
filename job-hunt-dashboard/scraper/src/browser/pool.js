@@ -4,9 +4,10 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
 chromium.use(StealthPlugin());
 
-const POOL_SIZE = 2;
+const POOL_SIZE = 2; // Chromium — used by arc.js; revisit after Story 31.5 (Arc → Firefox)
+const FIREFOX_POOL_SIZE = 2;
 let browsers = [];
-let firefoxBrowser = null;
+let firefoxBrowsers = [];
 
 const USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
@@ -15,15 +16,19 @@ const USER_AGENTS = [
 ];
 
 export async function initPool() {
-  [browsers, firefoxBrowser] = await Promise.all([
+  [browsers, firefoxBrowsers] = await Promise.all([
     Promise.all(
       Array.from({ length: POOL_SIZE }, () =>
         chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] })
       )
     ),
-    firefox.launch({ headless: true }),
+    Promise.all(
+      Array.from({ length: FIREFOX_POOL_SIZE }, () =>
+        firefox.launch({ headless: true })
+      )
+    ),
   ]);
-  console.log(`Browser pool initialized (${POOL_SIZE} Chromium + 1 Firefox)`);
+  console.log(`Browser pool initialized (${POOL_SIZE} Chromium + ${FIREFOX_POOL_SIZE} Firefox)`);
 }
 
 export async function getPage(storageStatePath = null, contextOverrides = {}) {
@@ -48,6 +53,7 @@ export async function releasePage(context) {
 }
 
 export async function getFirefoxPage(storageStatePath = null, contextOverrides = {}) {
+  const browser = firefoxBrowsers[Math.floor(Math.random() * firefoxBrowsers.length)];
   const contextOptions = {
     viewport: { width: 1280, height: 800 },
     locale: 'en-US',
@@ -55,11 +61,11 @@ export async function getFirefoxPage(storageStatePath = null, contextOverrides =
     ...contextOverrides,
   };
   if (storageStatePath) contextOptions.storageState = storageStatePath;
-  const context = await firefoxBrowser.newContext(contextOptions);
+  const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
   return { page, context };
 }
 
 export async function destroyPool() {
-  await Promise.all([...browsers.map(b => b.close()), firefoxBrowser?.close()]);
+  await Promise.all([...browsers.map(b => b.close()), ...firefoxBrowsers.map(b => b.close())]);
 }

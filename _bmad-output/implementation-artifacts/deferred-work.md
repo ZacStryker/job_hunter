@@ -597,3 +597,16 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 - AC11: New key appears after refetch latency, not immediately on POST response — optimistic prepend not implemented; refetch-on-invalidation is acceptable for an admin UI
 - AC5: Generate Key button `size="sm"` + explicit `h-7 px-3 text-xs` class overrides may conflict in shadcn depending on `cn()` merge order — verify visually at runtime [`admin-users.tsx`]
 - `insertInviteKey` test helper produces 15-char key for `id ≥ 10000` — `padStart(4, '0')` overflows; unrealistic in test setup but worth noting if large id fixtures are ever added [`api-admin.test.ts`]
+
+## Deferred from: code review of 31-3-firefox-browser-pool-2-instances (2026-05-12)
+
+- **`getFirefoxPage` crashes if called before `initPool`** — Pre-existing; old single-instance code threw identically (`null.newContext()`). Guard with an early throw or startup ordering guarantee. [`pool.js`]
+- **Partial Firefox pool init leaves Chromium browser processes leaked** — Theoretical; `Promise.all` over both pools means a single Firefox launch failure abandons already-launched Chromium instances with no cleanup. Pre-existing design gap (no try/catch around `initPool`). [`pool.js:initPool`]
+- **`storageStatePath` concurrent write race across 2 Firefox instances** — Theoretical given LinkedIn PQueue (concurrency:1, 7s interval) which serializes all LinkedIn callers. Would become real if concurrency ever increases. [`pool.js:getFirefoxPage`]
+- **Unbounded context accumulation per browser instance** — Pre-existing; each `getFirefoxPage` call creates a new context with no cap or eviction. Mirrors Chromium pool behavior. [`pool.js`]
+- **`destroyPool` lacks robustness on crashed or double-called** — Pre-existing pattern in Chromium pool; empty `firefoxBrowsers` spreads safely (no-op), but a crashed browser instance in the array may throw on `b.close()`. [`pool.js:destroyPool`]
+- **`initPool` double-initialization leaks browser processes** — Pre-existing; no guard against re-entrant calls. Leaked processes from prior run never get closed. [`pool.js:initPool`]
+- **`USER_AGENTS` array not applied to Firefox contexts** — Pre-existing; `getFirefoxPage` sets no `userAgent`, so Firefox contexts use Playwright's default UA. Untouched by this story. [`pool.js:getFirefoxPage`]
+- **Firefox launched without `--no-sandbox` / sandbox hardening flags** — Pre-existing; Chromium uses `['--no-sandbox', '--disable-dev-shm-usage']` but Firefox has no equivalent. May matter in containerized environments. [`pool.js:initPool`]
+- **`FIREFOX_POOL_SIZE` not env-configurable** — Out of scope for this story; hardcoded constant requires a code change to resize the pool. [`pool.js`]
+- **`storageState` persistence not atomic in `withFirefoxPage`** — Pre-existing in base.js; if `fn(page)` throws mid-session, mutated cookies are discarded and the retry restarts from stale state. [`base.js:withFirefoxPage`]

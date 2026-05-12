@@ -1,6 +1,6 @@
 # Story 31.1: Switch LinkedIn Listing/Detail Fetchers to Firefox
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
