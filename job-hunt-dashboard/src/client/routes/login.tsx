@@ -41,8 +41,17 @@ export function LoginRoute() {
 
   return (
     <AuthFormCard>
-      <div className="flex justify-center mb-6">
+      <div className="flex justify-center mb-4">
         <img src="/hl-logo.png" alt="Hit Lobster" width="400" height="400" className="w-[400px] h-[400px] object-contain" />
+      </div>
+      <div className="text-center mb-6">
+        <h1 className="text-xl font-bold text-zinc-100 tracking-widest">HITLOBSTER</h1>
+        <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+          Human in the Loop Organized Business<br />Search, Track, &amp; Evaluation Resource
+        </p>
+        <p className="text-sm text-zinc-400 mt-3 leading-relaxed">
+          AI-assisted job search command center — track applications, analyze fit, and stay in control of your pipeline.
+        </p>
       </div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
