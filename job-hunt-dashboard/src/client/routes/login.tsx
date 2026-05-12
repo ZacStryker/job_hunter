@@ -41,6 +41,9 @@ export function LoginRoute() {
 
   return (
     <AuthFormCard>
+      <div className="flex justify-center mb-6">
+        <img src="/hl-logo.png" alt="Hit Lobster" width="80" height="80" className="w-20 h-20 object-contain" />
+      </div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
           <Label htmlFor="email">Email</Label>
