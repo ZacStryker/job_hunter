@@ -1,4 +1,4 @@
-import { getPage, getFirefoxPage, releasePage } from '../browser/pool.js';
+import { getFirefoxPage, releasePage } from '../browser/pool.js';
 import PQueue from 'p-queue';
 import retry from 'p-retry';
 
@@ -37,21 +37,6 @@ export async function withFirefoxPage(storageStatePath, fn, contextOverrides = {
     const result = await fn(page);
     if (storageStatePath) await context.storageState({ path: storageStatePath });
     return result;
-  } finally {
-    await releasePage(context);
-  }
-}
-
-export async function withPage(storageStatePath, fn, contextOverrides = {}) {
-  const { page, context } = await getPage(storageStatePath, contextOverrides);
-  try {
-    // Simulate human: random scroll + wait before extracting
-    page.on('load', async () => {
-      await page.evaluate(() =>
-        window.scrollTo(0, Math.random() * 300)
-      ).catch(() => {});
-    });
-    return await fn(page);
   } finally {
     await releasePage(context);
   }

@@ -34,11 +34,13 @@ RUN bun install --production --frozen-lockfile
 
 ENV NODE_ENV=production
 
-# Install Playwright Chromium + system packages (needed for PDF generation and scraper)
+# Install Playwright browsers + system packages
+# Main app: chromium (PDF generation) + firefox (shared with scraper)
+# Scraper: firefox only — all scrapers migrated to Firefox in story 31.5
 # bunx finds playwright in node_modules; --with-deps installs apt packages
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN bunx playwright install --with-deps chromium firefox
-RUN cd scraper && bunx playwright install --with-deps chromium firefox
+RUN cd scraper && bunx playwright install --with-deps firefox
 
 EXPOSE 3000
 
