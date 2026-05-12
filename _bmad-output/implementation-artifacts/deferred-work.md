@@ -1,5 +1,20 @@
 # Deferred Work
 
+## Deferred from: code review of 31-2-parameterize-firefox-pool-locale-and-timezone (2026-05-12)
+
+- `fetchIndeedNlJobDetails` passes `retries=0` to `scrapeWithRetry` — suppresses all retry protection; any single transient failure propagates immediately. Pre-existing before this story; the diff preserved but did not introduce it. [`indeed_nl.js:84`]
+- `contextOverrides` spread in `getFirefoxPage` cannot un-set a key once a default exists — a caller passing `{ locale: undefined }` would still carry the key; opting out of locale defaults requires object reconstruction. Pre-existing API design gap; no current caller needs this. [`pool.js:55`]
+
+## Deferred from: code review of 32-1-apply-webhook-runs-input-tokens-migration-and-harden-startup-runner (2026-05-08)
+
+- FK enforcement edge case when adding `user_id` repair column — if users table is absent and FK enforcement is toggled on externally, ALTER TABLE REFERENCES could fail. SQLite FK enforcement is off by default; theoretical only. [`migrate.ts:49`]
+- Concurrent startup race on `ALTER TABLE` — two processes starting simultaneously could both attempt ALTER TABLE, causing "duplicate column name" error. Single-process architecture makes this very unlikely. [`migrate.ts:44-52`]
+- No automated test covering repair path — existing tests create the table with all columns already present, so `repairWebhookRunsSchema()` never fires during tests. Manual verification only; acknowledged in story notes.
+- No automated idempotency test for `repairWebhookRunsSchema()` — pre-existing pattern copied from `repairSchema()`, same gap exists there.
+- No assertion on `user_id` value after `recordRun()` insert — tests don't verify multi-tenancy correctness of the column value. Pre-existing test gap.
+- `process.env` not cleaned in `afterEach` — inline `delete process.env.ANTHROPIC_API_KEY` leaks if assertion throws before cleanup line. Pre-existing test hygiene issue in `api-webhooks.test.ts`.
+- No `users` row in test DB — `webhook_runs` FK on `user_id REFERENCES users(id)` is unenforced (SQLite FK off by default), but latent hole if enforcement is toggled. Pre-existing.
+
 ## Deferred from: code review of 30-2-ui-in-app-linkedin-browser-modal-and-connectionscard-update (2026-05-08)
 
 - Sync DB query in `getSessionUserId` blocks Bun event loop — `db.select().get()` is synchronous and runs on every WebSocket upgrade request in the `fetch` hot path; stalls event loop under concurrent upgrades. Story 30.1 server-side scope. [`index.ts:getSessionUserId`]

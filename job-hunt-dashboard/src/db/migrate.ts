@@ -18,6 +18,18 @@ const JOBS_NULLABLE_COLUMNS: Array<[string, string]> = [
   ['date_analyzed', 'TEXT'],
 ]
 
+// Columns added via ALTER TABLE after initial webhook_runs creation (migrations 0016–0018, 0025).
+const WEBHOOK_RUNS_COLUMNS: Array<[string, string]> = [
+  ['duration_ms', 'INTEGER'],
+  ['input_tokens', 'INTEGER'],
+  ['output_tokens', 'INTEGER'],
+  ['cost_usd', 'REAL'],
+  ['matched_count', 'INTEGER'],
+  ['archived_count', 'INTEGER'],
+  ['source_breakdown', 'TEXT'],
+  ['user_id', 'INTEGER DEFAULT 1 NOT NULL REFERENCES users(id)'], // 1 = bootstrap admin user
+]
+
 function repairSchema(): void {
   const rows = sqlite.query('PRAGMA table_info(jobs)').all() as Array<{ name: string }>
   const cols = new Set(rows.map((r) => r.name))
@@ -29,9 +41,21 @@ function repairSchema(): void {
   }
 }
 
+function repairWebhookRunsSchema(): void {
+  const rows = sqlite.query('PRAGMA table_info(webhook_runs)').all() as Array<{ name: string }>
+  const cols = new Set(rows.map((r) => r.name))
+  for (const [col, type] of WEBHOOK_RUNS_COLUMNS) {
+    if (!cols.has(col)) {
+      sqlite.prepare(`ALTER TABLE webhook_runs ADD COLUMN ${col} ${type}`).run()
+      console.log(`[db] Schema repair: added webhook_runs.${col}`)
+    }
+  }
+}
+
 export function runMigrations(): void {
   migrate(db, { migrationsFolder: join(import.meta.dir, 'migrations') })
   repairSchema()
+  repairWebhookRunsSchema()
   console.log('[db] Migrations complete')
 }
 
