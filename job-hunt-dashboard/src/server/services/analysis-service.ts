@@ -100,6 +100,7 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
             hostname === 'linkedin.com' || hostname.endsWith('.linkedin.com') ? 'linkedin' :
             hostname === 'nl.indeed.com' ? 'indeed_nl' :
             hostname === 'indeed.com' || hostname.endsWith('.indeed.com') ? 'indeed' :
+            hostname === 'arc.dev' ? 'arc' :
             null
           if (!scraperSource) throw new Error(`No scraper for host: ${hostname}`)
           const scraperRes = await fetch(`${scraperUrl}/scrape/listing`, {

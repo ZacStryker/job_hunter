@@ -1,5 +1,17 @@
 import { withFirefoxPage, scrapeWithRetry, parseRelativeDate, isWithin24Hours } from './base.js';
 
+export async function fetchArcListing(url, storageStatePath = null) {
+  return scrapeWithRetry('arc', () =>
+    withFirefoxPage(null, async (page) => {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForSelector('[aria-label="job-detail-content"]', { timeout: 20000 });
+      return page.evaluate(() =>
+        document.querySelector('[aria-label="job-detail-content"]')?.innerText?.trim() ?? ''
+      );
+    })
+  );
+}
+
 export async function searchArc({ query, maxResults = 25 }) {
   return scrapeWithRetry('arc', () => {
     const url = `https://arc.dev/remote-jobs?search=${encodeURIComponent(query)}`;

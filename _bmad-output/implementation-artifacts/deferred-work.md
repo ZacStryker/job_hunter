@@ -619,3 +619,8 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 - **Firefox launched without `--no-sandbox` / sandbox hardening flags** — Pre-existing; Chromium uses `['--no-sandbox', '--disable-dev-shm-usage']` but Firefox has no equivalent. May matter in containerized environments. [`pool.js:initPool`]
 - **`FIREFOX_POOL_SIZE` not env-configurable** — Out of scope for this story; hardcoded constant requires a code change to resize the pool. [`pool.js`]
 - **`storageState` persistence not atomic in `withFirefoxPage`** — Pre-existing in base.js; if `fn(page)` throws mid-session, mutated cookies are discarded and the retry restarts from stale state. [`base.js:withFirefoxPage`]
+
+## Deferred from: code review of 36-1-arc-listing-description-scraper (2026-05-12)
+
+- **Empty string returned when Arc SPA skeleton renders before hydration** — `waitForSelector` succeeds on an empty container before React populates `innerText`; `?? ''` returns silently, analysis proceeds with no description. Fix would be a `waitForFunction` checking `innerText.length > 0`. Pre-existing pattern across all scrapers. [`arc.js:fetchArcListing`]
+- **Retry after `waitForSelector` timeout holds Firefox pool slot for up to 100 s** — `scrapeWithRetry` retries the full `withFirefoxPage` lambda; with `retries=1` and combined 50 s timeout per attempt, the arc queue (concurrency 1) can be blocked for ~100 s on a failed scrape. Cleanup is handled correctly via `finally`. Pre-existing design trade-off. [`arc.js:fetchArcListing`, `base.js:scrapeWithRetry`]

@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { searchIndeed, fetchIndeedListing, fetchIndeedJobDetails } from '../scrapers/indeed.js';
 import { searchIndeedNl, fetchIndeedNlListing, fetchIndeedNlJobDetails } from '../scrapers/indeed_nl.js';
 import { searchLinkedIn, fetchLinkedInListing, fetchLinkedInJobDetails } from '../scrapers/linkedin.js';
-import { searchArc } from '../scrapers/arc.js';
+import { searchArc, fetchArcListing } from '../scrapers/arc.js';
 
 async function withStorageState(content, fn) {
   if (!content) return { result: await fn(null), updatedContent: null };
@@ -29,7 +29,7 @@ const SearchSchema = z.object({
 });
 
 const ListingSchema = z.object({
-  source: z.enum(['indeed', 'indeed_nl', 'linkedin']),
+  source: z.enum(['indeed', 'indeed_nl', 'linkedin', 'arc']),
   url: z.string().url(),
   storageStateContent: z.string().optional(),
 });
@@ -58,7 +58,7 @@ export async function scrapeRoutes(fastify) {
     if (!body.success) return reply.status(400).send(body.error);
 
     const { source, url, storageStateContent } = body.data;
-    const fetchers = { indeed: fetchIndeedListing, indeed_nl: fetchIndeedNlListing, linkedin: fetchLinkedInListing };
+    const fetchers = { indeed: fetchIndeedListing, indeed_nl: fetchIndeedNlListing, linkedin: fetchLinkedInListing, arc: fetchArcListing };
     const { result: description } = await withStorageState(storageStateContent, (storageStatePath) =>
       fetchers[source](url, storageStatePath)
     );
