@@ -1,9 +1,9 @@
-import { withPage, scrapeWithRetry, parseRelativeDate, isWithin24Hours } from './base.js';
+import { withFirefoxPage, scrapeWithRetry, parseRelativeDate, isWithin24Hours } from './base.js';
 
 export async function searchArc({ query, maxResults = 25 }) {
   return scrapeWithRetry('arc', () => {
     const url = `https://arc.dev/remote-jobs?search=${encodeURIComponent(query)}`;
-    return withPage(null, async (page) => {
+    return withFirefoxPage(null, async (page) => {
       await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
       await page.waitForSelector('.job-card', { timeout: 15000 });
       await page.waitForTimeout(1500 + Math.random() * 1000);
