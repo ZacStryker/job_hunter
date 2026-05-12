@@ -52,6 +52,18 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
   const profileRow = (userId !== undefined ? db.select().from(profile).where(eq(profile.userId, userId)).get() : null) ?? null
   const promptConfig = loadEffectivePrompt('analysis')
 
+  let linkedinStorageState: string | undefined
+  if (userId !== undefined) {
+    const linkedinSecret = db
+      .select({ ciphertext: userSecrets.ciphertext })
+      .from(userSecrets)
+      .where(and(eq(userSecrets.userId, userId), eq(userSecrets.keyName, 'linkedin_storage_state')))
+      .get()
+    if (linkedinSecret) {
+      try { linkedinStorageState = decrypt(linkedinSecret.ciphertext) } catch { /* best-effort */ }
+    }
+  }
+
   const pendingJobs = db
     .select()
     .from(jobs)
@@ -96,7 +108,11 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
               'Content-Type': 'application/json',
               ...(scraperToken ? { Authorization: `Bearer ${scraperToken}` } : {}),
             },
-            body: JSON.stringify({ source: scraperSource, url: job.sourceUrl }),
+            body: JSON.stringify({
+              source: scraperSource,
+              url: job.sourceUrl,
+              ...(scraperSource === 'linkedin' && linkedinStorageState ? { storageStateContent: linkedinStorageState } : {}),
+            }),
             signal: AbortSignal.timeout(60_000),
           })
           if (!scraperRes.ok) throw new Error(`Scraper HTTP ${scraperRes.status}`)
