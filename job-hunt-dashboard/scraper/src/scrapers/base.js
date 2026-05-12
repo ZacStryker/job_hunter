@@ -57,7 +57,7 @@ export async function withPage(storageStatePath, fn, contextOverrides = {}) {
   }
 }
 
-export async function scrapeWithRetry(source, fn, retries = 3) {
+export async function scrapeWithRetry(source, fn, retries = 1) {
   return queues[source].add(() =>
     retry(fn, {
       retries,
