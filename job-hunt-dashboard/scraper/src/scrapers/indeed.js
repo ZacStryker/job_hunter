@@ -1,14 +1,9 @@
 import { withFirefoxPage, scrapeWithRetry, parseRelativeDate } from './base.js';
-import { existsSync } from 'fs';
-import { resolve } from 'path';
 
-const SESSION_PATH = resolve(process.cwd(), 'sessions/indeed.json');
-const sessionPath = () => (existsSync(SESSION_PATH) ? SESSION_PATH : null);
-
-export async function searchIndeed({ query, location = 'remote', maxResults = 25 }) {
+export async function searchIndeed({ query, location = 'remote', maxResults = 25, storageStatePath = null }) {
   return scrapeWithRetry('indeed', async () => {
     const url = `https://www.indeed.com/jobs?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}&sort=date&fromage=3`;
-    return withFirefoxPage(sessionPath(), async (page) => {
+    return withFirefoxPage(storageStatePath, async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // Cloudflare challenge — wait for it to resolve before looking for results
@@ -52,9 +47,9 @@ export async function searchIndeed({ query, location = 'remote', maxResults = 25
   });
 }
 
-export async function fetchIndeedListing(url) {
+export async function fetchIndeedListing(url, storageStatePath = null) {
   return scrapeWithRetry('indeed', () =>
-    withFirefoxPage(sessionPath(), async (page) => {
+    withFirefoxPage(storageStatePath, async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('#jobDescriptionText', { timeout: 15000 });
       return page.evaluate(() =>
@@ -64,9 +59,9 @@ export async function fetchIndeedListing(url) {
   );
 }
 
-export async function fetchIndeedJobDetails(url) {
+export async function fetchIndeedJobDetails(url, storageStatePath = null) {
   return scrapeWithRetry('indeed', () =>
-    withFirefoxPage(sessionPath(), async (page) => {
+    withFirefoxPage(storageStatePath, async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('h1', { timeout: 15000 });
       return page.evaluate(() => {

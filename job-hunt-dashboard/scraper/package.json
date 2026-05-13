@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "save-session:indeed": "bun src/browser/save-session.js sessions/indeed.json",
     "save-session:indeed_nl": "bun src/browser/save-session.js"
   },
   "keywords": [],

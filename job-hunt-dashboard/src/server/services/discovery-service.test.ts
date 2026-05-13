@@ -12,6 +12,7 @@ const prodSqlite = (prodDb as unknown as { $client: Database }).$client
 
 const { encrypt } = await import('../lib/crypto')
 const VALID_LINKEDIN_CIPHERTEXT = encrypt('{"cookies":[],"origins":[]}')
+const VALID_INDEED_CIPHERTEXT = encrypt('{"cookies":[],"origins":[]}')
 
 const CREATE_JOBS_TABLE = `
   CREATE TABLE IF NOT EXISTS jobs (
@@ -211,11 +212,11 @@ describe('runDiscovery()', () => {
   })
 
   test('LinkedIn searches skipped when no linkedin_storage_state, other sources complete', async () => {
-    prodSqlite.run(`INSERT INTO search_configs (source, query, enabled, user_id) VALUES ('indeed', 'backend dev', 1, 1)`)
+    prodSqlite.run(`INSERT INTO search_configs (source, query, enabled, user_id) VALUES ('arc', 'backend dev', 1, 1)`)
 
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response(
-        JSON.stringify({ results: [{ id: 'job-ind', title: 'Dev', company: 'Co', location: null, url: null }] }),
+        JSON.stringify({ results: [{ id: 'job-arc', title: 'Dev', company: 'Co', location: null, url: null }] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
     )
@@ -226,6 +227,131 @@ describe('runDiscovery()', () => {
       expect(errors).toHaveLength(1)
       expect(errors[0].source).toBe('linkedin')
       expect(errors[0].error).toBe('LinkedIn not connected — add your session in Config > Connections')
+    } finally {
+      prodSqlite.run(`DELETE FROM search_configs WHERE source = 'arc'`)
+    }
+  })
+
+  test('Indeed searches skipped when no indeed_storage_state', async () => {
+    prodSqlite.run(
+      `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+    )
+    prodSqlite.run(`INSERT INTO search_configs (source, query, enabled, user_id) VALUES ('indeed', 'backend dev', 1, 1)`)
+
+    globalThis.fetch = mock(() =>
+      Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    )
+
+    try {
+      const { inserted, errors } = await runDiscovery(undefined, 1)
+      expect(inserted).toBe(0)
+      expect(errors).toHaveLength(1)
+      expect(errors[0].source).toBe('indeed')
+      expect(errors[0].error).toBe('Indeed not connected — add your session in Config > Connections')
+    } finally {
+      prodSqlite.run(`DELETE FROM search_configs WHERE source = 'indeed'`)
+    }
+  })
+
+  test('indeed_nl searches also skipped when no indeed_storage_state', async () => {
+    prodSqlite.run(
+      `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+    )
+    prodSqlite.run(`INSERT INTO search_configs (source, query, enabled, user_id) VALUES ('indeed_nl', 'dev', 1, 1)`)
+
+    const capturedSources: string[] = []
+    globalThis.fetch = mock((_url: unknown, options: unknown) => {
+      const body = JSON.parse((options as RequestInit).body as string) as Record<string, unknown>
+      capturedSources.push(body.source as string)
+      return Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    })
+
+    try {
+      const { errors } = await runDiscovery(undefined, 1)
+      expect(errors.some((e) => e.source === 'indeed')).toBe(true)
+      expect(capturedSources).not.toContain('indeed_nl')
+    } finally {
+      prodSqlite.run(`DELETE FROM search_configs WHERE source = 'indeed_nl'`)
+    }
+  })
+
+  test('Indeed proceeds when indeed_storage_state exists', async () => {
+    prodSqlite.run(
+      `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+    )
+    prodSqlite.run(
+      `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'indeed_storage_state', '${VALID_INDEED_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+    )
+    prodSqlite.run(`INSERT INTO search_configs (source, query, enabled, user_id) VALUES ('indeed', 'backend dev', 1, 1)`)
+
+    globalThis.fetch = mock(() =>
+      Promise.resolve(new Response(
+        JSON.stringify({ results: [{ id: 'job-ind', title: 'Dev', company: 'Co', location: null, url: null }] }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      ))
+    )
+
+    try {
+      const { errors } = await runDiscovery(undefined, 1)
+      expect(errors.filter((e) => e.source === 'indeed')).toHaveLength(0)
+    } finally {
+      prodSqlite.run(`DELETE FROM search_configs WHERE source = 'indeed'`)
+    }
+  })
+
+  test('Indeed passes storageStateContent in request body', async () => {
+    prodSqlite.run(
+      `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+    )
+    prodSqlite.run(
+      `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'indeed_storage_state', '${VALID_INDEED_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+    )
+    prodSqlite.run(`INSERT INTO search_configs (source, query, enabled, user_id) VALUES ('indeed', 'backend dev', 1, 1)`)
+
+    let capturedContent: string | undefined
+    globalThis.fetch = mock((_url: unknown, options: unknown) => {
+      const body = JSON.parse((options as RequestInit).body as string) as Record<string, unknown>
+      if (body.source === 'indeed') capturedContent = body.storageStateContent as string
+      return Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    })
+
+    try {
+      await runDiscovery(undefined, 1)
+      expect(capturedContent).toBeDefined()
+    } finally {
+      prodSqlite.run(`DELETE FROM search_configs WHERE source = 'indeed'`)
+    }
+  })
+
+  test('Indeed updatedStorageStateContent written back to user_secrets', async () => {
+    prodSqlite.run(
+      `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+    )
+    prodSqlite.run(
+      `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'indeed_storage_state', '${VALID_INDEED_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+    )
+    prodSqlite.run(`INSERT INTO search_configs (source, query, enabled, user_id) VALUES ('indeed', 'backend dev', 1, 1)`)
+
+    const updatedContent = '{"cookies":[{"name":"updated"}],"origins":[]}'
+    globalThis.fetch = mock((_url: unknown, options: unknown) => {
+      const body = JSON.parse((options as RequestInit).body as string) as Record<string, unknown>
+      if (body.source === 'indeed') {
+        return Promise.resolve(new Response(
+          JSON.stringify({ results: [], updatedStorageStateContent: updatedContent }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      }
+      return Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    })
+
+    try {
+      await runDiscovery(undefined, 1)
+      const row = prodSqlite.prepare(
+        `SELECT ciphertext FROM user_secrets WHERE user_id = 1 AND key_name = 'indeed_storage_state'`
+      ).get() as { ciphertext: string }
+      expect(row).toBeDefined()
+      const { decrypt } = await import('../lib/crypto')
+      expect(decrypt(row.ciphertext)).toBe(updatedContent)
     } finally {
       prodSqlite.run(`DELETE FROM search_configs WHERE source = 'indeed'`)
     }

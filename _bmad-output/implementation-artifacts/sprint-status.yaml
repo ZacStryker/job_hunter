@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-05-12 # stories 31.1–31.5 done; story 36.1 done
+last_updated: 2026-05-13 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -227,6 +227,10 @@ development_status:
   # Epic 32: Webhook Run Recording Hotfix
   epic-32: in-progress
   32-1-apply-webhook-runs-input-tokens-migration-and-harden-startup-runner: done
+
+  # Epic 33: Indeed Session Cookie Storage
+  epic-33: in-progress
+  33-1-indeed-session-cookie-storage: done
 
   # Epic 36: Arc Listing Description Scraper
   epic-36: in-progress

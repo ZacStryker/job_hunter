@@ -256,5 +256,6 @@ export type OnboardingStatusResponse = {
   hasAnthropicKey: boolean
   hasImap: boolean
   hasLinkedinAuth: boolean
+  hasIndeedAuth: boolean
   onboardingComplete: boolean
 }

@@ -1,5 +1,14 @@
 # Deferred Work
 
+## Deferred from: code review of 33-1-indeed-session-cookie-storage (2026-05-13)
+
+- Unbounded session file size — no size cap on PUT /indeed body or client FileReader; matches LinkedIn pattern. [`api-onboarding.ts`, `config.tsx`]
+- `userId === undefined` skips indeed secret lookup but searches run without session — pre-existing pattern mirrored from LinkedIn. [`discovery-service.ts:41`]
+- File-dialog click races with FileReader.onload — button re-enables before async read completes; allows a second concurrent mutation. Rare, mostly harmless. [`config.tsx`]
+- `withStorageState` temp-file prefix hardcoded "linkedin-session-*" for all sources including Indeed — cosmetic confusion in /tmp. Pre-existing. [`scrape.js`]
+- `save-session:indeed_nl` script has no explicit output path — falls back to save-session.js default. Pre-existing. [`scraper/package.json`]
+- `save-session.js` FIREFOX_COOKIES path hardcoded to author's snap Firefox path — fails on other machines. Pre-existing. [`save-session.js`]
+
 ## Deferred from: code review of 31-5-switch-arc-scraper-to-firefox (2026-05-12)
 
 - Non-async callback in `scrapeWithRetry` returns a promise — pre-existing pattern identical to old `withPage` usage; `scrapeWithRetry` must await the callback return. [`arc.js:4`]

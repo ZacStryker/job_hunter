@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { useLinkedinBrowserSession } from '@/hooks/useLinkedinBrowserSession'
 import { LinkedInBrowserModal } from '@/components/linkedin/LinkedInBrowserModal'
 import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
@@ -21,8 +21,10 @@ function ConnectionsCard() {
   const queryClient = useQueryClient()
   const { status: sessionStatus, error, startSession, sendClick, sendKey, sendCancel, onFrameRef } = useLinkedinBrowserSession()
   const [modalOpen, setModalOpen] = useState(false)
+  const indeedFileRef = useRef<HTMLInputElement>(null)
 
-  const isConnected = status?.hasLinkedinAuth ?? false
+  const isLinkedinConnected = status?.hasLinkedinAuth ?? false
+  const isIndeedConnected = status?.hasIndeedAuth ?? false
 
   useEffect(() => {
     if (sessionStatus === 'captured' && modalOpen) {
@@ -43,19 +45,77 @@ function ConnectionsCard() {
     setModalOpen(false)
   }
 
+  const indeedUploadMutation = useMutation({
+    mutationFn: async (body: unknown) => {
+      const res = await fetch('/api/onboarding/indeed', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string }
+        throw new Error(data.error ?? 'Upload failed')
+      }
+    },
+    onSuccess: () => {
+      toast.success('Indeed connected')
+      queryClient.invalidateQueries({ queryKey: ['onboarding-status'] })
+    },
+    onError: (err: Error) => {
+      toast.error(err.message)
+    },
+  })
+
+  function handleIndeedUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(ev.target?.result as string)
+      } catch {
+        toast.error('Invalid JSON file')
+        return
+      }
+      const cookies = (parsed as Record<string, unknown>).cookies
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(cookies) || cookies.length === 0) {
+        toast.error('Invalid session file — expected a non-empty cookies array')
+        return
+      }
+      indeedUploadMutation.mutate(parsed)
+    }
+    reader.onerror = () => toast.error('Failed to read file')
+    reader.readAsText(file)
+  }
+
   return (
     <div className="border border-zinc-800 rounded-lg p-4">
       <h2 className="text-base font-semibold text-zinc-100 mb-3">Connections</h2>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-sm text-zinc-300">LinkedIn</span>
-          <span className={`text-xs ${isConnected ? 'text-emerald-500' : 'text-zinc-500'}`}>
-            {isConnected ? 'Connected' : 'Not connected'}
+          <span className={`text-xs ${isLinkedinConnected ? 'text-emerald-500' : 'text-zinc-500'}`}>
+            {isLinkedinConnected ? 'Connected' : 'Not connected'}
           </span>
         </div>
         <Button size="sm" disabled={modalOpen} onClick={handleConnect}>
           Connect LinkedIn
         </Button>
+      </div>
+
+      <div className="flex items-center justify-between mt-3">
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-zinc-300">Indeed</span>
+          <span className={`text-xs ${isIndeedConnected ? 'text-emerald-500' : 'text-zinc-500'}`}>
+            {isIndeedConnected ? 'Connected' : 'Not connected'}
+          </span>
+        </div>
+        <Button size="sm" disabled={indeedUploadMutation.isPending} onClick={() => indeedFileRef.current?.click()}>
+          Upload session
+        </Button>
+        <input ref={indeedFileRef} type="file" accept=".json" className="hidden" onChange={handleIndeedUpload} />
       </div>
 
       {(sessionStatus === 'error' || sessionStatus === 'timeout') && error && (

@@ -36,6 +36,7 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
   const errors: Array<{ source: string; error: string }> = []
 
   let storageStateContent: string | undefined
+  let indeedStorageStateContent: string | undefined
 
   if (userId !== undefined) {
     const linkedinSecret = db
@@ -67,10 +68,45 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
         }
       }
     }
+
+    const indeedSecret = db
+      .select({ ciphertext: userSecrets.ciphertext })
+      .from(userSecrets)
+      .where(and(eq(userSecrets.userId, userId), eq(userSecrets.keyName, 'indeed_storage_state')))
+      .get()
+
+    if (!indeedSecret) {
+      const indeedSearches = searches.filter((s) => s.source === 'indeed' || s.source === 'indeed_nl')
+      if (indeedSearches.length > 0) {
+        const errMsg = 'Indeed not connected — add your session in Config > Connections'
+        errors.push({ source: 'indeed', error: errMsg })
+        onProgress?.(`Indeed skipped: ${errMsg}`)
+      }
+    } else {
+      const indeedSearches = searches.filter((s) => s.source === 'indeed' || s.source === 'indeed_nl')
+      if (indeedSearches.length > 0) {
+        let decrypted: string | undefined
+        try {
+          decrypted = decrypt(indeedSecret.ciphertext)
+        } catch {
+          const errMsg = 'Failed to read Indeed session — re-upload in Config > Connections'
+          errors.push({ source: 'indeed', error: errMsg })
+          onProgress?.(`Indeed skipped: ${errMsg}`)
+        }
+        if (decrypted !== undefined) {
+          indeedStorageStateContent = decrypted
+        }
+      }
+    }
   }
 
-  const activeSearches = errors.some((e) => e.source === 'linkedin')
-    ? searches.filter((s) => s.source !== 'linkedin')
+  const skippedSources = new Set(errors.map((e) => e.source))
+  const activeSearches = skippedSources.size > 0
+    ? searches.filter((s) => {
+        if (skippedSources.has(s.source)) return false
+        if (s.source === 'indeed_nl' && skippedSources.has('indeed')) return false
+        return true
+      })
     : searches
 
   const responses = await Promise.all(
@@ -81,6 +117,9 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
         }
         if (s.source === 'linkedin' && storageStateContent) {
           requestBody.storageStateContent = storageStateContent
+        }
+        if ((s.source === 'indeed' || s.source === 'indeed_nl') && indeedStorageStateContent) {
+          requestBody.storageStateContent = indeedStorageStateContent
         }
         const _fetchStart = Date.now()
         console.log(`[DISCOVERY] → fetch ${s.source} query="${s.query}" location="${s.location ?? ''}"`)
@@ -123,6 +162,21 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
           const updatedAt = new Date().toISOString()
           db.insert(userSecrets)
             .values({ userId, keyName: 'linkedin_storage_state', ciphertext, updatedAt })
+            .onConflictDoUpdate({
+              target: [userSecrets.userId, userSecrets.keyName],
+              set: { ciphertext, updatedAt },
+            })
+            .run()
+        } catch { /* best-effort */ }
+      }
+
+      const indeedResponse = responses.findLast((r) => r.source === 'indeed' || r.source === 'indeed_nl')
+      if (indeedResponse?.updatedStorageStateContent) {
+        try {
+          const ciphertext = encrypt(indeedResponse.updatedStorageStateContent)
+          const updatedAt = new Date().toISOString()
+          db.insert(userSecrets)
+            .values({ userId, keyName: 'indeed_storage_state', ciphertext, updatedAt })
             .onConflictDoUpdate({
               target: [userSecrets.userId, userSecrets.keyName],
               set: { ciphertext, updatedAt },

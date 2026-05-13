@@ -84,6 +84,23 @@ describe('GET /api/onboarding/status', () => {
     expect(body.hasLinkedinAuth).toBe(true)
   })
 
+  test('with indeed_storage_state → hasIndeedAuth true', async () => {
+    prodSqlite.run(
+      `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'indeed_storage_state', 'cipher', '2026-04-30T00:00:00.000Z')`
+    )
+    const res = await onboardingApp.request('/status', { method: 'GET' })
+    expect(res.status).toBe(200)
+    const body = await res.json() as { hasIndeedAuth: boolean }
+    expect(body.hasIndeedAuth).toBe(true)
+  })
+
+  test('no indeed_storage_state → hasIndeedAuth false', async () => {
+    const res = await onboardingApp.request('/status', { method: 'GET' })
+    expect(res.status).toBe(200)
+    const body = await res.json() as { hasIndeedAuth: boolean }
+    expect(body.hasIndeedAuth).toBe(false)
+  })
+
   test('response never contains ciphertext or raw secret value', async () => {
     prodSqlite.run(
       `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'anthropic_api_key', 'supersecret', '2026-04-30T00:00:00.000Z')`
@@ -190,6 +207,73 @@ describe('PUT /api/onboarding/anthropic — input validation', () => {
     expect(res.status).toBe(400)
     const body = await res.json() as { error: string }
     expect(body.error).toBeDefined()
+  })
+})
+
+describe('PUT /api/onboarding/indeed', () => {
+  test('valid session file → 200 { ok: true } and row stored', async () => {
+    const res = await onboardingApp.request('/indeed', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cookies: [{ name: 'sess', value: 'abc' }], origins: [] }),
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json() as { ok: boolean }
+    expect(body.ok).toBe(true)
+    const row = prodSqlite.prepare(
+      `SELECT key_name FROM user_secrets WHERE user_id = 1 AND key_name = 'indeed_storage_state'`
+    ).get() as { key_name: string } | undefined
+    expect(row?.key_name).toBe('indeed_storage_state')
+  })
+
+  test('missing cookies field → 400', async () => {
+    const res = await onboardingApp.request('/indeed', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ origins: [] }),
+    })
+    expect(res.status).toBe(400)
+    const body = await res.json() as { error: string }
+    expect(body.error).toBeDefined()
+  })
+
+  test('cookies is not an array → 400', async () => {
+    const res = await onboardingApp.request('/indeed', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cookies: 'bad' }),
+    })
+    expect(res.status).toBe(400)
+    const body = await res.json() as { error: string }
+    expect(body.error).toBeDefined()
+  })
+
+  test('invalid JSON body → 400', async () => {
+    const res = await onboardingApp.request('/indeed', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: 'not-json',
+    })
+    expect(res.status).toBe(400)
+    const body = await res.json() as { error: string }
+    expect(body.error).toBeDefined()
+  })
+
+  test('second PUT upserts — single row in user_secrets', async () => {
+    await onboardingApp.request('/indeed', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cookies: [], origins: [] }),
+    })
+    await onboardingApp.request('/indeed', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cookies: [{ name: 'new' }], origins: [] }),
+    })
+    const rows = prodSqlite.prepare(
+      `SELECT * FROM user_secrets WHERE key_name = 'indeed_storage_state'`
+    ).all() as Array<Record<string, unknown>>
+    expect(rows).toHaveLength(1)
   })
 })
 

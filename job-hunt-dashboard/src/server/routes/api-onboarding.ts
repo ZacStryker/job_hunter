@@ -19,8 +19,9 @@ app.get('/status', (c) => {
   const hasAnthropicKey = keys.has('anthropic_api_key')
   const hasImap = keys.has('imap_host') && keys.has('imap_user') && keys.has('imap_pass')
   const hasLinkedinAuth = keys.has('linkedin_storage_state')
+  const hasIndeedAuth = keys.has('indeed_storage_state')
   const onboardingComplete = hasAnthropicKey
-  return c.json({ hasAnthropicKey, hasImap, hasLinkedinAuth, onboardingComplete })
+  return c.json({ hasAnthropicKey, hasImap, hasLinkedinAuth, hasIndeedAuth, onboardingComplete })
 })
 
 const anthropicSchema = z.object({ apiKey: z.string().min(1) })
@@ -147,6 +148,30 @@ app.put('/imap', async (c) => {
       })
       .run()
   }
+
+  return c.json({ ok: true })
+})
+
+const indeedSessionSchema = z.object({ cookies: z.array(z.unknown()).min(1) }).passthrough()
+
+app.put('/indeed', async (c) => {
+  const userId = c.get('userId')
+
+  let body: unknown
+  try { body = await c.req.json() } catch { return c.json({ error: 'Invalid JSON body' }, 400) }
+
+  const parsed = indeedSessionSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body' }, 400)
+
+  const now = new Date().toISOString()
+  const ciphertext = encrypt(JSON.stringify(parsed.data))
+  db.insert(userSecrets)
+    .values({ userId, keyName: 'indeed_storage_state', ciphertext, updatedAt: now })
+    .onConflictDoUpdate({
+      target: [userSecrets.userId, userSecrets.keyName],
+      set: { ciphertext, updatedAt: now },
+    })
+    .run()
 
   return c.json({ ok: true })
 })
