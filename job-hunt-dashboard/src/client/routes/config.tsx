@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { useQueryClient, useMutation } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLinkedinBrowserSession } from '@/hooks/useLinkedinBrowserSession'
 import { LinkedInBrowserModal } from '@/components/linkedin/LinkedInBrowserModal'
+import { useIndeedBrowserSession } from '@/hooks/useIndeedBrowserSession'
+import { IndeedBrowserModal } from '@/components/indeed/IndeedBrowserModal'
 import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useWebhookRunsQuery } from '@/hooks/useWebhookRunsQuery'
@@ -19,9 +21,12 @@ import type { PromptFlow, ScraperSource } from '@shared/schemas'
 function ConnectionsCard() {
   const { data: status } = useOnboardingStatusQuery()
   const queryClient = useQueryClient()
+
   const { status: sessionStatus, error, startSession, sendClick, sendKey, sendCancel, onFrameRef } = useLinkedinBrowserSession()
   const [modalOpen, setModalOpen] = useState(false)
-  const indeedFileRef = useRef<HTMLInputElement>(null)
+
+  const { status: indeedSessionStatus, error: indeedError, startSession: startIndeedSession, saveSession, sendClick: sendIndeedClick, sendKey: sendIndeedKey, sendCancel: sendIndeedCancel, onFrameRef: indeedOnFrameRef } = useIndeedBrowserSession()
+  const [indeedModalOpen, setIndeedModalOpen] = useState(false)
 
   const isLinkedinConnected = status?.hasLinkedinAuth ?? false
   const isIndeedConnected = status?.hasIndeedAuth ?? false
@@ -36,6 +41,16 @@ function ConnectionsCard() {
     }
   }, [sessionStatus, modalOpen, queryClient])
 
+  useEffect(() => {
+    if (indeedSessionStatus === 'captured' && indeedModalOpen) {
+      setIndeedModalOpen(false)
+      toast.success('Indeed connected')
+      queryClient.invalidateQueries({ queryKey: ['onboarding-status'] })
+    } else if ((indeedSessionStatus === 'timeout' || indeedSessionStatus === 'error') && indeedModalOpen) {
+      setIndeedModalOpen(false)
+    }
+  }, [indeedSessionStatus, indeedModalOpen, queryClient])
+
   function handleConnect() {
     startSession()
     setModalOpen(true)
@@ -45,49 +60,13 @@ function ConnectionsCard() {
     setModalOpen(false)
   }
 
-  const indeedUploadMutation = useMutation({
-    mutationFn: async (body: unknown) => {
-      const res = await fetch('/api/onboarding/indeed', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({})) as { error?: string }
-        throw new Error(data.error ?? 'Upload failed')
-      }
-    },
-    onSuccess: () => {
-      toast.success('Indeed connected')
-      queryClient.invalidateQueries({ queryKey: ['onboarding-status'] })
-    },
-    onError: (err: Error) => {
-      toast.error(err.message)
-    },
-  })
+  function handleIndeedConnect() {
+    startIndeedSession()
+    setIndeedModalOpen(true)
+  }
 
-  function handleIndeedUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    e.target.value = ''
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(ev.target?.result as string)
-      } catch {
-        toast.error('Invalid JSON file')
-        return
-      }
-      const cookies = (parsed as Record<string, unknown>).cookies
-      if (!parsed || typeof parsed !== 'object' || !Array.isArray(cookies) || cookies.length === 0) {
-        toast.error('Invalid session file — expected a non-empty cookies array')
-        return
-      }
-      indeedUploadMutation.mutate(parsed)
-    }
-    reader.onerror = () => toast.error('Failed to read file')
-    reader.readAsText(file)
+  function handleIndeedModalClose() {
+    setIndeedModalOpen(false)
   }
 
   return (
@@ -112,15 +91,20 @@ function ConnectionsCard() {
             {isIndeedConnected ? 'Connected' : 'Not connected'}
           </span>
         </div>
-        <Button size="sm" disabled={indeedUploadMutation.isPending} onClick={() => indeedFileRef.current?.click()}>
-          Upload session
+        <Button size="sm" disabled={indeedModalOpen} onClick={handleIndeedConnect}>
+          Connect Indeed
         </Button>
-        <input ref={indeedFileRef} type="file" accept=".json" className="hidden" onChange={handleIndeedUpload} />
       </div>
 
       {(sessionStatus === 'error' || sessionStatus === 'timeout') && error && (
         <Alert variant="destructive" className="mt-3">
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {(indeedSessionStatus === 'error' || indeedSessionStatus === 'timeout') && indeedError && (
+        <Alert variant="destructive" className="mt-3">
+          <AlertDescription>{indeedError}</AlertDescription>
         </Alert>
       )}
 
@@ -132,6 +116,17 @@ function ConnectionsCard() {
         sendKey={sendKey}
         sendCancel={sendCancel}
         onFrameRef={onFrameRef}
+      />
+
+      <IndeedBrowserModal
+        open={indeedModalOpen}
+        onClose={handleIndeedModalClose}
+        status={indeedSessionStatus}
+        saveSession={saveSession}
+        sendClick={sendIndeedClick}
+        sendKey={sendIndeedKey}
+        sendCancel={sendIndeedCancel}
+        onFrameRef={indeedOnFrameRef}
       />
     </div>
   )

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-05-13 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done
+last_updated: 2026-05-13 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -231,6 +231,10 @@ development_status:
   # Epic 33: Indeed Session Cookie Storage
   epic-33: in-progress
   33-1-indeed-session-cookie-storage: done
+
+  # Epic 34: Indeed In-App Browser Authentication
+  epic-34: in-progress
+  34-1-indeed-in-app-browser-auth: done
 
   # Epic 36: Arc Listing Description Scraper
   epic-36: in-progress

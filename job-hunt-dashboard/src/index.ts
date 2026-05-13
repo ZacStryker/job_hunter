@@ -23,10 +23,17 @@ import { adminMiddleware } from './server/middleware/admin-middleware'
 import authRoute from './server/routes/api-auth'
 import linkedInBrowserRoute from './server/routes/api-linkedin-browser'
 import * as linkedInBrowserService from './server/services/linkedin-browser-service'
-import type { WsData } from './server/services/linkedin-browser-service'
+import indeedBrowserRoute from './server/routes/api-indeed-browser'
+import * as indeedBrowserService from './server/services/indeed-browser-service'
 import onboardingRoute from './server/routes/api-onboarding'
 import adminRoute from './server/routes/api-admin'
 import type { AppEnv } from './server/types'
+
+interface WsData {
+  userId: number
+  sessionId: string
+  service: 'linkedin' | 'indeed'
+}
 
 async function seedAdmin(): Promise<void> {
   const email = process.env.ADMIN_EMAIL
@@ -93,6 +100,7 @@ app.route('/api/profile', profileRoute)
 app.route('/api/prompts', promptsRoute)
 app.route('/api/search-configs', searchConfigsRoute)
 app.route('/api/onboarding/linkedin/browser', linkedInBrowserRoute)
+app.route('/api/onboarding/indeed/browser', indeedBrowserRoute)
 app.route('/api/onboarding', onboardingRoute)
 app.route('/api/admin', adminRoute)
 app.route('/auth', authRoute)
@@ -111,11 +119,17 @@ await startScraperProcess().catch((err: Error) => {
 
 process.on('SIGTERM', () => {
   stopScraperProcess()
-  linkedInBrowserService.closeAllSessions().finally(() => process.exit(0))
+  Promise.all([
+    linkedInBrowserService.closeAllSessions(),
+    indeedBrowserService.closeAllSessions(),
+  ]).finally(() => process.exit(0))
 })
 process.on('SIGINT', () => {
   stopScraperProcess()
-  linkedInBrowserService.closeAllSessions().finally(() => process.exit(0))
+  Promise.all([
+    linkedInBrowserService.closeAllSessions(),
+    indeedBrowserService.closeAllSessions(),
+  ]).finally(() => process.exit(0))
 })
 
 const port = parseInt(process.env.PORT ?? '3000', 10)
@@ -147,18 +161,29 @@ export default {
   hostname: process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1',
   fetch(req: Request, server: Server<WsData>) {
     const url = new URL(req.url)
-    const wsMatch = url.pathname.match(
-      /^\/api\/onboarding\/linkedin\/browser\/([^/]+)\/ws$/
-    )
-    if (wsMatch) {
-      const sessionId = wsMatch[1]
+    const linkedInWsMatch = url.pathname.match(/^\/api\/onboarding\/linkedin\/browser\/([^/]+)\/ws$/)
+    if (linkedInWsMatch) {
+      const sessionId = linkedInWsMatch[1]
       const userId = getSessionUserId(req)
       if (!userId) return new Response('Unauthorized', { status: 401 })
       const session = linkedInBrowserService.getSession(sessionId)
       if (!session || session.userId !== userId) {
         return new Response('Forbidden', { status: 403 })
       }
-      const upgraded = server.upgrade(req, { data: { userId, sessionId } })
+      const upgraded = server.upgrade(req, { data: { userId, sessionId, service: 'linkedin' as const } })
+      if (upgraded) return undefined
+      return new Response('WebSocket upgrade failed', { status: 500 })
+    }
+    const indeedWsMatch = url.pathname.match(/^\/api\/onboarding\/indeed\/browser\/([^/]+)\/ws$/)
+    if (indeedWsMatch) {
+      const sessionId = indeedWsMatch[1]
+      const userId = getSessionUserId(req)
+      if (!userId) return new Response('Unauthorized', { status: 401 })
+      const session = indeedBrowserService.getSession(sessionId)
+      if (!session || session.userId !== userId) {
+        return new Response('Forbidden', { status: 403 })
+      }
+      const upgraded = server.upgrade(req, { data: { userId, sessionId, service: 'indeed' as const } })
       if (upgraded) return undefined
       return new Response('WebSocket upgrade failed', { status: 500 })
     }
@@ -166,13 +191,25 @@ export default {
   },
   websocket: {
     open(ws: ServerWebSocket<WsData>) {
-      void linkedInBrowserService.attachWebSocket(ws)
+      if (ws.data.service === 'linkedin') {
+        void linkedInBrowserService.attachWebSocket(ws)
+      } else {
+        void indeedBrowserService.attachWebSocket(ws)
+      }
     },
     message(ws: ServerWebSocket<WsData>, message: string | Buffer) {
-      void linkedInBrowserService.handleMessage(ws, message)
+      if (ws.data.service === 'linkedin') {
+        void linkedInBrowserService.handleMessage(ws, message)
+      } else {
+        void indeedBrowserService.handleMessage(ws, message)
+      }
     },
     close(ws: ServerWebSocket<WsData>) {
-      linkedInBrowserService.handleClose(ws)
+      if (ws.data.service === 'linkedin') {
+        linkedInBrowserService.handleClose(ws)
+      } else {
+        indeedBrowserService.handleClose(ws)
+      }
     },
   },
   idleTimeout: 120,

@@ -1,5 +1,13 @@
 # Deferred Work
 
+## Deferred from: code review of 34-1-indeed-in-app-browser-auth (2026-05-13)
+
+- Old WS `onclose` fires after rapid reconnect — pre-existing bug in `useLinkedinBrowserSession`, carried forward to `useIndeedBrowserSession`; old socket's `onclose` can overwrite new session's loading status with error. [`useIndeedBrowserSession.ts`]
+- `WsData` interface duplicated — service-level `WsData` (userId, sessionId) diverges from index.ts's extended version (adds `service` field); pre-existing from LinkedIn service pattern. [`indeed-browser-service.ts`, `index.ts`]
+- `handleSave` loses `captured` confirmation if client WS closed mid-save — DB write succeeds but `ws.send()` throws; pre-existing pattern in LinkedIn service. [`indeed-browser-service.ts`]
+- Canvas has no accessible label — `<canvas>` in `IndeedBrowserModal` captures input events but has no aria-label; pre-existing in `LinkedInBrowserModal`. [`IndeedBrowserModal.tsx`]
+- Browser session hook and service are near-duplicates of LinkedIn equivalents — no shared abstraction; technical debt. [`useIndeedBrowserSession.ts`, `indeed-browser-service.ts`]
+
 ## Deferred from: code review of 33-1-indeed-session-cookie-storage (2026-05-13)
 
 - Unbounded session file size — no size cap on PUT /indeed body or client FileReader; matches LinkedIn pattern. [`api-onboarding.ts`, `config.tsx`]
