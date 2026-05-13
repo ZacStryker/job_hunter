@@ -26,8 +26,8 @@ COPY --from=builder /app/scraper ./scraper
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/bun.lock ./bun.lock
 
-# Install curl for health check
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Install curl for health check, xvfb for headed Firefox (Cloudflare bot detection bypass)
+RUN apt-get update && apt-get install -y curl xvfb && rm -rf /var/lib/apt/lists/*
 
 # Install production dependencies only (no devDependencies)
 RUN bun install --production --frozen-lockfile
@@ -42,6 +42,9 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN bunx playwright install --with-deps chromium firefox
 RUN cd scraper && bunx playwright install --with-deps firefox
 
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 EXPOSE 3000
 
-CMD ["bun", "run", "src/index.ts"]
+CMD ["/app/entrypoint.sh"]

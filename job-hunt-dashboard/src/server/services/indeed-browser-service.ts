@@ -31,7 +31,7 @@ export async function createSession(userId: number): Promise<string> {
   }
 
   const sessionId = crypto.randomUUID()
-  const browser = await firefox.launch({ headless: true })
+  const browser = await firefox.launch({ headless: false })
   try {
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
