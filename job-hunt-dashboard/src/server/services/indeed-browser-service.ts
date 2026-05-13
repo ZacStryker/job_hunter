@@ -135,6 +135,13 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, message: string
     } else if (msg.type === 'click' && msg.x !== undefined && msg.y !== undefined) {
       await session.page.mouse.move(msg.x, msg.y)
       await session.page.mouse.click(msg.x, msg.y)
+    } else if (msg.type === 'solve-challenge') {
+      const cfFrame = session.page.frames().find(f => f.url().includes('challenges.cloudflare.com'))
+      if (cfFrame) {
+        await cfFrame.locator('input').first().click({ timeout: 3000 })
+          .catch(() => cfFrame.locator('[role="checkbox"]').first().click({ timeout: 3000 }))
+          .catch(() => { })
+      }
     } else if (msg.type === 'keydown' && msg.key) {
       await session.page.keyboard.press(msg.key)
     } else if (msg.type === 'cancel') {

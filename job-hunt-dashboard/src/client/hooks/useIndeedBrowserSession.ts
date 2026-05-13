@@ -13,6 +13,7 @@ export interface IndeedBrowserSession {
   sendClick: (x: number, y: number) => void
   sendKey: (key: string) => void
   sendCancel: () => void
+  solveChallenge: () => void
   onFrameRef: React.MutableRefObject<FrameCallback | null>
 }
 
@@ -121,11 +122,18 @@ export function useIndeedBrowserSession(): IndeedBrowserSession {
     setError(null)
   }, [cleanup])
 
+  const solveChallenge = useCallback(() => {
+    const ws = wsRef.current
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'solve-challenge' }))
+    }
+  }, [])
+
   useEffect(() => {
     return () => {
       cleanup(true)
     }
   }, [cleanup])
 
-  return { status, error, startSession, saveSession, sendClick, sendKey, sendCancel, onFrameRef }
+  return { status, error, startSession, saveSession, sendClick, sendKey, sendCancel, solveChallenge, onFrameRef }
 }

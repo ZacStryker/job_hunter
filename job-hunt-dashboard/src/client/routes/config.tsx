@@ -25,7 +25,7 @@ function ConnectionsCard() {
   const { status: sessionStatus, error, startSession, sendClick, sendKey, sendCancel, onFrameRef } = useLinkedinBrowserSession()
   const [modalOpen, setModalOpen] = useState(false)
 
-  const { status: indeedSessionStatus, error: indeedError, startSession: startIndeedSession, saveSession, sendClick: sendIndeedClick, sendKey: sendIndeedKey, sendCancel: sendIndeedCancel, onFrameRef: indeedOnFrameRef } = useIndeedBrowserSession()
+  const { status: indeedSessionStatus, error: indeedError, startSession: startIndeedSession, saveSession, sendClick: sendIndeedClick, sendKey: sendIndeedKey, sendCancel: sendIndeedCancel, solveChallenge: solveIndeedChallenge, onFrameRef: indeedOnFrameRef } = useIndeedBrowserSession()
   const [indeedModalOpen, setIndeedModalOpen] = useState(false)
 
   const isLinkedinConnected = status?.hasLinkedinAuth ?? false
@@ -126,6 +126,7 @@ function ConnectionsCard() {
         sendClick={sendIndeedClick}
         sendKey={sendIndeedKey}
         sendCancel={sendIndeedCancel}
+        solveChallenge={solveIndeedChallenge}
         onFrameRef={indeedOnFrameRef}
       />
     </div>

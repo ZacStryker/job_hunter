@@ -17,10 +17,11 @@ interface Props {
   sendClick: (x: number, y: number) => void
   sendKey: (key: string) => void
   sendCancel: () => void
+  solveChallenge: () => void
   onFrameRef: React.MutableRefObject<FrameCallback | null>
 }
 
-export function IndeedBrowserModal({ open, onClose, status, saveSession, sendClick, sendKey, sendCancel, onFrameRef }: Props) {
+export function IndeedBrowserModal({ open, onClose, status, saveSession, sendClick, sendKey, sendCancel, solveChallenge, onFrameRef }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -93,7 +94,10 @@ export function IndeedBrowserModal({ open, onClose, status, saveSession, sendCli
                 onMouseDown={handleMouseDown}
                 onKeyDown={handleKeyDown}
               />
-              <Button size="sm" onClick={saveSession}>Save Session</Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={solveChallenge}>Solve Cloudflare Challenge</Button>
+                <Button size="sm" onClick={saveSession}>Save Session</Button>
+              </div>
             </div>
           )}
         </div>
