@@ -28,11 +28,13 @@ export async function searchIndeedNl({ query, location = '', maxResults = 25 }) 
       const jobs = await page.evaluate((max) => {
         const links = [...document.querySelectorAll('a[data-jk]')].slice(0, max);
         return links.map(link => {
-          const card = link.closest('.job_seen_beacon');
+          const card = link.closest('.job_seen_beacon') ?? link.closest('td.resultContent');
           const jk = link.getAttribute('data-jk');
+          const titleEl = link.querySelector('span[title]');
+          const title = titleEl?.getAttribute('title')?.trim() || titleEl?.innerText?.trim() || null;
           return {
             id: jk,
-            title: link.querySelector(`span[id^="jobTitle-"]`)?.innerText?.trim() ?? null,
+            title,
             company: card?.querySelector('[data-testid="company-name"]')?.innerText?.trim() ?? null,
             location: card?.querySelector('[data-testid="text-location"]')?.innerText?.trim() ?? null,
             url: `https://nl.indeed.com/viewjob?jk=${jk}`,

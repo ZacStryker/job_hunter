@@ -624,3 +624,6 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 
 - **Empty string returned when Arc SPA skeleton renders before hydration** — `waitForSelector` succeeds on an empty container before React populates `innerText`; `?? ''` returns silently, analysis proceeds with no description. Fix would be a `waitForFunction` checking `innerText.length > 0`. Pre-existing pattern across all scrapers. [`arc.js:fetchArcListing`]
 - **Retry after `waitForSelector` timeout holds Firefox pool slot for up to 100 s** — `scrapeWithRetry` retries the full `withFirefoxPage` lambda; with `retries=1` and combined 50 s timeout per attempt, the arc queue (concurrency 1) can be blocked for ~100 s on a failed scrape. Cleanup is handled correctly via `finally`. Pre-existing design trade-off. [`arc.js:fetchArcListing`, `base.js:scrapeWithRetry`]
+
+## Indeed scraper — all card selectors miss → silent company=null drop (2026-05-13)
+If none of `.job_seen_beacon`, `td.resultContent` match, card=null → company=null → job silently dropped by discovery-service filter. Pre-existing behavior; the two-way fallback is already an improvement. Future work: add a warning log when card is null so it's visible in server logs.
