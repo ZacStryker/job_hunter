@@ -136,30 +136,20 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, message: string
       await session.page.mouse.move(msg.x, msg.y)
       await session.page.mouse.click(msg.x, msg.y)
     } else if (msg.type === 'solve-challenge') {
-      const allFrames = session.page.frames()
-      const mainFrame = session.page.mainFrame()
       console.log('[indeed-browser] solve-challenge — page url:', session.page.url())
-      let clicked = false
-      for (const frame of allFrames) {
-        if (frame === mainFrame) continue
-        try {
-          const html = await frame.evaluate(() => document.documentElement.outerHTML).catch(() => '(evaluate failed)')
-          console.log(`[indeed-browser] non-main frame url="${frame.url()}" html:`, html.slice(0, 1000))
-          const count = await frame.locator('input, [role="checkbox"], label').count()
-          console.log(`[indeed-browser] non-main frame interactive elements: ${count}`)
-          if (count > 0) {
-            await frame.locator('input, [role="checkbox"], label').first().click({ timeout: 3000 })
-            console.log('[indeed-browser] clicked in non-main frame')
-            clicked = true
-            break
-          }
-        } catch (err) {
-          console.log('[indeed-browser] non-main frame error:', err)
+      const html = await session.page.content()
+      console.log('[indeed-browser] main frame HTML (first 3000):', html.slice(0, 3000))
+      const canvasCount = await session.page.locator('canvas').count()
+      console.log('[indeed-browser] canvas elements in main frame:', canvasCount)
+      if (canvasCount > 0) {
+        const box = await session.page.locator('canvas').first().boundingBox()
+        console.log('[indeed-browser] canvas bounds:', box)
+        if (box) {
+          await session.page.mouse.click(box.x + box.width * 0.15, box.y + box.height * 0.5)
+          console.log('[indeed-browser] clicked canvas at checkbox position')
         }
-      }
-      if (!clicked) {
-        console.log('[indeed-browser] no non-main frame click succeeded — trying main frame')
-        await mainFrame.locator('input[type="checkbox"], [role="checkbox"]').first().click({ timeout: 2000 })
+      } else {
+        await session.page.locator('input[type="checkbox"], [role="checkbox"]').first().click({ timeout: 2000 })
           .catch((err) => { console.log('[indeed-browser] main frame click failed:', err) })
       }
     } else if (msg.type === 'keydown' && msg.key) {
