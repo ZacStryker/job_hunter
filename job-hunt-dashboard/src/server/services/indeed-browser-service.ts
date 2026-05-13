@@ -136,11 +136,20 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, message: string
       await session.page.mouse.move(msg.x, msg.y)
       await session.page.mouse.click(msg.x, msg.y)
     } else if (msg.type === 'solve-challenge') {
-      const cfFrame = session.page.frames().find(f => f.url().includes('challenges.cloudflare.com'))
+      const allFrames = session.page.frames()
+      console.log('[indeed-browser] solve-challenge — page url:', session.page.url())
+      console.log('[indeed-browser] solve-challenge — frames:', allFrames.map(f => `${f.name() || '(unnamed)'} ${f.url()}`))
+      const cfFrame = allFrames.find(f => f.url().includes('challenges.cloudflare.com'))
       if (cfFrame) {
+        console.log('[indeed-browser] found CF frame, clicking input')
         await cfFrame.locator('input').first().click({ timeout: 3000 })
           .catch(() => cfFrame.locator('[role="checkbox"]').first().click({ timeout: 3000 }))
-          .catch(() => { })
+          .catch((err) => { console.log('[indeed-browser] CF frame click failed:', err) })
+      } else {
+        console.log('[indeed-browser] no CF frame — trying main frame checkbox selectors')
+        await session.page.locator('input[type="checkbox"]').first().click({ timeout: 2000 })
+          .catch(() => session.page.locator('[role="checkbox"]').first().click({ timeout: 2000 }))
+          .catch((err) => { console.log('[indeed-browser] main frame click failed:', err) })
       }
     } else if (msg.type === 'keydown' && msg.key) {
       await session.page.keyboard.press(msg.key)
