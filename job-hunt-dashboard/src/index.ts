@@ -211,6 +211,9 @@ export default {
         indeedBrowserService.handleClose(ws)
       }
     },
+    error(ws: ServerWebSocket<WsData>, error: Error) {
+      console.error(`[browser] WS error (service=${ws.data.service}):`, error)
+    },
   },
   idleTimeout: 120,
 }

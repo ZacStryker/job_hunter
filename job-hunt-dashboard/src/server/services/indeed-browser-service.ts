@@ -44,7 +44,7 @@ export async function createSession(userId: number): Promise<string> {
 
     sessions.set(sessionId, { userId, browser, context, page, ws: null, timeout, screenshotInterval: null })
 
-    await page.goto('https://www.indeed.com')
+    await page.goto('https://www.indeed.com', { waitUntil: 'commit' })
 
     return sessionId
   } catch (err) {
@@ -110,11 +110,13 @@ export async function attachWebSocket(ws: ServerWebSocket<WsData>): Promise<void
   try {
     const buf = await session.page.screenshot({ type: 'png' })
     ws.send(buf)
-  } catch { }
+  } catch (err) { console.error('[indeed-browser] initial screenshot error:', err) }
   session.screenshotInterval = setInterval(() => {
     session.page.screenshot({ type: 'png' })
-      .then((buf) => { if (session.ws?.readyState === 1) session.ws.send(buf) })
-      .catch(() => { })
+      .then((buf) => {
+        if (session.ws?.readyState === 1) session.ws.send(buf)
+      })
+      .catch((err) => { console.error('[indeed-browser] interval screenshot error:', err) })
   }, 200)
 }
 
@@ -128,6 +130,7 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, message: string
     if (msg.type === 'save') {
       await handleSave(ws.data.sessionId, ws)
     } else if (msg.type === 'click' && msg.x !== undefined && msg.y !== undefined) {
+      await session.page.mouse.move(msg.x, msg.y)
       await session.page.mouse.click(msg.x, msg.y)
     } else if (msg.type === 'keydown' && msg.key) {
       await session.page.keyboard.press(msg.key)
