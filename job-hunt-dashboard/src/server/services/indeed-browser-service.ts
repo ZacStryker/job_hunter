@@ -38,6 +38,9 @@ export async function createSession(userId: number): Promise<string> {
       locale: 'en-US',
       timezoneId: 'America/New_York',
     })
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined })
+    })
     const page = await context.newPage()
 
     const timeout = setTimeout(() => { void closeSession(sessionId, 'timeout') }, 5 * 60 * 1000)
