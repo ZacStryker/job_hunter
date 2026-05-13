@@ -18,7 +18,11 @@ export async function searchIndeed({ query, location = 'remote', maxResults = 25
       ).catch(() => {});
 
       const hasResults = await page.waitForSelector('a[data-jk]', { timeout: 15000 }).catch(() => null);
-      if (!hasResults) return [];
+      if (!hasResults) {
+        const title = await page.title();
+        console.warn(`[indeed] no a[data-jk] found — page title: "${title}" url: ${url}`);
+        return [];
+      }
       await page.waitForTimeout(1000 + Math.random() * 1500);
 
       const jobs = await page.evaluate((max) => {
