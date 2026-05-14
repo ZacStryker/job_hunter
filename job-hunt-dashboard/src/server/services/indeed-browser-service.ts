@@ -31,12 +31,28 @@ export async function createSession(userId: number): Promise<string> {
   }
 
   const sessionId = crypto.randomUUID()
-  const browser = await chromium.launch({ headless: false })
+  const browser = await chromium.launch({
+    headless: false,
+    args: ['--disable-blink-features=AutomationControlled'],
+  })
   try {
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
       locale: 'en-US',
       timezoneId: 'America/New_York',
+    })
+    await context.addInitScript(() => {
+      // Spoof WebGL renderer — SwiftShader (no-GPU server default) is a known Cloudflare signal
+      const patchWebGL = (ctor: typeof WebGLRenderingContext) => {
+        const orig = ctor.prototype.getParameter
+        ctor.prototype.getParameter = function (p: number) {
+          if (p === 37445) return 'Intel Inc.'
+          if (p === 37446) return 'Intel Iris OpenGL Engine'
+          return orig.call(this, p)
+        }
+      }
+      patchWebGL(WebGLRenderingContext)
+      if (typeof WebGL2RenderingContext !== 'undefined') patchWebGL(WebGL2RenderingContext)
     })
     const page = await context.newPage()
 
