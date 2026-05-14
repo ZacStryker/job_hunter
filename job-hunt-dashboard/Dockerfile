@@ -41,6 +41,7 @@ ENV NODE_ENV=production
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN bunx playwright install --with-deps chromium firefox
 RUN cd scraper && bunx playwright install --with-deps firefox
+RUN bunx patchright install chromium
 
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh

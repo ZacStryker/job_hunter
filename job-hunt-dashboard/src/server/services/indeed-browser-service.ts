@@ -1,5 +1,5 @@
-import { firefox } from 'playwright'
-import type { Browser, BrowserContext, Page } from 'playwright'
+import { chromium } from 'patchright'
+import type { Browser, BrowserContext, Page } from 'patchright'
 import type { ServerWebSocket } from 'bun'
 import { db } from '../../db/client'
 import { userSecrets } from '../../db/schema'
@@ -31,15 +31,12 @@ export async function createSession(userId: number): Promise<string> {
   }
 
   const sessionId = crypto.randomUUID()
-  const browser = await firefox.launch({ headless: false })
+  const browser = await chromium.launch({ headless: false })
   try {
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
       locale: 'en-US',
       timezoneId: 'America/New_York',
-    })
-    await context.addInitScript(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined })
     })
     const page = await context.newPage()
 
@@ -136,21 +133,11 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, message: string
       await session.page.mouse.move(msg.x, msg.y)
       await session.page.mouse.click(msg.x, msg.y)
     } else if (msg.type === 'solve-challenge') {
-      console.log('[indeed-browser] solve-challenge — page url:', session.page.url())
-      const html = await session.page.content()
-      console.log('[indeed-browser] main frame HTML (first 3000):', html.slice(0, 3000))
-      const canvasCount = await session.page.locator('canvas').count()
-      console.log('[indeed-browser] canvas elements in main frame:', canvasCount)
-      if (canvasCount > 0) {
-        const box = await session.page.locator('canvas').first().boundingBox()
-        console.log('[indeed-browser] canvas bounds:', box)
-        if (box) {
-          await session.page.mouse.click(box.x + box.width * 0.15, box.y + box.height * 0.5)
-          console.log('[indeed-browser] clicked canvas at checkbox position')
-        }
-      } else {
-        await session.page.locator('input[type="checkbox"], [role="checkbox"]').first().click({ timeout: 2000 })
-          .catch((err) => { console.log('[indeed-browser] main frame click failed:', err) })
+      const cfFrame = session.page.frames().find(f => f.url().includes('challenges.cloudflare.com'))
+      if (cfFrame) {
+        await cfFrame.locator('input').first().click({ timeout: 3000 })
+          .catch(() => cfFrame.locator('[role="checkbox"]').first().click({ timeout: 3000 }))
+          .catch(() => { })
       }
     } else if (msg.type === 'keydown' && msg.key) {
       await session.page.keyboard.press(msg.key)
