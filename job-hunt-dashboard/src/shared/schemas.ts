@@ -210,6 +210,12 @@ export type SearchConfig = z.infer<typeof searchConfigSchema>
 export type SearchConfigInput = z.infer<typeof searchConfigInputSchema>
 export type ScraperSource = z.infer<typeof scraperSourceSchema>
 
+export const sourceSettingSchema = z.object({
+  source: scraperSourceSchema,
+  enabled: z.boolean(),
+})
+export type SourceSetting = z.infer<typeof sourceSettingSchema>
+
 export const PROMPT_FLOWS = ['analysis', 'cover_letter', 'resume'] as const
 export const promptFlowSchema = z.enum(PROMPT_FLOWS)
 export const promptSchema = z.object({

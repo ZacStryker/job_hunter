@@ -162,6 +162,11 @@ export const userSecrets = sqliteTable('user_secrets', {
   primaryKey({ columns: [table.userId, table.keyName] }),
 ])
 
+export const sourceSettings = sqliteTable('source_settings', {
+  source: text('source').primaryKey(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+})
+
 export const sessions = sqliteTable('sessions', {
   id: text('id').primaryKey(),         // 32-byte hex string; NOT autoincrement
   userId: integer('user_id').notNull().references(() => users.id),

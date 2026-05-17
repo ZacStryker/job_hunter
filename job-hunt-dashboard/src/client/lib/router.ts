@@ -15,6 +15,7 @@ import { fetchPrompts } from '../hooks/usePromptsQuery'
 import { MatchesRoute } from '../routes/matches'
 import { ConfigRoute } from '../routes/config'
 import { fetchSearchConfigs } from '../hooks/useSearchConfigsQuery'
+import { fetchSourceSettings } from '../hooks/useSourceSettingsQuery'
 import { fetchSession } from '../hooks/useSessionQuery'
 import { LoginRoute } from '../routes/login'
 import { RegisterRoute } from '../routes/register'
@@ -171,6 +172,7 @@ const configRoute = createRoute({
     queryClient.ensureQueryData({ queryKey: ['profile'], queryFn: fetchProfile }),
     queryClient.ensureQueryData({ queryKey: ['prompts'], queryFn: fetchPrompts }),
     queryClient.ensureQueryData({ queryKey: ['search-configs'], queryFn: fetchSearchConfigs }),
+    queryClient.ensureQueryData({ queryKey: ['source-settings'], queryFn: fetchSourceSettings }),
   ]),
 })
 
@@ -185,6 +187,7 @@ const adminUsersRoute = createRoute({
   loader: () => Promise.all([
     queryClient.ensureQueryData({ queryKey: ['admin-users'], queryFn: fetchAdminUsers }),
     queryClient.ensureQueryData({ queryKey: ['admin-invite-keys'], queryFn: fetchInviteKeys }).catch(() => []),
+    queryClient.ensureQueryData({ queryKey: ['source-settings'], queryFn: fetchSourceSettings }),
   ]),
 })
 

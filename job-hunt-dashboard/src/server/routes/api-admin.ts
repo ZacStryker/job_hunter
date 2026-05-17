@@ -4,7 +4,8 @@ import { asc, desc, eq, inArray } from 'drizzle-orm'
 import { getCookie } from 'hono/cookie'
 import { randomBytes } from 'node:crypto'
 import { db } from '../../db/client'
-import { users, sessions, inviteKeys, jobs, coverLetters, statusEvents, messages, searchConfigs, userSecrets } from '../../db/schema'
+import { users, sessions, inviteKeys, jobs, coverLetters, statusEvents, messages, searchConfigs, userSecrets, sourceSettings } from '../../db/schema'
+import { scraperSourceSchema } from '../../shared/schemas'
 import type { AppEnv } from '../types'
 
 const app = new Hono<AppEnv>()
@@ -227,6 +228,36 @@ app.delete('/invite-keys/:id', (c) => {
   if (outcome.notFound) return c.json({ error: 'Invite key not found' }, 404)
   if (outcome.alreadyUsed) return c.json({ error: 'Cannot revoke a used invite key' }, 409)
   return c.body(null, 204)
+})
+
+const toggleSourceSchema = z.object({ enabled: z.boolean() })
+
+app.get('/source-settings', (c) => {
+  const rows = db.select().from(sourceSettings).all()
+  return c.json(rows)
+})
+
+app.patch('/source-settings/:source', async (c) => {
+  const sourceParam = c.req.param('source')
+  const parsed = scraperSourceSchema.safeParse(sourceParam)
+  if (!parsed.success) return c.json({ error: 'Invalid source' }, 400)
+
+  let body: unknown
+  try { body = await c.req.json() } catch { return c.json({ error: 'Invalid JSON body' }, 400) }
+
+  const bodyParsed = toggleSourceSchema.safeParse(body)
+  if (!bodyParsed.success) return c.json({ error: bodyParsed.error.issues[0]?.message ?? 'Invalid body' }, 400)
+
+  const { enabled } = bodyParsed.data
+  const result = db
+    .insert(sourceSettings)
+    .values({ source: parsed.data, enabled })
+    .onConflictDoUpdate({ target: sourceSettings.source, set: { enabled } })
+    .returning()
+    .get()
+
+  if (!result) return c.json({ error: 'Not found' }, 404)
+  return c.json(result)
 })
 
 export default app

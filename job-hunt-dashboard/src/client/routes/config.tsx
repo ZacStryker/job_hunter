@@ -15,6 +15,8 @@ import { useProfileQuery } from '@/hooks/useProfileQuery'
 import { usePromptsQuery } from '@/hooks/usePromptsQuery'
 import { useSearchConfigsQuery } from '@/hooks/useSearchConfigsQuery'
 import { useAddSearchConfigMutation, useDeleteSearchConfigMutation, useUpdateSearchConfigMutation } from '@/hooks/useSearchConfigMutations'
+import { useSourceSettingsQuery } from '@/hooks/useSourceSettingsQuery'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { SCRAPER_SOURCES } from '@shared/schemas'
 import type { PromptFlow, ScraperSource } from '@shared/schemas'
 
@@ -290,9 +292,13 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 
 function SearchConfigCard() {
   const { data: configs = [], isPending } = useSearchConfigsQuery()
+  const { data: sourceSettingsList = [], isLoading: sourceSettingsLoading } = useSourceSettingsQuery()
   const addMutation = useAddSearchConfigMutation()
   const updateMutation = useUpdateSearchConfigMutation()
   const deleteMutation = useDeleteSearchConfigMutation()
+
+  const enabledSources = new Set(sourceSettingsList.filter((s) => s.enabled).map((s) => s.source))
+  const addableSources = SCRAPER_SOURCES.filter((s) => enabledSources.has(s))
 
   const [source, setSource] = useState<ScraperSource>('linkedin')
   const [query, setQuery] = useState('')
@@ -367,12 +373,16 @@ function SearchConfigCard() {
           <select
             id="sc-source"
             className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100"
-            value={source}
+            value={addableSources.includes(source) ? source : (addableSources[0] ?? source)}
             onChange={(e) => setSource(e.target.value as ScraperSource)}
+            disabled={addableSources.length === 0 || sourceSettingsLoading}
           >
-            {SCRAPER_SOURCES.map((s) => (
+            {addableSources.map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
+            {addableSources.length === 0 && (
+              <option value="" disabled>No sources available</option>
+            )}
           </select>
         </div>
         <div className="flex flex-col gap-1">
@@ -400,7 +410,7 @@ function SearchConfigCard() {
         <button
           type="submit"
           className="px-3 py-1 rounded bg-zinc-700 text-zinc-100 text-sm hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!query.trim() || addMutation.isPending}
+          disabled={!query.trim() || addMutation.isPending || addableSources.length === 0 || sourceSettingsLoading}
         >
           Add
         </button>
@@ -440,8 +450,8 @@ function SearchConfigCard() {
                       value={editSource}
                       onChange={(e) => setEditSource(e.target.value as ScraperSource)}
                     >
-                      {SCRAPER_SOURCES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
+                      {SCRAPER_SOURCES.filter((s) => enabledSources.has(s) || s === row.source).map((s) => (
+                        <option key={s} value={s}>{s}{!enabledSources.has(s) ? ' (disabled)' : ''}</option>
                       ))}
                     </select>
                   </TableCell>
@@ -483,7 +493,24 @@ function SearchConfigCard() {
                 </TableRow>
               ) : (
                 <TableRow key={row.id} className="border-zinc-800">
-                  <TableCell className="px-3 py-2 text-zinc-300">{row.source}</TableCell>
+                  <TableCell className="px-3 py-2 text-zinc-300">
+                    <span className="inline-flex items-center gap-1">
+                      {row.source}
+                      {sourceSettingsList.length > 0 && !enabledSources.has(row.source) && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                aria-label="Disabled by Admin"
+                                className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-xs font-bold leading-none cursor-default"
+                              >!</span>
+                            </TooltipTrigger>
+                            <TooltipContent>Disabled by Admin</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell className="px-3 py-2 text-zinc-300">{row.query}</TableCell>
                   <TableCell className="px-3 py-2 text-zinc-300">
                     {row.location ?? <span className="text-zinc-600">—</span>}

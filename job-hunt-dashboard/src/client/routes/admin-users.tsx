@@ -18,10 +18,12 @@ import { useInviteKeysQuery } from '@/hooks/useInviteKeysQuery'
 import { useGenerateInviteKeyMutation } from '@/hooks/useGenerateInviteKeyMutation'
 import { useRevokeInviteKeyMutation } from '@/hooks/useRevokeInviteKeyMutation'
 import { useDeleteAdminUserMutation } from '@/hooks/useDeleteAdminUserMutation'
+import { useSourceSettingsQuery } from '@/hooks/useSourceSettingsQuery'
+import { useToggleSourceMutation } from '@/hooks/useToggleSourceMutation'
 import { UserEditDrawer } from '@/components/admin/UserEditDrawer'
 import { apiFetch } from '@/lib/api'
 import { toast } from 'sonner'
-import type { AdminUser, InviteKey } from '@shared/schemas'
+import type { AdminUser, InviteKey, ScraperSource } from '@shared/schemas'
 
 type DialogState =
   | { type: 'reset-pw'; user: AdminUser }
@@ -46,6 +48,9 @@ export function AdminUsersRoute() {
   const revokeMutation = useRevokeInviteKeyMutation()
   const deleteMutation = useDeleteAdminUserMutation()
   const [copiedKeyId, setCopiedKeyId] = useState<number | null>(null)
+
+  const { data: sourceSettingsList = [], isLoading: sourceSettingsLoading } = useSourceSettingsQuery()
+  const toggleSourceMutation = useToggleSourceMutation()
 
   function openEditDrawer(user: AdminUser) {
     setDrawerUser(user)
@@ -125,6 +130,14 @@ export function AdminUsersRoute() {
       toast('User deleted')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to delete user')
+    }
+  }
+
+  async function handleToggleSource(source: ScraperSource, enabled: boolean) {
+    try {
+      await toggleSourceMutation.mutateAsync({ source, enabled })
+    } catch {
+      toast.error('Failed to update source')
     }
   }
 
@@ -292,6 +305,47 @@ export function AdminUsersRoute() {
                   </td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Source Settings section */}
+      <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+          <h2 className="text-sm font-medium text-zinc-100">Discovery Source Settings</h2>
+        </div>
+        {sourceSettingsLoading ? (
+          <div className="px-4 py-6 text-zinc-400 text-sm">Loading…</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-zinc-800 text-zinc-400 text-xs">
+                <th className="text-left px-4 py-3 font-medium">Source</th>
+                <th className="text-left px-4 py-3 font-medium">Enabled</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sourceSettingsList.map((setting) => (
+                <tr key={setting.source} className="border-b border-zinc-800/50">
+                  <td className="px-4 py-3 text-zinc-100 font-mono text-xs">{setting.source}</td>
+                  <td className="px-4 py-3">
+                    <Switch
+                      checked={setting.enabled}
+                      onCheckedChange={(checked) => handleToggleSource(setting.source as ScraperSource, checked)}
+                      disabled={toggleSourceMutation.isPending}
+                      aria-label={`${setting.enabled ? 'Disable' : 'Enable'} ${setting.source}`}
+                    />
+                  </td>
+                </tr>
+              ))}
+              {sourceSettingsList.length === 0 && (
+                <tr>
+                  <td colSpan={2} className="px-4 py-6 text-center text-zinc-500 text-sm">
+                    No source settings found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         )}

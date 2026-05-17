@@ -71,10 +71,19 @@ const CREATE_USER_SECRETS_TABLE = `
   )
 `
 
+const CREATE_SOURCE_SETTINGS_TABLE = `
+  CREATE TABLE IF NOT EXISTS source_settings (
+    source TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 1
+  )
+`
+
 beforeAll(() => {
   prodSqlite.run(CREATE_JOBS_TABLE)
   prodSqlite.run(CREATE_SEARCH_CONFIGS_TABLE)
   prodSqlite.run(CREATE_USER_SECRETS_TABLE)
+  prodSqlite.run(CREATE_SOURCE_SETTINGS_TABLE)
+  prodSqlite.run(`INSERT OR IGNORE INTO source_settings (source, enabled) VALUES ('linkedin',1),('indeed',1),('indeed_nl',1),('arc',1)`)
   prodSqlite.run(`INSERT INTO search_configs (source, query, enabled) VALUES ('linkedin', 'genai python', 1)`)
   process.env.SCRAPER_URL = 'http://test-scraper.invalid'
   process.env.SCRAPER_TOKEN = 'test-token'

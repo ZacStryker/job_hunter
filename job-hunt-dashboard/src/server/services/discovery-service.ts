@@ -1,6 +1,6 @@
 import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import { db } from '../../db/client'
-import { jobs, searchConfigs, userSecrets } from '../../db/schema'
+import { jobs, searchConfigs, userSecrets, sourceSettings } from '../../db/schema'
 import { decrypt, encrypt } from '../lib/crypto'
 import type { ScraperSource } from '../../shared/schemas'
 
@@ -24,12 +24,21 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
   const _debugStart = Date.now()
   console.log(`[DISCOVERY] start — userId=${userId ?? 'none'} scraperUrl=${scraperUrl}`)
 
+  const globallyEnabledSources = new Set(
+    db.select({ source: sourceSettings.source })
+      .from(sourceSettings)
+      .where(eq(sourceSettings.enabled, true))
+      .all()
+      .map((r) => r.source)
+  )
+
   const searches = db.select().from(searchConfigs)
     .where(and(
       eq(searchConfigs.enabled, true),
       userId !== undefined ? eq(searchConfigs.userId, userId) : sql`1=1`,
     ))
     .all()
+    .filter((s) => globallyEnabledSources.has(s.source))
 
   console.log(`[DISCOVERY] ${searches.length} enabled search config(s): ${searches.map((s) => `${s.source}:"${s.query}"`).join(', ') || '(none)'}`)
 

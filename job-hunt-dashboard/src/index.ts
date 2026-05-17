@@ -17,6 +17,7 @@ import statsRoute from './server/routes/api-stats'
 import profileRoute from './server/routes/api-profile'
 import promptsRoute from './server/routes/api-prompts'
 import searchConfigsRoute from './server/routes/api-search-configs'
+import sourceSettingsRoute from './server/routes/api-source-settings'
 import { errorHandler } from './server/middleware/error-handler'
 import { authMiddleware } from './server/middleware/auth-middleware'
 import { adminMiddleware } from './server/middleware/admin-middleware'
@@ -99,6 +100,7 @@ app.route('/api/stats', statsRoute)
 app.route('/api/profile', profileRoute)
 app.route('/api/prompts', promptsRoute)
 app.route('/api/search-configs', searchConfigsRoute)
+app.route('/api/source-settings', sourceSettingsRoute)
 app.route('/api/onboarding/linkedin/browser', linkedInBrowserRoute)
 app.route('/api/onboarding/indeed/browser', indeedBrowserRoute)
 app.route('/api/onboarding', onboardingRoute)
