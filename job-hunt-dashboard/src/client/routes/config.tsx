@@ -6,8 +6,6 @@ import { Button } from '@/components/ui/button'
 import { useQueryClient } from '@tanstack/react-query'
 import { useLinkedinBrowserSession } from '@/hooks/useLinkedinBrowserSession'
 import { LinkedInBrowserModal } from '@/components/linkedin/LinkedInBrowserModal'
-import { useIndeedBrowserSession } from '@/hooks/useIndeedBrowserSession'
-import { IndeedBrowserModal } from '@/components/indeed/IndeedBrowserModal'
 import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useWebhookRunsQuery } from '@/hooks/useWebhookRunsQuery'
@@ -27,11 +25,7 @@ function ConnectionsCard() {
   const { status: sessionStatus, error, startSession, sendClick, sendKey, sendCancel, onFrameRef } = useLinkedinBrowserSession()
   const [modalOpen, setModalOpen] = useState(false)
 
-  const { status: indeedSessionStatus, error: indeedError, startSession: startIndeedSession, saveSession, sendClick: sendIndeedClick, sendKey: sendIndeedKey, sendCancel: sendIndeedCancel, solveChallenge: solveIndeedChallenge, onFrameRef: indeedOnFrameRef } = useIndeedBrowserSession()
-  const [indeedModalOpen, setIndeedModalOpen] = useState(false)
-
   const isLinkedinConnected = status?.hasLinkedinAuth ?? false
-  const isIndeedConnected = status?.hasIndeedAuth ?? false
 
   useEffect(() => {
     if (sessionStatus === 'captured' && modalOpen) {
@@ -43,16 +37,6 @@ function ConnectionsCard() {
     }
   }, [sessionStatus, modalOpen, queryClient])
 
-  useEffect(() => {
-    if (indeedSessionStatus === 'captured' && indeedModalOpen) {
-      setIndeedModalOpen(false)
-      toast.success('Indeed connected')
-      queryClient.invalidateQueries({ queryKey: ['onboarding-status'] })
-    } else if ((indeedSessionStatus === 'timeout' || indeedSessionStatus === 'error') && indeedModalOpen) {
-      setIndeedModalOpen(false)
-    }
-  }, [indeedSessionStatus, indeedModalOpen, queryClient])
-
   function handleConnect() {
     startSession()
     setModalOpen(true)
@@ -60,15 +44,6 @@ function ConnectionsCard() {
 
   function handleModalClose() {
     setModalOpen(false)
-  }
-
-  function handleIndeedConnect() {
-    startIndeedSession()
-    setIndeedModalOpen(true)
-  }
-
-  function handleIndeedModalClose() {
-    setIndeedModalOpen(false)
   }
 
   return (
@@ -86,27 +61,9 @@ function ConnectionsCard() {
         </Button>
       </div>
 
-      <div className="flex items-center justify-between mt-3">
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-zinc-300">Indeed</span>
-          <span className={`text-xs ${isIndeedConnected ? 'text-emerald-500' : 'text-zinc-500'}`}>
-            {isIndeedConnected ? 'Connected' : 'Not connected'}
-          </span>
-        </div>
-        <Button size="sm" disabled={indeedModalOpen} onClick={handleIndeedConnect}>
-          Connect Indeed
-        </Button>
-      </div>
-
       {(sessionStatus === 'error' || sessionStatus === 'timeout') && error && (
         <Alert variant="destructive" className="mt-3">
           <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {(indeedSessionStatus === 'error' || indeedSessionStatus === 'timeout') && indeedError && (
-        <Alert variant="destructive" className="mt-3">
-          <AlertDescription>{indeedError}</AlertDescription>
         </Alert>
       )}
 
@@ -118,18 +75,6 @@ function ConnectionsCard() {
         sendKey={sendKey}
         sendCancel={sendCancel}
         onFrameRef={onFrameRef}
-      />
-
-      <IndeedBrowserModal
-        open={indeedModalOpen}
-        onClose={handleIndeedModalClose}
-        status={indeedSessionStatus}
-        saveSession={saveSession}
-        sendClick={sendIndeedClick}
-        sendKey={sendIndeedKey}
-        sendCancel={sendIndeedCancel}
-        solveChallenge={solveIndeedChallenge}
-        onFrameRef={indeedOnFrameRef}
       />
     </div>
   )
