@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-05-18 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1 done; story 35.2 done; story 35.3 done
+last_updated: 2026-05-18 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1 done; story 35.2 done; story 35.3 done; story 35.4 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -241,6 +241,7 @@ development_status:
   35-1-config-layout-shell-router-restructure-overview: done
   35-2-profile-section-overview-and-resume-subpage: done
   35-3-profile-api-keys-and-inbox-mapping-subpages: done
+  35-4-job-sources-section-overview-auth-setup-and-searches: done
 
   # Epic 36: Arc Listing Description Scraper
   epic-36: in-progress

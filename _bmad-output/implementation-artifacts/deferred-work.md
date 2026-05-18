@@ -663,3 +663,14 @@ If none of `.job_seen_beacon`, `td.resultContent` match, card=null → company=n
 ## Deferred from: code review of 35-2-profile-section-overview-and-resume-subpage (2026-05-18)
 
 - **No unsaved-changes guard when navigating away mid-edit** — `ProfileResumeRoute` holds `isEditing` + `draft` in local state with no `beforeUnload` or router navigation guard; unsaved edits are silently lost when the user clicks the sidebar or top nav. Pre-existing pattern from `profile.tsx`. [`profile-resume.tsx`]
+
+## Deferred from: code review of 35-4-job-sources-section-overview-auth-setup-and-searches (2026-05-18)
+
+- **Second session can start if modal closes while session is running** — button is only gated on `modalOpen`; if user dismisses modal via ESC/backdrop while session is active, button re-enables and `startSession()` can be called again. Pre-existing from `ConnectionsCard`. [`job-sources-auth-setup.tsx:29-31, 49`]
+- **`handleModalClose` doesn't call `sendCancel`** — closing the modal via the X or ESC leaves the underlying browser session running on the server. Pre-existing from `ConnectionsCard`. [`job-sources-auth-setup.tsx:36-38`]
+- **`source` state diverges from `addableSources`** — select rendered value is corrected on screen but internal `source` state is not synced; submit fires with the initialised `'linkedin'` value if it's not in `addableSources`. Pre-existing from `SearchConfigCard`. [`job-sources-searches.tsx:32, 103`]
+- **`deleteMutation.reset()` not called before new deletes** — if a delete fails, the error banner persists for subsequent delete attempts. Pre-existing from `SearchConfigCard`. [`job-sources-searches.tsx`]
+- **Edit select allows submitting original source even when disabled** — rows created with a now-disabled source show it as selectable in inline edit with "(disabled)" label; saving will likely fail server-side. Pre-existing from `SearchConfigCard`. [`job-sources-searches.tsx:180`]
+- **`[...configs].sort()` creates new array every render** — breaks row memoisation for large config lists; sort comparator also type-assumes string for all columns. Pre-existing from `SearchConfigCard`. [`job-sources-searches.tsx:88-91`]
+- **`Promise.all` in route loaders swallows individual query errors** — a single failing query aborts the entire loader; project-wide pattern across all config routes. [`router.ts:212-215, 229-232`]
+- **Raw `<table>` wraps ShadCN `TableHeader`/`TableBody` without `<Table>` root** — missing the ShadCN `Table` scroll container; can cause layout issues on narrow viewports. Pre-existing from `SearchConfigCard`. [`job-sources-searches.tsx:153`]

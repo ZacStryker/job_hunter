@@ -31,6 +31,8 @@ import { ProfileResumeRoute } from '../routes/config/profile-resume'
 import { ProfileApiKeysRoute } from '../routes/config/profile-api-keys'
 import { ProfileInboxMappingRoute } from '../routes/config/profile-inbox-mapping'
 import { fetchInboxMappings } from '../hooks/useInboxMappingsQuery'
+import { JobSourcesAuthSetupRoute } from '../routes/config/job-sources-auth-setup'
+import { JobSourcesSearchesRoute } from '../routes/config/job-sources-searches'
 import type { OnboardingStatusResponse, SessionResponse } from '@shared/schemas'
 
 const rootRoute = createRootRoute({
@@ -207,6 +209,27 @@ const configJobSourcesRoute = createRoute({
   getParentRoute: () => configLayoutRoute,
   path: '/config/job-sources',
   component: ConfigJobSourcesIndexRoute,
+  loader: () => Promise.all([
+    queryClient.ensureQueryData({ queryKey: ['onboarding-status'], queryFn: fetchOnboardingStatus }),
+    queryClient.ensureQueryData({ queryKey: ['search-configs'], queryFn: fetchSearchConfigs }),
+  ]),
+})
+
+const configJobSourcesAuthSetupRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/job-sources/auth-setup',
+  component: JobSourcesAuthSetupRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['onboarding-status'], queryFn: fetchOnboardingStatus }),
+})
+
+const configJobSourcesSearchesRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/job-sources/searches',
+  component: JobSourcesSearchesRoute,
+  loader: () => Promise.all([
+    queryClient.ensureQueryData({ queryKey: ['search-configs'], queryFn: fetchSearchConfigs }),
+    queryClient.ensureQueryData({ queryKey: ['source-settings'], queryFn: fetchSourceSettings }),
+  ]),
 })
 
 const configPromptsRoute = createRoute({
@@ -256,6 +279,8 @@ const routeTree = rootRoute.addChildren([
       configProfileApiKeysRoute,
       configProfileInboxMappingRoute,
       configJobSourcesRoute,
+      configJobSourcesAuthSetupRoute,
+      configJobSourcesSearchesRoute,
       configPromptsRoute,
       configLogsRoute,
     ]),
