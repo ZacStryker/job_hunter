@@ -96,4 +96,9 @@ Webhook-triggered discovery runs are recorded correctly in the database. The `in
 **Source:** Scraper Bot Detection & Reliability Investigation Report, 2026-05-08
 **Priority:** Currently broken in production — fix immediately
 
+## Epic 35: Config Section Navigation Refactor
+User can navigate the Config section through a persistent left nav (Profile, Job Sources, Prompts, Logs). Each section has an overview page with status-badged tiles that drill into subpages. Flat `/config`, standalone `/profile`, `/prompts`, and `/logs` routes are replaced by a `/config/*` hierarchy.
+**Source:** User request 2026-05-18
+**Priority:** Medium — UX improvement; Story 35.3 adds new inbox folder mapping DB table
+
 ---
