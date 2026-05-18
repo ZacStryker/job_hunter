@@ -33,6 +33,9 @@ import { ProfileInboxMappingRoute } from '../routes/config/profile-inbox-mapping
 import { fetchInboxMappings } from '../hooks/useInboxMappingsQuery'
 import { JobSourcesAuthSetupRoute } from '../routes/config/job-sources-auth-setup'
 import { JobSourcesSearchesRoute } from '../routes/config/job-sources-searches'
+import { PromptsAnalysisRoute } from '../routes/config/prompts-analysis'
+import { PromptsCoverLetterRoute } from '../routes/config/prompts-cover-letter'
+import { PromptsResumeRoute } from '../routes/config/prompts-resume'
 import type { OnboardingStatusResponse, SessionResponse } from '@shared/schemas'
 
 const rootRoute = createRootRoute({
@@ -236,6 +239,28 @@ const configPromptsRoute = createRoute({
   getParentRoute: () => configLayoutRoute,
   path: '/config/prompts',
   component: ConfigPromptsIndexRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['prompts'], queryFn: fetchPrompts }),
+})
+
+const configPromptsAnalysisRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/prompts/analysis',
+  component: PromptsAnalysisRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['prompts'], queryFn: fetchPrompts }),
+})
+
+const configPromptsCoverLetterRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/prompts/cover-letter',
+  component: PromptsCoverLetterRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['prompts'], queryFn: fetchPrompts }),
+})
+
+const configPromptsResumeRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/prompts/resume',
+  component: PromptsResumeRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['prompts'], queryFn: fetchPrompts }),
 })
 
 const configLogsRoute = createRoute({
@@ -282,6 +307,9 @@ const routeTree = rootRoute.addChildren([
       configJobSourcesAuthSetupRoute,
       configJobSourcesSearchesRoute,
       configPromptsRoute,
+      configPromptsAnalysisRoute,
+      configPromptsCoverLetterRoute,
+      configPromptsResumeRoute,
       configLogsRoute,
     ]),
   ]),

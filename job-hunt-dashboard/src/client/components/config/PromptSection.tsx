@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { usePromptsQuery } from '@/hooks/usePromptsQuery'
 import { usePromptMutation } from '@/hooks/usePromptMutation'
 import { usePromptResetMutation } from '@/hooks/usePromptResetMutation'
 import type { Prompt, PromptFlow } from '@shared/schemas'
@@ -18,13 +17,14 @@ const SYSTEM_PROMPT_PLACEHOLDERS: Record<PromptFlow, string | null> = {
   cover_letter: '{{CANDIDATE_PROFILE}}',
   resume: '{{CANDIDATE_PROFILE}}  (HTML template appended automatically)',
 }
+
 const USER_MESSAGE_PLACEHOLDERS: Record<PromptFlow, string> = {
   analysis: '{{CANDIDATE_NAME}}, {{CANDIDATE_PROFILE_JSON}}, {{JOB_LISTING_JSON}}',
   cover_letter: '{{JOB_DETAILS}}',
   resume: '{{JOB_DETAILS}}',
 }
 
-function PromptSection({ prompt }: { prompt: Prompt }) {
+export function PromptSection({ prompt }: { prompt: Prompt }) {
   const [isEditing, setIsEditing] = useState(false)
   const [draftSystem, setDraftSystem] = useState('')
   const [draftUser, setDraftUser] = useState('')
@@ -132,21 +132,5 @@ function PromptSection({ prompt }: { prompt: Prompt }) {
         </div>
       </div>
     </section>
-  )
-}
-
-export function PromptsRoute() {
-  const { data, isLoading, isError } = usePromptsQuery()
-
-  if (isLoading) return <div className="max-w-3xl mx-auto p-6 text-zinc-400">Loading…</div>
-  if (isError) return <div className="max-w-3xl mx-auto p-6 text-red-400">Failed to load prompts.</div>
-
-  return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-semibold text-zinc-100">Prompts</h1>
-      {data?.map((prompt) => (
-        <PromptSection key={prompt.flow} prompt={prompt} />
-      ))}
-    </div>
   )
 }

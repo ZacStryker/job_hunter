@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: code review of 35-5-prompts-section-overview-and-per-flow-subpages (2026-05-18)
+
+- Reset error never shown to user — `resetMutation.isError` has no error display in `PromptSection`; carried verbatim from pre-existing `prompts.tsx`. [`PromptSection.tsx`]
+- Concurrent mutation collision traps UI — if reset fails silently, `isBusy` returns to false but user has no visible recovery path or error feedback. [`PromptSection.tsx`]
+
 ## Deferred from: code review of 35-3-profile-api-keys-and-inbox-mapping-subpages (2026-05-18)
 
 - No array size cap (`.max()`) on `inboxFolderMappingInputSchema` — unbounded bulk insert in PUT endpoint. [`api-config-inbox-mappings.ts`, `shared/schemas.ts`]
