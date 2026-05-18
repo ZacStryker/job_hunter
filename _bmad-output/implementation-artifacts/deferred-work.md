@@ -1,5 +1,13 @@
 # Deferred Work
 
+## Deferred from: code review of 35-3-profile-api-keys-and-inbox-mapping-subpages (2026-05-18)
+
+- No array size cap (`.max()`) on `inboxFolderMappingInputSchema` — unbounded bulk insert in PUT endpoint. [`api-config-inbox-mappings.ts`, `shared/schemas.ts`]
+- No max-length validation on `folderPath` — arbitrarily large strings accepted. [`shared/schemas.ts`]
+- No `DEFAULT` on `created_at` in SQL migration — low risk since server always supplies value, but no schema-level safety net. [`0028_inbox_folder_mappings.sql`]
+- GET response rows not runtime-validated against `inboxFolderMappingSchema` client-side — pre-existing pattern across other routes. [`api-config-inbox-mappings.ts`, `useInboxMappingsQuery.ts`]
+- `key={i}` on folder mapping table rows — controlled inputs make this benign in practice; cleanup when table grows. [`profile-inbox-mapping.tsx`]
+
 ## Deferred from: code review of 34-1-indeed-in-app-browser-auth (2026-05-13)
 
 - Old WS `onclose` fires after rapid reconnect — pre-existing bug in `useLinkedinBrowserSession`, carried forward to `useIndeedBrowserSession`; old socket's `onclose` can overwrite new session's loading status with error. [`useIndeedBrowserSession.ts`]

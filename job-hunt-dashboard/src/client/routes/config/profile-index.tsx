@@ -24,7 +24,7 @@ export function ConfigProfileIndexRoute() {
           </div>
         </Link>
 
-        <div className="border border-zinc-800 rounded-lg p-4 opacity-50 cursor-not-allowed">
+        <Link to="/config/profile/api-keys" className="border border-zinc-800 rounded-lg p-4 block hover:border-zinc-700 transition-colors">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-zinc-200">API Keys</span>
             {apiKeysConfigured
@@ -32,9 +32,9 @@ export function ConfigProfileIndexRoute() {
               : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
             }
           </div>
-        </div>
+        </Link>
 
-        <div className="border border-zinc-800 rounded-lg p-4 opacity-50 cursor-not-allowed">
+        <Link to="/config/profile/inbox-mapping" className="border border-zinc-800 rounded-lg p-4 block hover:border-zinc-700 transition-colors">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-zinc-200">Inbox Mapping</span>
             {inboxConfigured
@@ -42,7 +42,7 @@ export function ConfigProfileIndexRoute() {
               : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
             }
           </div>
-        </div>
+        </Link>
       </div>
     </div>
   )

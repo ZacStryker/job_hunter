@@ -68,6 +68,20 @@ export type CoverLetter = z.infer<typeof coverLetterSchema>
 
 export const MESSAGE_TYPES = ['Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other'] as const
 
+export const inboxFolderMappingSchema = z.object({
+  id: z.number().int(),
+  userId: z.number().int(),
+  folderPath: z.string(),
+  jobStatus: z.enum(MESSAGE_TYPES),
+  createdAt: z.string(),
+})
+export const inboxFolderMappingInputSchema = z.array(z.object({
+  folderPath: z.string().min(1),
+  jobStatus: z.enum(MESSAGE_TYPES),
+}))
+export type InboxFolderMapping = z.infer<typeof inboxFolderMappingSchema>
+export type InboxFolderMappingInput = z.infer<typeof inboxFolderMappingInputSchema>
+
 export const messageSchema = z.object({
   id: z.number().int(),
   uid: z.string(),

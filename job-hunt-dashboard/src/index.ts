@@ -27,6 +27,7 @@ import * as linkedInBrowserService from './server/services/linkedin-browser-serv
 import indeedBrowserRoute from './server/routes/api-indeed-browser'
 import * as indeedBrowserService from './server/services/indeed-browser-service'
 import onboardingRoute from './server/routes/api-onboarding'
+import inboxMappingsRoute from './server/routes/api-config-inbox-mappings'
 import adminRoute from './server/routes/api-admin'
 import type { AppEnv } from './server/types'
 
@@ -104,6 +105,7 @@ app.route('/api/source-settings', sourceSettingsRoute)
 app.route('/api/onboarding/linkedin/browser', linkedInBrowserRoute)
 app.route('/api/onboarding/indeed/browser', indeedBrowserRoute)
 app.route('/api/onboarding', onboardingRoute)
+app.route('/api/config/inbox-mappings', inboxMappingsRoute)
 app.route('/api/admin', adminRoute)
 app.route('/auth', authRoute)
 app.onError(errorHandler)

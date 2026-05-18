@@ -28,6 +28,9 @@ import { ConfigJobSourcesIndexRoute } from '../routes/config/job-sources-index'
 import { ConfigPromptsIndexRoute } from '../routes/config/prompts-index'
 import { ConfigLogsRoute } from '../routes/config/logs'
 import { ProfileResumeRoute } from '../routes/config/profile-resume'
+import { ProfileApiKeysRoute } from '../routes/config/profile-api-keys'
+import { ProfileInboxMappingRoute } from '../routes/config/profile-inbox-mapping'
+import { fetchInboxMappings } from '../hooks/useInboxMappingsQuery'
 import type { OnboardingStatusResponse, SessionResponse } from '@shared/schemas'
 
 const rootRoute = createRootRoute({
@@ -183,6 +186,23 @@ const configProfileResumeRoute = createRoute({
   loader: () => queryClient.ensureQueryData({ queryKey: ['profile'], queryFn: fetchProfile }),
 })
 
+const configProfileApiKeysRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/profile/api-keys',
+  component: ProfileApiKeysRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['onboarding-status'], queryFn: fetchOnboardingStatus }),
+})
+
+const configProfileInboxMappingRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/profile/inbox-mapping',
+  component: ProfileInboxMappingRoute,
+  loader: () => Promise.all([
+    queryClient.ensureQueryData({ queryKey: ['onboarding-status'], queryFn: fetchOnboardingStatus }),
+    queryClient.ensureQueryData({ queryKey: ['inbox-mappings'], queryFn: fetchInboxMappings }),
+  ]),
+})
+
 const configJobSourcesRoute = createRoute({
   getParentRoute: () => configLayoutRoute,
   path: '/config/job-sources',
@@ -233,6 +253,8 @@ const routeTree = rootRoute.addChildren([
       configOverviewRoute,
       configProfileRoute,
       configProfileResumeRoute,
+      configProfileApiKeysRoute,
+      configProfileInboxMappingRoute,
       configJobSourcesRoute,
       configPromptsRoute,
       configLogsRoute,
