@@ -27,6 +27,7 @@ import { ConfigProfileIndexRoute } from '../routes/config/profile-index'
 import { ConfigJobSourcesIndexRoute } from '../routes/config/job-sources-index'
 import { ConfigPromptsIndexRoute } from '../routes/config/prompts-index'
 import { ConfigLogsRoute } from '../routes/config/logs'
+import { fetchWebhookRuns } from '../hooks/useWebhookRunsQuery'
 import { ProfileResumeRoute } from '../routes/config/profile-resume'
 import { ProfileApiKeysRoute } from '../routes/config/profile-api-keys'
 import { ProfileInboxMappingRoute } from '../routes/config/profile-inbox-mapping'
@@ -267,6 +268,7 @@ const configLogsRoute = createRoute({
   getParentRoute: () => configLayoutRoute,
   path: '/config/logs',
   component: ConfigLogsRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['webhook-runs'], queryFn: fetchWebhookRuns }),
 })
 
 const adminUsersRoute = createRoute({

@@ -679,3 +679,15 @@ If none of `.job_seen_beacon`, `td.resultContent` match, card=null → company=n
 - **`[...configs].sort()` creates new array every render** — breaks row memoisation for large config lists; sort comparator also type-assumes string for all columns. Pre-existing from `SearchConfigCard`. [`job-sources-searches.tsx:88-91`]
 - **`Promise.all` in route loaders swallows individual query errors** — a single failing query aborts the entire loader; project-wide pattern across all config routes. [`router.ts:212-215, 229-232`]
 - **Raw `<table>` wraps ShadCN `TableHeader`/`TableBody` without `<Table>` root** — missing the ShadCN `Table` scroll container; can cause layout issues on narrow viewports. Pre-existing from `SearchConfigCard`. [`job-sources-searches.tsx:153`]
+
+## Deferred from: code review of 35-6-logs-section-config-logs (2026-05-18)
+
+- **`parseName` silently produces empty Detail for unrecognized workflow names** — any workflow type not prefixed with "Cover Letter - " or "Resume - " renders a dash in the Detail column with no indication of data loss. Pre-existing from `history.tsx`. [`logs.tsx:26-29`]
+- **`sourceBreakdown` values assumed to be numbers without validation** — `Object.entries(breakdown).filter(([, count]) => count >= 1)` silently coerces non-numeric values. Pre-existing from `history.tsx`. [`logs.tsx:59`]
+- **`queryKey: ['webhook-runs']` duplicated in loader and hook** — if the key is renamed in the hook, the loader silently pre-fetches into a different cache bucket. Systemic project pattern. [`router.ts:271`, `useWebhookRunsQuery.ts:7`]
+- **`onSortingChange` calls `table.setPageIndex(0)` before `setSorting`** — may trigger two renders in edge cases. Pre-existing from `history.tsx`. [`logs.tsx:130-133`]
+- **`getFilteredRowModel()` used for total row count when no filter configured** — semantically impure; `getRowCount()` would be correct. Pre-existing from `history.tsx`. [`logs.tsx:136`]
+- **Raw `<table>` wraps shadcn `TableHeader`/`TableBody` without `<Table>` root** — missing the shadcn scroll container; consistent with `job-sources-searches.tsx` pattern. Pre-existing from `history.tsx`. [`logs.tsx:160`]
+- **Invalid `runAt` string renders "Invalid Date"** — no `isNaN` guard on `new Date(info.getValue()).toLocaleString()`. Pre-existing from `history.tsx`. [`logs.tsx:35`]
+- **Route loader throw renders blank screen** — `configLogsRoute` loader has no `.catch()` and no `errorComponent`; `isError` branch in component never reached if loader throws. Systemic pattern. [`router.ts:268-272`]
+- **Double fetch on navigation — no `staleTime` on `ensureQueryData`** — every navigation triggers a loader fetch + component mount refetch. Systemic across all config route loaders. [`router.ts:271`]
