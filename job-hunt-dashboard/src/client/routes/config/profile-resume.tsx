@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -7,31 +8,15 @@ import { useProfileQuery } from '@/hooks/useProfileQuery'
 import { useProfileMutation } from '@/hooks/useProfileMutation'
 import type { ProfileInput } from '@shared/schemas'
 
-const EMPTY_DRAFT: ProfileInput = {
-  name: '',
-  email: '',
-  phone: '',
-  location: '',
-  linkedinUrl: '',
-  githubUrl: '',
-  summary: '',
-  experience: '',
-  skills: '',
-  education: '',
-}
-
 function nullToEmpty(value: string | null | undefined): string {
   return value ?? ''
 }
 
-export function ProfileRoute() {
-  const { data, isLoading, isError } = useProfileQuery()
+export function ProfileResumeRoute() {
+  const { data } = useProfileQuery()
   const mutation = useProfileMutation()
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState<ProfileInput | null>(null)
-
-  if (isLoading) return <div className="max-w-3xl mx-auto p-6 text-zinc-400">Loading…</div>
-  if (isError) return <div className="max-w-3xl mx-auto p-6 text-red-400">Failed to load profile.</div>
 
   function handleEdit() {
     if (!data) return
@@ -73,6 +58,7 @@ export function ProfileRoute() {
       onSuccess: () => {
         setDraft(null)
         setIsEditing(false)
+        toast.success('Profile saved')
       },
     })
   }

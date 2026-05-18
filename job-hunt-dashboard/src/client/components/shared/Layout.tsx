@@ -67,6 +67,7 @@ export function Layout() {
           </Link>
           <Link
             to="/config"
+            activeOptions={{ exact: false }}
             className="px-3 py-1.5 text-sm transition-colors"
             activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
             inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}

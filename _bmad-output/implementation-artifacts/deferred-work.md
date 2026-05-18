@@ -644,3 +644,14 @@ The Source Breakdown ChartCard in the Jobs quadrant is wrapped in `if (data.jobs
 
 ## Indeed scraper — all card selectors miss → silent company=null drop (2026-05-13)
 If none of `.job_seen_beacon`, `td.resultContent` match, card=null → company=null → job silently dropped by discovery-service filter. Pre-existing behavior; the two-way fallback is already an improvement. Future work: add a warning log when card is null so it's visible in server logs.
+
+## Deferred from: code review of 35-1-config-layout-shell-router-restructure-overview (2026-05-18)
+- **Stub section routes have no loaders** — `/config/profile`, `/config/job-sources`, `/config/prompts`, `/config/logs` are scaffolding stubs; loaders will be added story-by-story as sections are implemented (35.2–35.6). [`router.ts`]
+- **No redirect from removed `/logs` → `/config/logs`** — URL reorganization is intentional; any existing bookmarks to `/logs` will 404. No redirect specified in story scope. [`router.ts`]
+- **Tile status badges flash "Incomplete" on stale-cache re-fetch** — `staleTime: 0` on `useOnboardingStatusQuery` causes a background re-fetch on every mount; before it resolves, tiles briefly show "Incomplete". Pre-existing hook behavior. [`overview.tsx`, `useOnboardingStatusQuery.ts`]
+- **`res.json()` cast is unsound** — `res.json() as Promise<OnboardingStatusResponse>` provides no runtime type safety; malformed API responses pass through silently. Pre-existing pattern throughout the codebase. [`useOnboardingStatusQuery.ts`]
+- **`profile.name` whitespace-only treated as configured** — `!!profile?.name` is truthy for `" "`; no `.trim()` guard. Extremely edge case; form validation on profile save should prevent whitespace-only names. [`overview.tsx`]
+
+## Deferred from: code review of 35-2-profile-section-overview-and-resume-subpage (2026-05-18)
+
+- **No unsaved-changes guard when navigating away mid-edit** — `ProfileResumeRoute` holds `isEditing` + `draft` in local state with no `beforeUnload` or router navigation guard; unsaved edits are silently lost when the user clicks the sidebar or top nav. Pre-existing pattern from `profile.tsx`. [`profile-resume.tsx`]

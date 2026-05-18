@@ -5,18 +5,15 @@ import { PipelineRoute } from '../routes/index'
 import { TrackerRoute } from '../routes/tracker'
 import { ArchivedRoute } from '../routes/archived'
 import { MessagesRoute } from '../routes/messages'
-import { HistoryRoute } from '../routes/history'
 import { queryClient } from './query-client'
 import { fetchJobs } from '../hooks/useJobsQuery'
-import { ProfileRoute } from '../routes/profile'
 import { fetchProfile } from '../hooks/useProfileQuery'
-import { PromptsRoute } from '../routes/prompts'
 import { fetchPrompts } from '../hooks/usePromptsQuery'
 import { MatchesRoute } from '../routes/matches'
-import { ConfigRoute } from '../routes/config'
 import { fetchSearchConfigs } from '../hooks/useSearchConfigsQuery'
 import { fetchSourceSettings } from '../hooks/useSourceSettingsQuery'
 import { fetchSession } from '../hooks/useSessionQuery'
+import { fetchOnboardingStatus } from '../hooks/useOnboardingStatusQuery'
 import { LoginRoute } from '../routes/login'
 import { RegisterRoute } from '../routes/register'
 import { RegisterPendingRoute } from '../routes/register-pending'
@@ -24,6 +21,13 @@ import { OnboardingRoute } from '../routes/onboarding'
 import { AdminUsersRoute } from '../routes/admin-users'
 import { fetchAdminUsers } from '../hooks/useAdminUsersQuery'
 import { fetchInviteKeys } from '../hooks/useInviteKeysQuery'
+import { ConfigLayout } from '../routes/config/layout'
+import { ConfigOverviewRoute } from '../routes/config/overview'
+import { ConfigProfileIndexRoute } from '../routes/config/profile-index'
+import { ConfigJobSourcesIndexRoute } from '../routes/config/job-sources-index'
+import { ConfigPromptsIndexRoute } from '../routes/config/prompts-index'
+import { ConfigLogsRoute } from '../routes/config/logs'
+import { ProfileResumeRoute } from '../routes/config/profile-resume'
 import type { OnboardingStatusResponse, SessionResponse } from '@shared/schemas'
 
 const rootRoute = createRootRoute({
@@ -137,26 +141,6 @@ const messagesRoute = createRoute({
   loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
 })
 
-const historyRoute = createRoute({
-  getParentRoute: () => protectedRoute,
-  path: '/logs',
-  component: HistoryRoute,
-})
-
-const profileRoute = createRoute({
-  getParentRoute: () => protectedRoute,
-  path: '/profile',
-  component: ProfileRoute,
-  loader: () => queryClient.ensureQueryData({ queryKey: ['profile'], queryFn: fetchProfile }),
-})
-
-const promptsRoute = createRoute({
-  getParentRoute: () => protectedRoute,
-  path: '/prompts',
-  component: PromptsRoute,
-  loader: () => queryClient.ensureQueryData({ queryKey: ['prompts'], queryFn: fetchPrompts }),
-})
-
 const matchesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/matches',
@@ -164,16 +148,57 @@ const matchesRoute = createRoute({
   loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
 })
 
-const configRoute = createRoute({
+const configLayoutRoute = createRoute({
   getParentRoute: () => protectedRoute,
+  id: '_config',
+  component: ConfigLayout,
+})
+
+const configOverviewRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
   path: '/config',
-  component: ConfigRoute,
+  component: ConfigOverviewRoute,
   loader: () => Promise.all([
     queryClient.ensureQueryData({ queryKey: ['profile'], queryFn: fetchProfile }),
-    queryClient.ensureQueryData({ queryKey: ['prompts'], queryFn: fetchPrompts }),
+    queryClient.ensureQueryData({ queryKey: ['onboarding-status'], queryFn: fetchOnboardingStatus }),
     queryClient.ensureQueryData({ queryKey: ['search-configs'], queryFn: fetchSearchConfigs }),
-    queryClient.ensureQueryData({ queryKey: ['source-settings'], queryFn: fetchSourceSettings }),
+    queryClient.ensureQueryData({ queryKey: ['prompts'], queryFn: fetchPrompts }),
   ]),
+})
+
+const configProfileRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/profile',
+  component: ConfigProfileIndexRoute,
+  loader: () => Promise.all([
+    queryClient.ensureQueryData({ queryKey: ['profile'], queryFn: fetchProfile }),
+    queryClient.ensureQueryData({ queryKey: ['onboarding-status'], queryFn: fetchOnboardingStatus }),
+  ]),
+})
+
+const configProfileResumeRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/profile/resume',
+  component: ProfileResumeRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['profile'], queryFn: fetchProfile }),
+})
+
+const configJobSourcesRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/job-sources',
+  component: ConfigJobSourcesIndexRoute,
+})
+
+const configPromptsRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/prompts',
+  component: ConfigPromptsIndexRoute,
+})
+
+const configLogsRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/logs',
+  component: ConfigLogsRoute,
 })
 
 const adminUsersRoute = createRoute({
@@ -202,12 +227,16 @@ const routeTree = rootRoute.addChildren([
     trackerRoute,
     archivedRoute,
     messagesRoute,
-    historyRoute,
-    profileRoute,
-    promptsRoute,
     matchesRoute,
-    configRoute,
     adminUsersRoute,
+    configLayoutRoute.addChildren([
+      configOverviewRoute,
+      configProfileRoute,
+      configProfileResumeRoute,
+      configJobSourcesRoute,
+      configPromptsRoute,
+      configLogsRoute,
+    ]),
   ]),
 ])
 
