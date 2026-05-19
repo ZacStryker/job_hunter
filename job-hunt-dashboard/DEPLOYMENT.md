@@ -115,17 +115,49 @@ ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
 
 ---
 
-## Step 5 — Start the Application
+## Step 5 — Build the Deps Image (One-time setup)
+
+The `hitlobster-deps:latest` base image bundles all system packages, production `node_modules`, and Playwright browsers. Build it once on the server before the first `docker compose build`:
 
 ```bash
-docker compose up -d
+cd /path/to/repo/job-hunt-dashboard && bash scripts/build-deps.sh
+```
+
+This takes ~10 minutes on first run. You only need to rebuild it when dependencies change (see Step 6a below).
+
+---
+
+## Step 6 — Start the Application
+
+```bash
+docker compose build && docker compose up -d
 ```
 
 Database migrations run automatically on first start — no manual migration step needed.
 
+### Deploy workflow summary
+
+**Code-only deploy** (no dependency changes):
+
+```bash
+git pull && docker compose build && docker compose up -d
+```
+
+**Dependencies changed** (`package.json`, `bun.lock`, `scraper/package.json`, `scraper/package-lock.json`, or Playwright version):
+
+```bash
+bash scripts/build-deps.sh
+git pull && docker compose build && docker compose up -d
+```
+
+> **Note:** The `playwright_browsers` Docker volume is no longer used. If upgrading an existing deployment, prune it after confirming the app is healthy:
+> ```bash
+> docker volume rm hitlobster_playwright_browsers
+> ```
+
 ---
 
-## Step 6 — Verify the Deployment
+## Step 7 — Verify the Deployment
 
 ```bash
 # Watch logs
@@ -139,7 +171,7 @@ Expected: HTTP 200 from `curl`, application loads in browser at `https://yourdom
 
 ---
 
-## Step 7 — Generate First Invite Key
+## Step 8 — Generate First Invite Key
 
 1. Open `https://yourdomain.com` in a browser
 2. Log in with the `ADMIN_EMAIL` and `ADMIN_PASSWORD` you set in `.env`

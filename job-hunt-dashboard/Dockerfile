@@ -16,32 +16,21 @@ ENV NODE_ENV=production
 RUN bun run build
 
 # ── Stage 2: production ─────────────────────────────────────────────
-FROM oven/bun:1.3
+FROM hitlobster-deps:latest
 WORKDIR /app
 
-# Copy production artifacts from builder
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV NODE_ENV=production
+
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src ./src
-COPY --from=builder /app/scraper ./scraper
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/bun.lock ./bun.lock
 
-# Install curl for health check, xvfb for headed Firefox (Cloudflare bot detection bypass)
-RUN apt-get update && apt-get install -y curl xvfb && rm -rf /var/lib/apt/lists/*
-
-# Install production dependencies only (no devDependencies)
-RUN bun install --production --frozen-lockfile
-
-ENV NODE_ENV=production
-
-# Install Playwright browsers + system packages
-# Main app: chromium (PDF generation) + firefox (shared with scraper)
-# Scraper: firefox only — all scrapers migrated to Firefox in story 31.5
-# bunx finds playwright in node_modules; --with-deps installs apt packages
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN bunx playwright install --with-deps chromium firefox
-RUN cd scraper && bunx playwright install --with-deps firefox
-RUN bunx patchright install chromium
+# Selective scraper copy — preserves /app/scraper/node_modules from base image
+COPY --from=builder /app/scraper/src ./scraper/src
+COPY --from=builder /app/scraper/package.json ./scraper/package.json
+COPY --from=builder /app/scraper/package-lock.json ./scraper/package-lock.json
 
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh

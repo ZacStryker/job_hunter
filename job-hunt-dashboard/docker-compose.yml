@@ -4,7 +4,6 @@ services:
     env_file: .env
     volumes:
       - hitlobster_data:/app/data
-      - playwright_browsers:/ms-playwright
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:3000/ || exit 1"]
@@ -28,4 +27,3 @@ services:
 
 volumes:
   hitlobster_data:
-  playwright_browsers:
