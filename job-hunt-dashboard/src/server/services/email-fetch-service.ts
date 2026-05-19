@@ -1,7 +1,7 @@
 import { ImapFlow } from 'imapflow'
 import { eq } from 'drizzle-orm'
 import { db } from '../../db/client'
-import { messages } from '../../db/schema'
+import { messages, inboxFolderMappings } from '../../db/schema'
 export interface ImapCredentials {
   host: string
   port?: number
@@ -11,18 +11,14 @@ export interface ImapCredentials {
 
 const BLOCKED_SENDERS = ['zac@zacstryker.com', 'indeedapply@indeed.com']
 
-const FOLDERS: Array<{ name: string; type: string | null }> = [
-  { name: 'INBOX', type: null },
-  { name: 'INBOX/Submitted', type: 'Submitted' },
-  { name: 'INBOX/Screening', type: 'Screening' },
-  { name: 'INBOX/Rejected', type: 'Rejected' },
-  { name: 'INBOX/Other', type: 'Other' },
-  { name: 'INBOX/Offer', type: 'Offer' },
-  { name: 'INBOX/Interview', type: 'Interview' },
-]
-
 export async function fetchAndStoreEmails(credentials: ImapCredentials, userId: number): Promise<{ added: number }> {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+  const folders = db
+    .select({ name: inboxFolderMappings.folderPath, type: inboxFolderMappings.jobStatus })
+    .from(inboxFolderMappings)
+    .where(eq(inboxFolderMappings.userId, userId))
+    .all()
 
   const existingUids = new Set(
     db.select({ uid: messages.uid }).from(messages).where(eq(messages.userId, userId)).all().map((r) => r.uid)
@@ -49,7 +45,7 @@ export async function fetchAndStoreEmails(credentials: ImapCredentials, userId: 
   try {
     await client.connect()
 
-    for (const folder of FOLDERS) {
+    for (const folder of folders) {
       let lock
       try {
         lock = await client.getMailboxLock(folder.name)
@@ -82,7 +78,7 @@ export async function fetchAndStoreEmails(credentials: ImapCredentials, userId: 
             if (msgId !== null && existingByMessageId.has(msgId)) {
               const existing = existingByMessageId.get(msgId)!
               const updates: Partial<typeof messages.$inferInsert> = { uid: uidStr }
-              if (folder.type !== null && existing.type === null) updates.type = folder.type
+              if (existing.type === null) updates.type = folder.type
               db.update(messages).set(updates).where(eq(messages.id, existing.id)).run()
               existingUids.add(uidStr)
               continue
