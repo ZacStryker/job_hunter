@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-05-18 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1–35.6 done
+last_updated: 2026-05-18 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1–35.6 done; epic 37 added
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -248,3 +248,7 @@ development_status:
   # Epic 36: Arc Listing Description Scraper
   epic-36: in-progress
   36-1-arc-listing-description-scraper: done
+
+  # Epic 37: Docker Dependency Layer Separation
+  epic-37: in-progress
+  37-1-split-deps-into-base-image-for-fast-app-builds: backlog

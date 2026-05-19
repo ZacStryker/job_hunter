@@ -101,4 +101,9 @@ User can navigate the Config section through a persistent left nav (Profile, Job
 **Source:** User request 2026-05-18
 **Priority:** Medium — UX improvement; Story 35.3 adds new inbox folder mapping DB table
 
+## Epic 37: Docker Dependency Layer Separation
+Operators deploy new code in seconds. Playwright browsers, system packages, and node_modules live in a pre-built local `hitlobster-deps` base image that rebuilds only when dependencies change. The main `Dockerfile` derives from that base and copies only application code.
+**Source:** User request 2026-05-18
+**Priority:** High — every deploy currently waits 7–10 min on Playwright downloads
+
 ---

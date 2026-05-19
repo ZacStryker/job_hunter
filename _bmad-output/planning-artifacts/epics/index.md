@@ -92,3 +92,5 @@
     - [Story 35.4: Job Sources Section — Overview, Auth Setup & Searches](./epic-35-config-section-nav-refactor.md#story-354-job-sources-section--overview-auth-setup--searches)
     - [Story 35.5: Prompts Section — Overview & Per-Flow Subpages](./epic-35-config-section-nav-refactor.md#story-355-prompts-section--overview--per-flow-subpages)
     - [Story 35.6: Logs Section — /config/logs](./epic-35-config-section-nav-refactor.md#story-356-logs-section--configlogs)
+  - [Epic 37: Docker Dependency Layer Separation](./epic-37-docker-dependency-layer-separation.md)
+    - [Story 37.1: Split Deps into Base Image for Fast App Builds](./epic-37-docker-dependency-layer-separation.md#story-371-split-deps-into-base-image-for-fast-app-builds)
