@@ -106,4 +106,9 @@ Operators deploy new code in seconds. Playwright browsers, system packages, and 
 **Source:** User request 2026-05-18
 **Priority:** High — every deploy currently waits 7–10 min on Playwright downloads
 
+## Epic 38: Config UX Polish — Labels, Tooltips, Breadcrumbs & Expanded Nav
+Users see clearer, action-oriented labels in the Config section (Candidate Info, Analyze Jobs, Generate Cover Letter, Generate Resume), get one-sentence help tooltips on every section card, navigate with breadcrumbs at the top of the content area, and the left nav always shows an expanded tree with visually distinct parent and child entries.
+**Source:** User request 2026-05-21
+**Priority:** Medium — UX improvement; no backend or API changes required
+
 ---

@@ -110,9 +110,9 @@ function ProfilePreviewCard() {
 }
 
 const PROMPT_FLOW_LABELS: Record<PromptFlow, string> = {
-  analysis: 'Analysis',
-  cover_letter: 'Cover Letter',
-  resume: 'Resume',
+  analysis: 'Analyze Jobs',
+  cover_letter: 'Generate Cover Letter',
+  resume: 'Generate Resume',
 }
 
 function PromptsPreviewCard() {

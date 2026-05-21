@@ -7,7 +7,7 @@ export function PromptsResumeRoute() {
 
   return (
     <div className="p-6">
-      <h1 className="text-xl font-semibold text-zinc-100 mb-6">Resume</h1>
+      <h1 className="text-xl font-semibold text-zinc-100 mb-6">Generate Resume</h1>
       {prompt && <PromptSection prompt={prompt} />}
     </div>
   )

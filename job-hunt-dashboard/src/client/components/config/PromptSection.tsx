@@ -7,9 +7,9 @@ import { usePromptResetMutation } from '@/hooks/usePromptResetMutation'
 import type { Prompt, PromptFlow } from '@shared/schemas'
 
 const FLOW_LABELS: Record<PromptFlow, string> = {
-  analysis: 'Analysis',
-  cover_letter: 'Cover Letter',
-  resume: 'Resume',
+  analysis: 'Analyze Jobs',
+  cover_letter: 'Generate Cover Letter',
+  resume: 'Generate Resume',
 }
 
 const SYSTEM_PROMPT_PLACEHOLDERS: Record<PromptFlow, string | null> = {

@@ -10,16 +10,23 @@ export function RegisterRoute() {
   const [inviteKey, setInviteKey] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [inviteKeyError, setInviteKeyError] = useState<string | null>(null)
   const [emailError, setEmailError] = useState<string | null>(null)
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null)
   const [generalError, setGeneralError] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setInviteKeyError(null)
     setEmailError(null)
+    setConfirmPasswordError(null)
     setGeneralError(null)
+    if (password !== confirmPassword) {
+      setConfirmPasswordError('Passwords do not match')
+      return
+    }
     setIsLoading(true)
     try {
       const res = await fetch('/auth/register', {
@@ -85,6 +92,17 @@ export function RegisterRoute() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+        </div>
+        <div>
+          <Label htmlFor="confirmPassword">Confirm Password</Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+          />
+          {confirmPasswordError && <p role="alert" className="text-xs text-red-400 mt-1">{confirmPasswordError}</p>}
         </div>
         {generalError && <p role="alert" className="text-xs text-red-400 mt-1">{generalError}</p>}
         <Button type="submit" className="w-full mt-6" disabled={isLoading}>Create account</Button>

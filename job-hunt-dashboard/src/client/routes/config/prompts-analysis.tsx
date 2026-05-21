@@ -7,7 +7,7 @@ export function PromptsAnalysisRoute() {
 
   return (
     <div className="p-6">
-      <h1 className="text-xl font-semibold text-zinc-100 mb-6">Analysis</h1>
+      <h1 className="text-xl font-semibold text-zinc-100 mb-6">Analyze Jobs</h1>
       {prompt && <PromptSection prompt={prompt} />}
     </div>
   )

@@ -1,5 +1,18 @@
 # Deferred Work
 
+## Deferred from: code review of 38-3-breadcrumbs-and-expanded-left-nav (2026-05-21)
+
+- Fallback breadcrumb label exposes raw path string for unrecognized routes — `PATH_LABELS[prefix] ?? prefix` silently renders the URL segment as text if a future config route is added without updating the map. [`ConfigBreadcrumb.tsx`]
+- Trailing slash `/config/` bypasses breadcrumb null guard — `pathname === '/config'` check does not cover `/config/` variant; TanStack Router normalizes in practice but no code-level safety net. [`ConfigBreadcrumb.tsx`]
+
+## Deferred from: code review of 38-2-card-tooltips-in-config-sections (2026-05-21)
+
+- `<button>` nested inside `<Link>` (`<a>`) — technically invalid HTML (interactive in interactive); spec-mandated pattern with `e.preventDefault(); e.stopPropagation()`, acknowledged in dev notes. All 4 config index files.
+- Touch device tooltip dead zone — Radix Tooltip does not open on tap; `stopPropagation` swallows the tap so mobile users get no feedback. Known Radix limitation, out of scope for this story.
+- Prompts "Edited" badge color inconsistency — `prompts-index.tsx` uses `bg-zinc-700 text-zinc-300`; `overview.tsx` uses `bg-emerald-900 text-emerald-400` for same semantic state. Pre-existing; 38.2 did not change badge logic.
+- 13 identical tooltip-button blocks with no abstraction — `<Tooltip><TooltipTrigger><button>…</button></TooltipTrigger><TooltipContent>` repeated verbatim 13 times across 4 files; extractable to a shared `CardTooltip` component in a future cleanup pass.
+- `aria-label="What is this?"` is non-contextual across all 13 buttons — screen readers can't distinguish which card each button belongs to; per-card labels (e.g., `aria-label="About Profile"`) would be a better a11y improvement for a future story.
+
 ## Deferred from: code review of 35-5-prompts-section-overview-and-per-flow-subpages (2026-05-18)
 
 - Reset error never shown to user — `resetMutation.isError` has no error display in `PromptSection`; carried verbatim from pre-existing `prompts.tsx`. [`PromptSection.tsx`]
@@ -691,3 +704,8 @@ If none of `.job_seen_beacon`, `td.resultContent` match, card=null → company=n
 - **Invalid `runAt` string renders "Invalid Date"** — no `isNaN` guard on `new Date(info.getValue()).toLocaleString()`. Pre-existing from `history.tsx`. [`logs.tsx:35`]
 - **Route loader throw renders blank screen** — `configLogsRoute` loader has no `.catch()` and no `errorComponent`; `isError` branch in component never reached if loader throws. Systemic pattern. [`router.ts:268-272`]
 - **Double fetch on navigation — no `staleTime` on `ensureQueryData`** — every navigation triggers a loader fetch + component mount refetch. Systemic across all config route loaders. [`router.ts:271`]
+
+## Deferred from: code review of 38-1-rename-config-section-labels (2026-05-21)
+
+- **Dashboard WORKFLOW_KEYS use old terminology** — `'Analysis'`, `'Cover Letter'`, `'Resume'` column headers and chart labels in `dashboard.tsx` are data-coupled to server-stored workflow names; renaming requires a coordinated server+client+DB change. [`dashboard.tsx`]
+- **Pipeline alert labels hardcode `'Analysis'`** — "Analysis complete" / "Analysis failed" toasts in `index.tsx` still use the pre-rename term; vocabulary gap with the now-renamed config UI. [`index.tsx`]

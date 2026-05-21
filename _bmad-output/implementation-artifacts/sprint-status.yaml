@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-05-19 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1–35.6 done; epic 37 added; story 37.1 created; story 37.1 in review
+last_updated: 2026-05-21 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1–35.6 done; epic 37 added; story 37.1 in review; epic 38 added (config UX polish); story 38.1 done; story 38.2 done; story 38.3 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -252,3 +252,9 @@ development_status:
   # Epic 37: Docker Dependency Layer Separation
   epic-37: in-progress
   37-1-split-deps-into-base-image-for-fast-app-builds: review
+
+  # Epic 38: Config UX Polish — Labels, Tooltips, Breadcrumbs & Expanded Nav
+  epic-38: in-progress
+  38-1-rename-config-section-labels: done
+  38-2-card-tooltips-in-config-sections: done
+  38-3-breadcrumbs-and-expanded-left-nav: done

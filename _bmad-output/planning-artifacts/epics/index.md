@@ -94,3 +94,7 @@
     - [Story 35.6: Logs Section — /config/logs](./epic-35-config-section-nav-refactor.md#story-356-logs-section--configlogs)
   - [Epic 37: Docker Dependency Layer Separation](./epic-37-docker-dependency-layer-separation.md)
     - [Story 37.1: Split Deps into Base Image for Fast App Builds](./epic-37-docker-dependency-layer-separation.md#story-371-split-deps-into-base-image-for-fast-app-builds)
+  - [Epic 38: Config UX Polish — Labels, Tooltips, Breadcrumbs & Expanded Nav](./epic-38-config-ux-polish.md)
+    - [Story 38.1: Rename Config Section Labels](./epic-38-config-ux-polish.md#story-381-rename-config-section-labels)
+    - [Story 38.2: Card Tooltips in Config Sections](./epic-38-config-ux-polish.md#story-382-card-tooltips-in-config-sections)
+    - [Story 38.3: Breadcrumbs & Expanded Left Nav](./epic-38-config-ux-polish.md#story-383-breadcrumbs--expanded-left-nav)

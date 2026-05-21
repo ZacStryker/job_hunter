@@ -70,7 +70,7 @@ export function ProfileResumeRoute() {
   return (
     <div className="max-w-3xl mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold text-zinc-100">Profile</h1>
+        <h1 className="text-2xl font-semibold text-zinc-100">Candidate Info</h1>
         {!isEditing && (
           <Button variant="outline" size="sm" onClick={handleEdit}>
             Edit
