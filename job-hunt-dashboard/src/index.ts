@@ -115,7 +115,7 @@ const distDir = join(import.meta.dir, '..', 'dist')
 
 // Serve SPA bundle in production
 app.use('/*', serveStatic({ root: distDir }))
-app.get('/*', serveStatic({ path: join(distDir, 'index.html') }))
+app.get('/*', serveStatic({ root: distDir, path: 'index.html' }))
 
 await startScraperProcess().catch((err: Error) => {
   console.error('[scraper] startup failed:', err.message)
