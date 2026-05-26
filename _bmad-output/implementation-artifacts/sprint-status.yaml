@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-05-21 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1–35.6 done; epic 37 added; story 37.1 in review; epic 38 added (config UX polish); story 38.1 done; story 38.2 done; story 38.3 done
+last_updated: 2026-05-26 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1–35.6 done; epic 37 added; story 37.1 in review; epic 38 added (config UX polish); story 38.1 done; story 38.2 done; story 38.3 done; epic 39 added (add job manual description); story 39.1 done; story 39.2 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -258,3 +258,8 @@ development_status:
   38-1-rename-config-section-labels: done
   38-2-card-tooltips-in-config-sections: done
   38-3-breadcrumbs-and-expanded-left-nav: done
+
+  # Epic 39: Add Job with Manual Description
+  epic-39: in-progress
+  39-1-add-job-form-and-api-accept-optional-job-description: done
+  39-2-analysis-use-pre-stored-description-skip-scraper: done

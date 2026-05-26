@@ -112,3 +112,10 @@ Users see clearer, action-oriented labels in the Config section (Candidate Info,
 **Priority:** Medium — UX improvement; no backend or API changes required
 
 ---
+
+## Epic 39: Add Job with Manual Description
+Users can add a job to the pipeline with a pasted job description — either alongside a URL or with no URL at all. When a description is pre-populated at creation time, the analysis flow uses it directly and skips the scraper.
+**Source:** User request 2026-05-26
+**Priority:** Medium — UX and reliability improvement; no DB migration required
+
+---

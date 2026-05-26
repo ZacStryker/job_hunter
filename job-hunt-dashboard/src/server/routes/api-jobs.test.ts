@@ -595,6 +595,67 @@ describe('POST /api/jobs', () => {
     const data = await res.json() as { job: Record<string, unknown> }
     expect(data.job.location).toBeNull()
   })
+
+  test('creates job with description only (no sourceUrl) → 201 with jobDescription set', async () => {
+    const res = await jobsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: 'DescOnly', jobTitle: 'Engineer', description: 'We are looking for…' }),
+    })
+    expect(res.status).toBe(201)
+    const data = await res.json() as { job: Record<string, unknown> }
+    expect(data).toHaveProperty('job')
+    expect(data.job.jobDescription).toBe('We are looking for…')
+    expect(data.job.sourceUrl).toBeNull()
+    expect(data.job.analysisStatus).toBe('pending')
+  })
+
+  test('returns 400 when neither sourceUrl nor description provided', async () => {
+    const res = await jobsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: 'Neither', jobTitle: 'Dev' }),
+    })
+    expect(res.status).toBe(400)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    expect(data).not.toHaveProperty('message')
+  })
+
+  test('creates job with both sourceUrl and description → 201 with both stored', async () => {
+    const res = await jobsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: 'Both', jobTitle: 'Dev', sourceUrl: 'https://example.com/job/99', description: 'Role requires 5 years of experience.' }),
+    })
+    expect(res.status).toBe(201)
+    const data = await res.json() as { job: Record<string, unknown> }
+    expect(data.job.sourceUrl).toBe('https://example.com/job/99')
+    expect(data.job.jobDescription).toBe('Role requires 5 years of experience.')
+  })
+
+  test('accepts sourceUrl: null explicitly (real client payload for description-only submit) → 201', async () => {
+    const res = await jobsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: 'NullUrl', jobTitle: 'Dev', sourceUrl: null, description: 'We are hiring a developer.' }),
+    })
+    expect(res.status).toBe(201)
+    const data = await res.json() as { job: Record<string, unknown> }
+    expect(data.job.sourceUrl).toBeNull()
+    expect(data.job.jobDescription).toBe('We are hiring a developer.')
+  })
+
+  test('returns 400 when sourceUrl is null and description is blank whitespace', async () => {
+    const res = await jobsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: 'Blank', jobTitle: 'Dev', sourceUrl: null, description: '   ' }),
+    })
+    expect(res.status).toBe(400)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+  })
 })
 
 describe('POST /api/jobs/scrape-url', () => {

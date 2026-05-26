@@ -5,7 +5,8 @@ interface AddJobInput {
   company: string
   jobTitle: string
   location: string | null
-  sourceUrl: string
+  sourceUrl: string | null
+  description: string | null
 }
 
 export function useAddJobMutation() {

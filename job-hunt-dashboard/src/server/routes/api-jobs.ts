@@ -187,8 +187,9 @@ const manualJobSchema = z.object({
   company: z.string().min(1),
   jobTitle: z.string().min(1),
   location: z.string().optional(),
-  sourceUrl: z.string().url(),
-})
+  sourceUrl: z.string().url().nullable().optional(),
+  description: z.string().refine(s => s.trim().length > 0, { message: 'description must not be blank' }).nullable().optional(),
+}).refine(d => !!(d.sourceUrl || d.description), { message: 'sourceUrl or description is required' })
 
 app.post('/', async (c) => {
   const userId = c.get('userId')
@@ -197,7 +198,7 @@ app.post('/', async (c) => {
   const parsed = manualJobSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, 400)
 
-  const { company, jobTitle, location, sourceUrl } = parsed.data
+  const { company, jobTitle, location, sourceUrl, description } = parsed.data
   const locationValue = location?.trim() || null
 
   const existing = db.select({ id: jobs.id }).from(jobs)
@@ -208,7 +209,8 @@ app.post('/', async (c) => {
   db.insert(jobs).values({
     company, jobTitle,
     location: locationValue,
-    sourceUrl,
+    sourceUrl: sourceUrl ?? null,
+    jobDescription: description?.trim() || null,
     source: 'Manual',
     analysisStatus: 'pending',
     dateScraped,

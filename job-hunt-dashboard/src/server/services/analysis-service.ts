@@ -92,8 +92,8 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
       .run()
 
     try {
-      let description = ''
-      if (scraperUrl && job.sourceUrl) {
+      let description = job.jobDescription ?? ''
+      if (!description && scraperUrl && job.sourceUrl) {
         try {
           const hostname = (() => { try { return new URL(job.sourceUrl).hostname.replace(/^www\./, '') } catch { return '' } })()
           const scraperSource =

@@ -14,9 +14,10 @@ export function AddJobDrawer({ open, onClose, onSuccess }: AddJobDrawerProps) {
   const [jobTitle, setJobTitle] = useState('')
   const [location, setLocation] = useState('')
   const [url, setUrl] = useState('')
+  const [description, setDescription] = useState('')
   const mutation = useAddJobMutation()
 
-  const isValid = company.trim().length > 0 && jobTitle.trim().length > 0 && url.trim().length > 0
+  const isValid = company.trim().length > 0 && jobTitle.trim().length > 0 && (url.trim().length > 0 || description.trim().length > 0)
 
   function handleSubmit() {
     mutation.mutate(
@@ -24,10 +25,16 @@ export function AddJobDrawer({ open, onClose, onSuccess }: AddJobDrawerProps) {
         company: company.trim(),
         jobTitle: jobTitle.trim(),
         location: location.trim() || null,
-        sourceUrl: url.trim(),
+        sourceUrl: url.trim() || null,
+        description: description.trim() || null,
       },
       {
         onSuccess: () => {
+          setCompany('')
+          setJobTitle('')
+          setLocation('')
+          setUrl('')
+          setDescription('')
           onSuccess()
           onClose()
         },
@@ -70,12 +77,22 @@ export function AddJobDrawer({ open, onClose, onSuccess }: AddJobDrawerProps) {
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-zinc-400">URL *</span>
+            <span className="text-zinc-400">URL (optional if description provided)</span>
             <input
               className="bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 text-sm"
               value={url}
               onChange={e => setUrl(e.target.value)}
               placeholder="https://..."
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-zinc-400">Job Description (optional if URL provided)</span>
+            <textarea
+              className="bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 text-sm resize-none"
+              rows={6}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Paste the job description here…"
             />
           </label>
 

@@ -1,5 +1,17 @@
 # Deferred Work
 
+## Deferred from: code review of 39-2-analysis-use-pre-stored-description-skip-scraper (2026-05-26)
+
+- Whitespace-only `jobDescription` bypasses scraper and is passed to Anthropic as-is — unreachable from normal insert path (39.1 trims whitespace to NULL) but no defense-in-depth `.trim()` in service. [`analysis-service.ts:95`]
+- Empty string `''` vs `NULL` semantic ambiguity — `''` stored in DB causes scraper to run (different from `null`); unreachable from normal app flow. [`analysis-service.ts:95`]
+- `description || null` write-back coerces explicit empty string to `null` — pre-existing behavior, unreachable from normal flow. [`analysis-service.ts`]
+- No observability/logging when scraper is skipped due to pre-stored description — no `onProgress` call on bypass path; pre-existing logging pattern not extended. [`analysis-service.ts`]
+- No AC3 regression test (null description → scraper runs) — covered indirectly by existing tests that exercise the scraper path. [`analysis-service.test.ts`]
+- No AC5 test (manual job with no URL and no description) — pre-existing behavior, not changed by this diff. [`analysis-service.test.ts`]
+- No test for pre-stored description + Anthropic failure path — failure path preserves `job_description` correctly but is untested. [`analysis-service.test.ts`]
+- No test for `job_description = ''` in DB — documents `''` vs `null` split behavior; edge case unreachable from normal insert path. [`analysis-service.test.ts`]
+- `anthropicBody` not explicitly null-checked before messages assertion — would give cryptic failure rather than "Anthropic was never called" but fails loudly so acceptable. [`analysis-service.test.ts`]
+
 ## Deferred from: code review of 38-3-breadcrumbs-and-expanded-left-nav (2026-05-21)
 
 - Fallback breadcrumb label exposes raw path string for unrecognized routes — `PATH_LABELS[prefix] ?? prefix` silently renders the URL segment as text if a future config route is added without updating the map. [`ConfigBreadcrumb.tsx`]
@@ -709,3 +721,10 @@ If none of `.job_seen_beacon`, `td.resultContent` match, card=null → company=n
 
 - **Dashboard WORKFLOW_KEYS use old terminology** — `'Analysis'`, `'Cover Letter'`, `'Resume'` column headers and chart labels in `dashboard.tsx` are data-coupled to server-stored workflow names; renaming requires a coordinated server+client+DB change. [`dashboard.tsx`]
 - **Pipeline alert labels hardcode `'Analysis'`** — "Analysis complete" / "Analysis failed" toasts in `index.tsx` still use the pre-rename term; vocabulary gap with the now-renamed config UI. [`index.tsx`]
+
+## Deferred from: code review of 39-1-add-job-form-and-api-accept-optional-job-description (2026-05-26)
+
+- **No maxLength on description field** — `z.string().min(1).optional()` has no upper bound; unbounded text can be stored in the `jobDescription` TEXT column. No spec requirement for a limit; worth adding a reasonable cap (e.g. 50,000 chars) before shipping. [`api-jobs.ts:191`, `AddJobDrawer.tsx`]
+- **`analysisStatus: 'pending'` on description-only jobs with no scraper trigger** — jobs created with description but no URL are set to `pending` but the current analysis service has no path to progress them without a URL. Story 39.2 will fix this by using the pre-stored description and skipping the scraper. [`api-jobs.ts`]
+- **Duplicate check won't catch description-only dupes** — deduplication keys on `sourceUrl`; two identical manual pastes with no URL produce two separate rows silently. Pre-existing limitation. [`api-jobs.ts`]
+- **`company`/`jobTitle` not trimmed in duplicate-check WHERE clause** — leading/trailing whitespace produces a miss against an existing row. Pre-existing from original manual-add implementation. [`api-jobs.ts`]

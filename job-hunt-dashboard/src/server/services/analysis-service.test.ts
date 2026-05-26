@@ -401,6 +401,49 @@ describe('runAnalysis()', () => {
     expect(result.outputTokens).toBe(40)
   })
 
+  test('pre-stored jobDescription: skips scraper, passes description to Anthropic, retains in DB', async () => {
+    prodSqlite.run(
+      `INSERT INTO jobs (company, job_title, source, source_url, external_job_id, analysis_status, job_description)
+       VALUES ('PreDesc Co', 'Staff Engineer', 'manual', 'https://example.com/jobs/123', 'ext-pre-1', 'pending', 'We build developer tools for AI teams.')`,
+    )
+    const { id } = prodSqlite.prepare('SELECT id FROM jobs ORDER BY id DESC LIMIT 1').get() as { id: number }
+
+    let scraperCalled = false
+    let anthropicBody: Record<string, unknown> | null = null
+
+    globalThis.fetch = mock((url: string, init?: RequestInit) => {
+      if (String(url).includes('scrape/listing')) {
+        scraperCalled = true
+        return Promise.resolve(new Response(null, { status: 500 }))
+      }
+      anthropicBody = JSON.parse((init?.body as string) ?? '{}') as Record<string, unknown>
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            content: [{ type: 'text', text: JSON.stringify(VALID_ANALYSIS_RESPONSE) }],
+            usage: { input_tokens: 40, output_tokens: 20 },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    }) as typeof globalThis.fetch
+
+    const result = await runAnalysis(undefined, 1)
+
+    expect(scraperCalled).toBe(false)
+    expect(result.processed).toBe(1)
+    expect(result.failed).toBe(0)
+
+    const messages = (anthropicBody?.messages as Array<{ content: string }> | undefined) ?? []
+    expect(messages[0]?.content).toContain('We build developer tools for AI teams.')
+
+    const row = prodSqlite.prepare('SELECT job_description, analysis_status FROM jobs WHERE id = ?').get(id) as {
+      job_description: string | null; analysis_status: string
+    }
+    expect(row.job_description).toBe('We build developer tools for AI teams.')
+    expect(row.analysis_status).toBe('done')
+  })
+
   test('processes only up to 10 pending jobs per run', async () => {
     for (let i = 1; i <= 12; i++) {
       prodSqlite.run(

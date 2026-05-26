@@ -98,3 +98,6 @@
     - [Story 38.1: Rename Config Section Labels](./epic-38-config-ux-polish.md#story-381-rename-config-section-labels)
     - [Story 38.2: Card Tooltips in Config Sections](./epic-38-config-ux-polish.md#story-382-card-tooltips-in-config-sections)
     - [Story 38.3: Breadcrumbs & Expanded Left Nav](./epic-38-config-ux-polish.md#story-383-breadcrumbs--expanded-left-nav)
+  - [Epic 39: Add Job with Manual Description](./epic-39-add-job-manual-description.md)
+    - [Story 39.1: Add Job Form & API — Accept Optional Job Description](./epic-39-add-job-manual-description.md#story-391-add-job-form--api--accept-optional-job-description)
+    - [Story 39.2: Analysis — Use Pre-Stored Description, Skip Scraper](./epic-39-add-job-manual-description.md#story-392-analysis--use-pre-stored-description-skip-scraper)
