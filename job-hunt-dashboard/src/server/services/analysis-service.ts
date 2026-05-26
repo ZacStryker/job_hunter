@@ -172,6 +172,7 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
         if (!jsonMatch) throw new Error('No JSON found in Anthropic response')
         result = JSON.parse(jsonMatch[0]) as AnalysisResult
       }
+      result.recommended_action = result.recommended_action?.replace(/^<|>$/g, '') ?? result.recommended_action
 
       db.update(jobs)
         .set({
