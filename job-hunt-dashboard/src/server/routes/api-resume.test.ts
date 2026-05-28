@@ -39,7 +39,7 @@ const CREATE_JOBS_TABLE = `
     fit_score INTEGER, recommendation TEXT, role_fit TEXT,
     requirements_met TEXT, requirements_missed TEXT, red_flags TEXT,
     job_description TEXT, source_url TEXT, date_scraped TEXT, source TEXT,
-    location TEXT, external_job_id TEXT, analysis_status TEXT, salary TEXT,
+    location TEXT, external_job_id TEXT, relevance_score REAL, analysis_status TEXT, salary TEXT,
     benefits TEXT, contact_name TEXT, contact_email TEXT, contact_phone TEXT,
     applied INTEGER NOT NULL DEFAULT 0, status TEXT, status_override TEXT,
     cover_letter_sent_at TEXT, date_applied TEXT, archived INTEGER NOT NULL DEFAULT 0,

@@ -24,6 +24,7 @@ const CREATE_JOBS_TABLE = `
     source TEXT,
     location TEXT,
     external_job_id TEXT,
+    relevance_score REAL,
     analysis_status TEXT,
     fit_score INTEGER,
     recommendation TEXT,

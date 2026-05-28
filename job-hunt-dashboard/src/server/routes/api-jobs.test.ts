@@ -32,6 +32,7 @@ const CREATE_JOBS_TABLE = `
     source TEXT,
     location TEXT,
     external_job_id TEXT,
+    relevance_score REAL,
     analysis_status TEXT,
     date_analyzed TEXT,
     salary TEXT,
@@ -507,6 +508,17 @@ describe('GET /api/jobs', () => {
     const res = await jobsApp.request('/', { method: 'GET' })
     const data = await res.json() as { jobs: Record<string, unknown>[] }
     expect(data.jobs[0].latestStatus).toBe('Screening')
+  })
+
+  test('relevanceScore is null (not undefined) when job has no score set', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('ScoreTest', 'Dev', 0)`)
+    const res = await jobsApp.request('/', { method: 'GET' })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { jobs: Record<string, unknown>[] }
+    expect(data.jobs).toHaveLength(1)
+    const job = data.jobs[0]
+    expect(Object.prototype.hasOwnProperty.call(job, 'relevanceScore')).toBe(true)
+    expect(job.relevanceScore).toBeNull()
   })
 
   test('latestStatus is null when all matching messages have null type', async () => {

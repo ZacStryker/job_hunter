@@ -119,3 +119,13 @@ Users can add a job to the pipeline with a pasted job description — either alo
 **Priority:** Medium — UX and reliability improvement; no DB migration required
 
 ---
+
+## Epic 40: Relevance Pre-Scoring in Discovery Pipeline
+Users can pre-screen newly discovered jobs against their resume before running expensive AI analysis. Each job gets a lightweight relevance score at discovery time (embedding cosine similarity, no Claude API). The score appears as a sortable column in the Jobs table and as a sibling card to Fit Score in the drawer. The Discover button requires a profile/resume to be configured.
+**Source:** User request 2026-05-27
+**Priority:** Medium — token-cost optimization and discovery UX improvement
+**FRs covered:** FR1–FR13 (epic-40 scope)
+**NFRs addressed:** NFR1–NFR5 (epic-40 scope)
+**Architecture:** New DB migration (relevance_score column + user_embeddings table); new embedding-service + resume-embedding-cache modules; hook in discovery-service after transaction; two parallel implementation paths gated by spike 40.1
+
+---

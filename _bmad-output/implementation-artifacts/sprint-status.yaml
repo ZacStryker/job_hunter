@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-05-26 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1–35.6 done; epic 37 added; story 37.1 in review; epic 38 added (config UX polish); story 38.1 done; story 38.2 done; story 38.3 done; epic 39 added (add job manual description); story 39.1 done; story 39.2 done
+last_updated: 2026-05-28 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1–35.6 done; epic 37 added; story 37.1 in review; epic 38 added (config UX polish); story 38.1 done; story 38.2 done; story 38.3 done; epic 39 added (add job manual description); story 39.1 done; story 39.2 done; epic 40 added (relevance pre-scoring); story 40.1 done; story 40.3B skipped; story 40.2 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -263,3 +263,12 @@ development_status:
   epic-39: in-progress
   39-1-add-job-form-and-api-accept-optional-job-description: done
   39-2-analysis-use-pre-stored-description-skip-scraper: done
+
+  # Epic 40: Relevance Pre-Scoring in Discovery Pipeline
+  epic-40: in-progress
+  40-1-spike-validate-xenova-transformers-under-bun: done
+  40-2-data-model-relevance-score-column-and-resume-embedding-cache: done
+  40-3a-embedding-service-in-process-via-xenova-transformers: backlog
+  40-3b-embedding-service-python-fastapi-sidecar-fallback: skip
+  40-4-discovery-pipeline-integration-score-jobs-at-insert-time: backlog
+  40-5-ux-relevance-column-drawer-layout-and-discover-button-guard: backlog

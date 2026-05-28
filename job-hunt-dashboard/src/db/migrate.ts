@@ -13,6 +13,7 @@ const JOBS_NULLABLE_COLUMNS: Array<[string, string]> = [
   ['contact_email', 'TEXT'],
   ['contact_phone', 'TEXT'],
   ['external_job_id', 'TEXT'],
+  ['relevance_score', 'REAL'],
   ['analysis_status', 'TEXT'],
   ['resume_generated_at', 'TEXT'],
   ['date_analyzed', 'TEXT'],

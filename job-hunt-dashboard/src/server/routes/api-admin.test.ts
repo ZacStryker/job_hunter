@@ -76,9 +76,34 @@ beforeAll(() => {
       company TEXT NOT NULL,
       job_title TEXT NOT NULL,
       source_url TEXT,
+      date_scraped TEXT,
+      source TEXT,
+      location TEXT,
+      external_job_id TEXT,
+      relevance_score REAL,
+      analysis_status TEXT,
+      date_analyzed TEXT,
+      fit_score INTEGER,
+      recommendation TEXT,
+      role_fit TEXT,
+      requirements_met TEXT,
+      requirements_missed TEXT,
+      red_flags TEXT,
+      job_description TEXT,
+      salary TEXT,
+      benefits TEXT,
+      contact_name TEXT,
+      contact_email TEXT,
+      contact_phone TEXT,
       applied INTEGER NOT NULL DEFAULT 0,
+      status TEXT,
+      status_override TEXT,
+      cover_letter_sent_at TEXT,
+      date_applied TEXT,
       archived INTEGER NOT NULL DEFAULT 0,
-      user_id INTEGER NOT NULL REFERENCES users(id)
+      resume_generated_at TEXT,
+      user_id INTEGER NOT NULL DEFAULT 1,
+      UNIQUE(company, job_title, user_id)
     )
   `)
   prodSqlite.run(`
@@ -103,10 +128,14 @@ beforeAll(() => {
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       uid TEXT NOT NULL UNIQUE,
+      message_id TEXT UNIQUE,
       received_at TEXT NOT NULL,
       from_address TEXT NOT NULL,
       subject TEXT NOT NULL,
-      user_id INTEGER NOT NULL REFERENCES users(id)
+      type TEXT,
+      company TEXT,
+      job_title TEXT,
+      user_id INTEGER NOT NULL DEFAULT 1
     )
   `)
   prodSqlite.run(`

@@ -11,6 +11,7 @@ export const jobs = sqliteTable('jobs', {
   location: text('location'),
   // Scraper/pipeline (set on INSERT — never overwritten on conflict)
   externalJobId: text('external_job_id'),
+  relevanceScore: real('relevance_score'),
   // Analysis-owned (set by Analysis service — never overwrite on ingest)
   analysisStatus: text('analysis_status'),
   dateAnalyzed: text('date_analyzed'),
@@ -187,3 +188,9 @@ export const sessions = sqliteTable('sessions', {
   index('sessions_user_id_idx').on(table.userId),
   index('sessions_expires_at_idx').on(table.expiresAt),
 ])
+
+export const userEmbeddings = sqliteTable('user_embeddings', {
+  userId:      integer('user_id').primaryKey().notNull().references(() => users.id),
+  embedding:   text('embedding').notNull(),
+  profileHash: text('profile_hash').notNull(),
+})

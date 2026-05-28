@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of 40-2-data-model-relevance-score-column-and-resume-embedding-cache (2026-05-28)
+
+- `api-admin.test.ts` jobs/messages DDL drops FK constraint on `user_id` (replaced with `DEFAULT 1`) — SQLite does not enforce FKs without `PRAGMA foreign_keys = ON`; this is an intentional test simplification; pre-existing pattern in other test files. [`src/server/routes/api-admin.test.ts:100`]
+- SQLite FK constraints not enforced by default; `user_embeddings.user_id` FK referencing `users.id` is informational only — pre-existing project-wide pattern; no `PRAGMA foreign_keys = ON` is set anywhere in the codebase. Orphaned embeddings can exist if a user is deleted.
+- No Zod/schema validation applied to the outbound `GET /api/jobs` response body; `jobSchema` defines the contract but is not used at the serialization boundary — pre-existing architectural pattern across all API routes; `relevanceScore` presence depends on Drizzle column inference rather than runtime enforcement.
+
 ## Deferred from: code review of 39-2-analysis-use-pre-stored-description-skip-scraper (2026-05-26)
 
 - Whitespace-only `jobDescription` bypasses scraper and is passed to Anthropic as-is — unreachable from normal insert path (39.1 trims whitespace to NULL) but no defense-in-depth `.trim()` in service. [`analysis-service.ts:95`]
@@ -722,9 +728,15 @@ If none of `.job_seen_beacon`, `td.resultContent` match, card=null → company=n
 - **Dashboard WORKFLOW_KEYS use old terminology** — `'Analysis'`, `'Cover Letter'`, `'Resume'` column headers and chart labels in `dashboard.tsx` are data-coupled to server-stored workflow names; renaming requires a coordinated server+client+DB change. [`dashboard.tsx`]
 - **Pipeline alert labels hardcode `'Analysis'`** — "Analysis complete" / "Analysis failed" toasts in `index.tsx` still use the pre-rename term; vocabulary gap with the now-renamed config UI. [`index.tsx`]
 
+## Deferred from: code review of 40-1-spike-validate-xenova-transformers-under-bun (2026-05-27)
+
+- `onnxruntime-web@1.14.0` is a transitive dep of `@xenova/transformers@2.17.2`; this vintage has known CVEs in the ONNX runtime C++ layer. Not addressable without a newer `@xenova/transformers` release that bumps its ort dependency. Revisit when implementing story 40.3A. [`job-hunt-dashboard/bun.lock`]
+- Docker image strategy for `@xenova/transformers` not yet defined — model cache path, image sizing, and `.dockerignore` handling for the `spike/` directory should all be addressed when implementing story 40.3A. [`job-hunt-dashboard/Dockerfile`]
+
 ## Deferred from: code review of 39-1-add-job-form-and-api-accept-optional-job-description (2026-05-26)
 
 - **No maxLength on description field** — `z.string().min(1).optional()` has no upper bound; unbounded text can be stored in the `jobDescription` TEXT column. No spec requirement for a limit; worth adding a reasonable cap (e.g. 50,000 chars) before shipping. [`api-jobs.ts:191`, `AddJobDrawer.tsx`]
 - **`analysisStatus: 'pending'` on description-only jobs with no scraper trigger** — jobs created with description but no URL are set to `pending` but the current analysis service has no path to progress them without a URL. Story 39.2 will fix this by using the pre-stored description and skipping the scraper. [`api-jobs.ts`]
 - **Duplicate check won't catch description-only dupes** — deduplication keys on `sourceUrl`; two identical manual pastes with no URL produce two separate rows silently. Pre-existing limitation. [`api-jobs.ts`]
 - **`company`/`jobTitle` not trimmed in duplicate-check WHERE clause** — leading/trailing whitespace produces a miss against an existing row. Pre-existing from original manual-add implementation. [`api-jobs.ts`]
+
