@@ -9,6 +9,9 @@ import { useWebhookStream } from '../hooks/useWebhookStream'
 import { PipelineTable } from '../components/pipeline/PipelineTable'
 import { JobDrawer } from '../components/detail/JobDrawer'
 import { AddJobDrawer } from '../components/pipeline/AddJobDrawer'
+import { useProfileQuery } from '../hooks/useProfileQuery'
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover'
+import { Link } from '@tanstack/react-router'
 
 type ActiveAlert =
   | { kind: 'webhook-success'; label: string; message: string | null }
@@ -76,6 +79,9 @@ export function PipelineRoute() {
   const [isAddJobDrawerOpen, setIsAddJobDrawerOpen] = useState(false)
   const [drawerKey, setDrawerKey] = useState(0)
 
+  const { data: profile } = useProfileQuery()
+  const hasResumeText = Boolean(profile?.summary || profile?.experience || profile?.skills)
+
   const activeJobs = (jobs ?? []).filter(j => !j.archived && j.fitScore == null)
 
   useEffect(() => {
@@ -123,24 +129,43 @@ export function PipelineRoute() {
 
   const actionBar = (
     <div className="flex items-center px-4 pt-4 gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={discoveryStream.isPending || analysisStream.isPending}
-        onClick={() => discoveryStream.trigger()}
-      >
-        {discoveryStream.isPending ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Discovering…
-          </>
-        ) : (
-          <>
-            <Search className="mr-2 h-4 w-4" />
-            Discover Jobs
-          </>
-        )}
-      </Button>
+      {hasResumeText ? (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={discoveryStream.isPending || analysisStream.isPending}
+          onClick={() => discoveryStream.trigger()}
+        >
+          {discoveryStream.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Discovering…
+            </>
+          ) : (
+            <>
+              <Search className="mr-2 h-4 w-4" />
+              Discover Jobs
+            </>
+          )}
+        </Button>
+      ) : (
+        <Popover>
+          <PopoverTrigger asChild>
+            <span>
+              <Button variant="outline" size="sm" disabled>
+                <Search className="mr-2 h-4 w-4" />
+                Discover Jobs
+              </Button>
+            </span>
+          </PopoverTrigger>
+          <PopoverContent className="max-w-[220px] space-y-1 p-3">
+            <p className="text-sm">Profile &amp; resume required to run discovery</p>
+            <Link to="/config/profile" className="text-xs text-blue-400 hover:underline block">
+              Configure profile →
+            </Link>
+          </PopoverContent>
+        </Popover>
+      )}
 
       <Button
         variant="outline"
@@ -226,7 +251,7 @@ export function PipelineRoute() {
             selectedJobId={selectedJobId}
             onBulkArchive={bulkArchiveMutation.mutate}
             isBulkArchiving={bulkArchiveMutation.isPending}
-            fixedColumns={['company', 'jobTitle', 'source', 'date_scraped']}
+            fixedColumns={['company', 'jobTitle', 'source', 'relevanceScore', 'date_scraped']}
           />
         </div>
         <JobDrawer

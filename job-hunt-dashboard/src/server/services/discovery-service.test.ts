@@ -4,6 +4,33 @@ process.env.DB_PATH = ':memory:'
 import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach, mock } from 'bun:test'
 import { Database } from 'bun:sqlite'
 
+// ---- MOCK SETUP: must precede any dynamic import that depends on these modules ----
+
+const mockEmbed = mock(async (_text: string): Promise<number[]> => new Array(384).fill(0.1))
+const mockGetOrComputeResumeEmbedding = mock(
+  async (_userId: number, _resumeText: string, _profileHash: string): Promise<number[]> =>
+    new Array(384).fill(0.1)
+)
+
+mock.module('./embedding-service', () => ({
+  embed: mockEmbed,
+  cosineSimilarity: (a: number[], b: number[]) => {
+    let dot = 0, magA = 0, magB = 0
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i]
+      magA += a[i] * a[i]
+      magB += b[i] * b[i]
+    }
+    return dot / (Math.sqrt(magA) * Math.sqrt(magB))
+  },
+}))
+
+mock.module('./resume-embedding-cache', () => ({
+  getOrComputeResumeEmbedding: mockGetOrComputeResumeEmbedding,
+}))
+
+// ---- END MOCK SETUP ----
+
 const originalFetch = globalThis.fetch
 
 const { runDiscovery } = await import('./discovery-service')
@@ -79,11 +106,39 @@ const CREATE_SOURCE_SETTINGS_TABLE = `
   )
 `
 
+const CREATE_PROFILE_TABLE = `
+  CREATE TABLE IF NOT EXISTS profile (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT,
+    email TEXT,
+    phone TEXT,
+    location TEXT,
+    linkedin_url TEXT,
+    github_url TEXT,
+    summary TEXT,
+    experience TEXT,
+    skills TEXT,
+    education TEXT,
+    UNIQUE(user_id)
+  )
+`
+
+const CREATE_USER_EMBEDDINGS_TABLE = `
+  CREATE TABLE IF NOT EXISTS user_embeddings (
+    user_id INTEGER PRIMARY KEY NOT NULL,
+    embedding TEXT NOT NULL,
+    profile_hash TEXT NOT NULL
+  )
+`
+
 beforeAll(() => {
   prodSqlite.run(CREATE_JOBS_TABLE)
   prodSqlite.run(CREATE_SEARCH_CONFIGS_TABLE)
   prodSqlite.run(CREATE_USER_SECRETS_TABLE)
   prodSqlite.run(CREATE_SOURCE_SETTINGS_TABLE)
+  prodSqlite.run(CREATE_PROFILE_TABLE)
+  prodSqlite.run(CREATE_USER_EMBEDDINGS_TABLE)
   prodSqlite.run(`INSERT OR IGNORE INTO source_settings (source, enabled) VALUES ('linkedin',1),('indeed',1),('indeed_nl',1),('arc',1)`)
   prodSqlite.run(`INSERT INTO search_configs (source, query, enabled) VALUES ('linkedin', 'genai python', 1)`)
   process.env.SCRAPER_URL = 'http://test-scraper.invalid'
@@ -97,6 +152,14 @@ afterAll(() => {
 beforeEach(() => {
   prodSqlite.run('DELETE FROM jobs')
   prodSqlite.run('DELETE FROM user_secrets')
+  prodSqlite.run('DELETE FROM profile')
+  prodSqlite.run('DELETE FROM user_embeddings')
+  mockEmbed.mockReset()
+  mockEmbed.mockImplementation(async (_text: string) => new Array(384).fill(0.1))
+  mockGetOrComputeResumeEmbedding.mockReset()
+  mockGetOrComputeResumeEmbedding.mockImplementation(
+    async (_userId: number, _resumeText: string, _profileHash: string) => new Array(384).fill(0.1)
+  )
 })
 
 afterEach(() => {
@@ -446,5 +509,211 @@ describe('runDiscovery()', () => {
     expect(errors[0].source).toBe('linkedin')
     expect(errors[0].error).toBe('Failed to read LinkedIn session — re-upload in Config > Connections')
     expect(inserted).toBe(0)
+  })
+
+  describe('relevance scoring', () => {
+    test('sets relevanceScore on new jobs when user has profile with resume text', async () => {
+      prodSqlite.run(
+        `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+      )
+      prodSqlite.run(
+        `INSERT INTO profile (user_id, summary, experience, skills) VALUES (1, 'software engineer', 'backend 5yrs', 'TypeScript')`
+      )
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(
+          JSON.stringify({ results: [{ id: 'job-r1', title: 'Backend Engineer', company: 'Acme', location: null, url: null }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      )
+
+      const { inserted } = await runDiscovery(undefined, 1)
+      expect(inserted).toBe(1)
+      const row = prodSqlite.prepare(
+        `SELECT relevance_score FROM jobs WHERE external_job_id = 'job-r1'`
+      ).get() as { relevance_score: number | null }
+      expect(row).not.toBeNull()
+      expect(row.relevance_score).not.toBeNull()
+      expect(typeof row.relevance_score).toBe('number')
+      expect(row.relevance_score).toBeGreaterThanOrEqual(-1)
+      expect(row.relevance_score).toBeLessThanOrEqual(1)
+      expect(mockGetOrComputeResumeEmbedding).toHaveBeenCalledTimes(1)
+      expect(mockEmbed).toHaveBeenCalledWith('Backend Engineer')
+    })
+
+    test('leaves relevanceScore null when user has no profile', async () => {
+      prodSqlite.run(
+        `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+      )
+      // No profile row inserted
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(
+          JSON.stringify({ results: [{ id: 'job-r2', title: 'Dev', company: 'Beta', location: null, url: null }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      )
+
+      const { inserted } = await runDiscovery(undefined, 1)
+      expect(inserted).toBe(1)
+      const row = prodSqlite.prepare(
+        `SELECT relevance_score FROM jobs WHERE external_job_id = 'job-r2'`
+      ).get() as { relevance_score: number | null }
+      expect(row.relevance_score).toBeNull()
+      expect(mockEmbed).not.toHaveBeenCalled()
+      expect(mockGetOrComputeResumeEmbedding).not.toHaveBeenCalled()
+    })
+
+    test('leaves relevanceScore null when profile has no resume text', async () => {
+      prodSqlite.run(
+        `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+      )
+      // Profile exists but no resume text (only name/email)
+      prodSqlite.run(`INSERT INTO profile (user_id, name, email) VALUES (1, 'Alice', 'alice@example.com')`)
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(
+          JSON.stringify({ results: [{ id: 'job-r3', title: 'Dev', company: 'Beta', location: null, url: null }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      )
+
+      const { inserted } = await runDiscovery(undefined, 1)
+      expect(inserted).toBe(1)
+      const row = prodSqlite.prepare(
+        `SELECT relevance_score FROM jobs WHERE external_job_id = 'job-r3'`
+      ).get() as { relevance_score: number | null }
+      expect(row.relevance_score).toBeNull()
+      expect(mockEmbed).not.toHaveBeenCalled()
+    })
+
+    test('per-job embed error does not abort discovery run; other jobs scored normally', async () => {
+      prodSqlite.run(
+        `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+      )
+      prodSqlite.run(
+        `INSERT INTO profile (user_id, summary) VALUES (1, 'software engineer')`
+      )
+
+      let embedCallCount = 0
+      mockEmbed.mockImplementation(async (text: string) => {
+        embedCallCount++
+        if (text === 'BadTitle') throw new Error('embed failed')
+        return new Array(384).fill(0.1)
+      })
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(
+          JSON.stringify({
+            results: [
+              { id: 'job-good', title: 'Good Engineer', company: 'Acme', location: null, url: null },
+              { id: 'job-bad', title: 'BadTitle', company: 'Fail Co', location: null, url: null },
+            ]
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      )
+
+      const { inserted } = await runDiscovery(undefined, 1)
+      expect(inserted).toBe(2) // Both jobs inserted
+      const goodRow = prodSqlite.prepare(
+        `SELECT relevance_score FROM jobs WHERE external_job_id = 'job-good'`
+      ).get() as { relevance_score: number | null }
+      const badRow = prodSqlite.prepare(
+        `SELECT relevance_score FROM jobs WHERE external_job_id = 'job-bad'`
+      ).get() as { relevance_score: number | null }
+      expect(goodRow.relevance_score).not.toBeNull()
+      expect(badRow.relevance_score).toBeNull()
+      expect(embedCallCount).toBe(2) // Both titles attempted
+      expect(mockGetOrComputeResumeEmbedding).toHaveBeenCalledTimes(1) // Resume embed fetched once per run
+    })
+
+    test('profileHash is deterministic across runs — same profile produces same cache key (AC2)', async () => {
+      prodSqlite.run(
+        `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+      )
+      prodSqlite.run(
+        `INSERT INTO profile (user_id, summary) VALUES (1, 'software engineer')`
+      )
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(
+          JSON.stringify({
+            results: [
+              { id: 'job-ac2-a', title: 'Engineer A', company: 'Acme', location: null, url: null },
+              { id: 'job-ac2-b', title: 'Engineer B', company: 'Beta', location: null, url: null },
+            ]
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      )
+
+      // First run: 2 new jobs — getOrComputeResumeEmbedding called once (not per job)
+      await runDiscovery(undefined, 1)
+      expect(mockGetOrComputeResumeEmbedding).toHaveBeenCalledTimes(1)
+      const firstHash = mockGetOrComputeResumeEmbedding.mock.calls[0][2]
+
+      mockGetOrComputeResumeEmbedding.mockReset()
+      mockGetOrComputeResumeEmbedding.mockImplementation(
+        async (_userId: number, _resumeText: string, _profileHash: string) => new Array(384).fill(0.1)
+      )
+      mockEmbed.mockReset()
+      mockEmbed.mockImplementation(async (_text: string) => new Array(384).fill(0.1))
+
+      // Second run with new jobs — profile unchanged
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(
+          JSON.stringify({
+            results: [{ id: 'job-ac2-c', title: 'Engineer C', company: 'Gamma', location: null, url: null }]
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      )
+
+      await runDiscovery(undefined, 1)
+      expect(mockGetOrComputeResumeEmbedding).toHaveBeenCalledTimes(1)
+      const secondHash = mockGetOrComputeResumeEmbedding.mock.calls[0][2]
+
+      // Unchanged profile → same hash → cache key is stable
+      expect(secondHash).toBe(firstHash)
+    })
+
+    test('pre-existing jobs are not scored (AC5)', async () => {
+      prodSqlite.run(
+        `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+      )
+      prodSqlite.run(
+        `INSERT INTO profile (user_id, summary) VALUES (1, 'software engineer')`
+      )
+      // Pre-insert an existing job
+      prodSqlite.run(
+        `INSERT INTO jobs (company, job_title, external_job_id, source, user_id) VALUES ('OldCo', 'Old Job', 'existing-job-id', 'linkedin', 1)`
+      )
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(
+          JSON.stringify({
+            results: [
+              { id: 'existing-job-id', title: 'Old Job', company: 'OldCo', location: null, url: null },
+              { id: 'new-job-id', title: 'New Engineer', company: 'NewCo', location: null, url: null },
+            ]
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      )
+
+      const { inserted } = await runDiscovery(undefined, 1)
+      expect(inserted).toBe(1) // Only the new job inserted
+
+      const existingRow = prodSqlite.prepare(
+        `SELECT relevance_score FROM jobs WHERE external_job_id = 'existing-job-id'`
+      ).get() as { relevance_score: number | null }
+      const newRow = prodSqlite.prepare(
+        `SELECT relevance_score FROM jobs WHERE external_job_id = 'new-job-id'`
+      ).get() as { relevance_score: number | null }
+
+      expect(existingRow.relevance_score).toBeNull() // Pre-existing job untouched
+      expect(newRow.relevance_score).not.toBeNull()  // New job scored
+    })
   })
 })

@@ -1,8 +1,10 @@
 import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import { db } from '../../db/client'
-import { jobs, searchConfigs, userSecrets, sourceSettings } from '../../db/schema'
+import { jobs, searchConfigs, userSecrets, sourceSettings, profile } from '../../db/schema'
 import { decrypt, encrypt } from '../lib/crypto'
 import type { ScraperSource } from '../../shared/schemas'
+import { getOrComputeResumeEmbedding } from './resume-embedding-cache'
+import { embed, cosineSimilarity } from './embedding-service'
 
 interface ScraperResult {
   id: string
@@ -14,6 +16,11 @@ interface ScraperResult {
 
 const DB_SOURCE: Record<ScraperSource, string> = {
   linkedin: 'linkedin', indeed: 'indeed', indeed_nl: 'indeed_nl', arc: 'arc',
+}
+
+async function hashText(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return Buffer.from(buf).toString('hex')
 }
 
 export async function runDiscovery(onProgress?: (msg: string) => void, userId?: number): Promise<{ inserted: number; bySource: Record<string, number>; errors: Array<{ source: string; error: string }> }> {
@@ -242,6 +249,40 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
             .run()
         }
       })
+    }
+    if (userId !== undefined && newJobs.length > 0) {
+      const profileRow = db.select().from(profile)
+        .where(eq(profile.userId, userId)).get()
+
+      const resumeText = profileRow
+        ? [profileRow.summary, profileRow.experience, profileRow.skills]
+            .filter(Boolean).join('\n')
+        : ''
+
+      if (resumeText) {
+        try {
+          const profileHash = await hashText(resumeText)
+          const resumeEmbedding = await getOrComputeResumeEmbedding(userId, resumeText, profileHash)
+
+          // No wrapping transaction — scoring is intentionally best-effort per job.
+          // A transaction would roll back all scores if any single embed fails,
+          // violating the requirement that other jobs in the batch are scored normally.
+          for (const job of newJobs) {
+            try {
+              const titleEmbedding = await embed(job.title)
+              const score = cosineSimilarity(resumeEmbedding, titleEmbedding)
+              db.update(jobs)
+                .set({ relevanceScore: score })
+                .where(and(eq(jobs.userId, userId), eq(jobs.externalJobId, job.id)))
+                .run()
+            } catch {
+              console.error(`[DISCOVERY] embed failed for job "${job.id}"; stays with null relevanceScore`)
+            }
+          }
+        } catch {
+          console.error('[DISCOVERY] resume embedding failed; batch stays with null relevanceScore')
+        }
+      }
     }
     // userId undefined: inserts skipped (userId is NOT NULL) — bySource still computed below
 

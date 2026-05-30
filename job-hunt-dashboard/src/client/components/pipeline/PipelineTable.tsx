@@ -118,6 +118,21 @@ const staticColumns = [
       )
     },
   }),
+  columnHelper.accessor('relevanceScore', {
+    header: 'Relevance',
+    cell: (info) => {
+      const v = info.getValue()
+      return v != null
+        ? <span className="text-zinc-300">{v.toFixed(2)}</span>
+        : <span className="text-zinc-500">—</span>
+    },
+    sortingFn: (rowA, rowB) => {
+      const a = rowA.original.relevanceScore ?? -Infinity
+      const b = rowB.original.relevanceScore ?? -Infinity
+      return a - b
+    },
+    enableSorting: true,
+  }),
   columnHelper.accessor('dateScraped', {
     id: 'date_scraped',
     header: 'Date Scraped',

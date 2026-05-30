@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
-import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, CheckCircle, Circle, Pencil } from 'lucide-react'
+import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, CheckCircle, Circle, Pencil, Info } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import type { Job } from '@shared/schemas'
@@ -187,6 +187,44 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
               <TabsTrigger value="documents" className="flex-1">Documents</TabsTrigger>
             </TabsList>
             <TabsContent value="analysis" className="pt-4">
+              <div className="flex flex-row gap-4 mb-4">
+                <div className="flex-1 bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-xs text-zinc-500 uppercase tracking-wide">Relevance Score</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info size={12} aria-label="About Relevance Score" className="cursor-help text-zinc-600 hover:text-zinc-400" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[240px]">
+                          <p>Similarity between this job title and your resume, scored at discovery using a self-hosted embedding model</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <p className="text-lg font-medium text-zinc-200">
+                    {job?.relevanceScore != null ? job.relevanceScore.toFixed(2) : '—'}
+                  </p>
+                </div>
+                <div className="flex-1 bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-xs text-zinc-500 uppercase tracking-wide">Fit Score</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info size={12} aria-label="About Fit Score" className="cursor-help text-zinc-600 hover:text-zinc-400" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[240px]">
+                          <p>AI analysis score based on the full job description and your resume</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <p className="text-lg font-medium text-zinc-200">
+                    {job?.fitScore != null ? job.fitScore : '—'}
+                  </p>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4 items-start">
                 <AssessmentSection label="Role Fit" content={job?.roleFit ?? null} />
                 <AssessmentSection label="Red Flags" content={job?.redFlags ?? null} />

@@ -1,5 +1,16 @@
 # Deferred Work
 
+## Deferred from: code review of 40-5-ux-relevance-column-drawer-layout-and-discover-button-guard (2026-05-29, updated 2026-05-30)
+
+- `NaN` relevanceScore renders as "NaN" in the table cell and corrupts the sort comparator — `v != null` passes for `NaN`; `NaN ?? -Infinity` does not coerce (nullish coalescing only catches null/undefined); root cause is in the embedding service layer, not this UI story. [`PipelineTable.tsx` lines 125, 129-133]
+- AC3 ascending sort places `null`-score rows first — `-Infinity` substitution in `sortingFn` puts nulls at the top on ascending sort; spec requires nulls-last on both directions; accepted trade-off per story dev notes (primary use case is descending). [`PipelineTable.tsx` lines 129-133]
+
+## Deferred from: code review of 40-3a-embedding-service-in-process-via-xenova-transformers (2026-05-29)
+
+- `embed()` accepts empty/whitespace-only text without guard — produces a meaningless 384-d vector that would silently corrupt relevance scores; caller (story 40.4) should validate before calling. [`embedding-service.ts:13`]
+- `JSON.parse(cached.embedding)` in `getOrComputeResumeEmbedding` is unguarded — a malformed row (truncated write, manual edit) will throw an uncaught exception; could add a try/catch fallback to recompute on parse failure. [`resume-embedding-cache.ts:12`]
+- Integration test `embed (real model)` loads the full ONNX model (~25 MB) on every test run with no skip guard — consider a `SKIP_SLOW_TESTS` env var or separating into a dedicated integration test suite. [`embedding-service.test.ts:35`]
+
 ## Deferred from: code review of 40-2-data-model-relevance-score-column-and-resume-embedding-cache (2026-05-28)
 
 - `api-admin.test.ts` jobs/messages DDL drops FK constraint on `user_id` (replaced with `DEFAULT 1`) — SQLite does not enforce FKs without `PRAGMA foreign_keys = ON`; this is an intentional test simplification; pre-existing pattern in other test files. [`src/server/routes/api-admin.test.ts:100`]
@@ -740,3 +751,11 @@ If none of `.job_seen_beacon`, `td.resultContent` match, card=null → company=n
 - **Duplicate check won't catch description-only dupes** — deduplication keys on `sourceUrl`; two identical manual pastes with no URL produce two separate rows silently. Pre-existing limitation. [`api-jobs.ts`]
 - **`company`/`jobTitle` not trimmed in duplicate-check WHERE clause** — leading/trailing whitespace produces a miss against an existing row. Pre-existing from original manual-add implementation. [`api-jobs.ts`]
 
+
+## Deferred from: code review of 40-4-discovery-pipeline-integration-score-jobs-at-insert-time (2026-05-29)
+
+- **`onConflictDoNothing` + novel `externalJobId` → scoring UPDATE targets non-existent row** — if a job has a new `externalJobId` but conflicts on `(company, jobTitle, userId)`, the insert is skipped but the job is in `newJobs`; the scoring `UPDATE WHERE externalJobId = job.id` silently matches zero rows. Pre-existing dedup logic edge case. [`discovery-service.ts`]
+- **`NaN` from zero-vector embedding could be written to `relevance_score`** — if `cosineSimilarity` returns `NaN` (degenerate embedding, no zero-guard), it is stored directly; per-job catch only fires on thrown errors. Embedding service responsibility. [`discovery-service.ts`]
+- **Whitespace-only job title silently passed to `embed()`** — `ScraperResult.title: string` with a whitespace-only value is truthy, passes the `newJobs` filter, and gets embedded. Scraper output normalization concern. [`discovery-service.ts`]
+- **`db.select().from(profile)...get()` is synchronous** — correct for Bun SQLite but breaks silently if driver is ever swapped to async (e.g. libsql/turso). [`discovery-service.ts`]
+- **`VALID_LINKEDIN_CIPHERTEXT` inserted via template literal SQL in test setup** — pre-existing pattern; a quote in the ciphertext would produce malformed SQL. [`discovery-service.test.ts`]
