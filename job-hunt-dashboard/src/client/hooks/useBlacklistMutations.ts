@@ -5,7 +5,7 @@ import type { BlacklistEntry, BlacklistEntryInput } from '@shared/schemas'
 async function extractError(res: Response): Promise<string> {
   try {
     const body = await res.json() as { error?: string }
-    return body.error ?? res.statusText || `HTTP ${res.status}`
+    return body.error ?? (res.statusText || `HTTP ${res.status}`)
   } catch {
     return res.statusText || `HTTP ${res.status}`
   }
