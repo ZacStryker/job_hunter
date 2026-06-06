@@ -194,3 +194,12 @@ export const userEmbeddings = sqliteTable('user_embeddings', {
   embedding:   text('embedding').notNull(),
   profileHash: text('profile_hash').notNull(),
 })
+
+export const companyBlacklist = sqliteTable('company_blacklist', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id),
+  companyName: text('company_name').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (t) => [
+  uniqueIndex('blacklist_user_company_idx').on(t.userId, t.companyName),
+])

@@ -1,6 +1,6 @@
 import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import { db } from '../../db/client'
-import { jobs, searchConfigs, userSecrets, sourceSettings, profile } from '../../db/schema'
+import { jobs, searchConfigs, userSecrets, sourceSettings, profile, companyBlacklist } from '../../db/schema'
 import { decrypt, encrypt } from '../lib/crypto'
 import type { ScraperSource } from '../../shared/schemas'
 import { getOrComputeResumeEmbedding } from './resume-embedding-cache'
@@ -212,9 +212,20 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
       .all()
     const existingIds = new Set(existing.map((r) => r.externalJobId!))
 
+    const blacklistedNames = userId !== undefined
+      ? new Set(
+          db.select({ companyName: companyBlacklist.companyName })
+            .from(companyBlacklist)
+            .where(eq(companyBlacklist.userId, userId))
+            .all()
+            .map((r) => r.companyName.toLowerCase())
+        )
+      : new Set<string>()
+
     const seen = new Set<string>()
     const newJobs = allResults.filter((r) => {
       if (!r.id || !r.company || !r.title || existingIds.has(r.id) || seen.has(r.id)) return false
+      if (blacklistedNames.size > 0 && blacklistedNames.has(r.company.toLowerCase())) return false
       seen.add(r.id)
       return true
     })

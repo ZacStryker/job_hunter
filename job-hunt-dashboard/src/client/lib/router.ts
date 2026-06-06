@@ -34,6 +34,8 @@ import { ProfileInboxMappingRoute } from '../routes/config/profile-inbox-mapping
 import { fetchInboxMappings } from '../hooks/useInboxMappingsQuery'
 import { JobSourcesAuthSetupRoute } from '../routes/config/job-sources-auth-setup'
 import { JobSourcesSearchesRoute } from '../routes/config/job-sources-searches'
+import { ConfigJobSourcesBlacklistRoute } from '../routes/config/job-sources-blacklist'
+import { fetchBlacklist } from '../hooks/useBlacklistQuery'
 import { PromptsAnalysisRoute } from '../routes/config/prompts-analysis'
 import { PromptsCoverLetterRoute } from '../routes/config/prompts-cover-letter'
 import { PromptsResumeRoute } from '../routes/config/prompts-resume'
@@ -126,21 +128,30 @@ const indexRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/',
   component: PipelineRoute,
-  loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
+  loader: () => Promise.all([
+    queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
+    queryClient.ensureQueryData({ queryKey: ['blacklist'], queryFn: fetchBlacklist }),
+  ]),
 })
 
 const trackerRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/applications',
   component: TrackerRoute,
-  loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
+  loader: () => Promise.all([
+    queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
+    queryClient.ensureQueryData({ queryKey: ['blacklist'], queryFn: fetchBlacklist }),
+  ]),
 })
 
 const archivedRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/archive',
   component: ArchivedRoute,
-  loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
+  loader: () => Promise.all([
+    queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
+    queryClient.ensureQueryData({ queryKey: ['blacklist'], queryFn: fetchBlacklist }),
+  ]),
 })
 
 const messagesRoute = createRoute({
@@ -154,7 +165,10 @@ const matchesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/matches',
   component: MatchesRoute,
-  loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
+  loader: () => Promise.all([
+    queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
+    queryClient.ensureQueryData({ queryKey: ['blacklist'], queryFn: fetchBlacklist }),
+  ]),
 })
 
 const configLayoutRoute = createRoute({
@@ -236,6 +250,13 @@ const configJobSourcesSearchesRoute = createRoute({
   ]),
 })
 
+const configJobSourcesBlacklistRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/job-sources/blacklist',
+  component: ConfigJobSourcesBlacklistRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['blacklist'], queryFn: fetchBlacklist }),
+})
+
 const configPromptsRoute = createRoute({
   getParentRoute: () => configLayoutRoute,
   path: '/config/prompts',
@@ -308,6 +329,7 @@ const routeTree = rootRoute.addChildren([
       configJobSourcesRoute,
       configJobSourcesAuthSetupRoute,
       configJobSourcesSearchesRoute,
+      configJobSourcesBlacklistRoute,
       configPromptsRoute,
       configPromptsAnalysisRoute,
       configPromptsCoverLetterRoute,

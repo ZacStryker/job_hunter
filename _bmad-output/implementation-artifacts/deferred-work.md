@@ -1,5 +1,20 @@
 # Deferred Work
 
+## Deferred from: code review of 41-4-job-drawer-blacklist-toggle-button (2026-06-06)
+
+- No `type="button"` attribute on the blacklist toggle button in the action row — pre-existing omission across all action buttons in `JobDrawer.tsx`; applied and archive buttons also lack explicit `type`. [`JobDrawer.tsx`]
+- `configJobSourcesBlacklistRoute` router wiring and `ConfigJobSourcesBlacklistRoute` import completed in story 41.4 but belong to story 41.3 scope — story 41.3 was marked done before this step was completed; code is functionally correct. [`router.ts`]
+
+## Deferred from: code review of 41-3-config-ui-job-sources-blacklist-page (2026-06-06)
+
+- Route loader `configJobSourcesBlacklistRoute` has no `errorComponent` — project-wide pattern; a loader failure (network down, 500) falls to the root error boundary with no per-route handling. [`router.ts`]
+- No optimistic update for remove mutation — after clicking Remove, all Remove buttons are disabled until the server round-trip + query invalidation completes; UX enhancement, not spec-required. [`job-sources-blacklist.tsx`]
+
+## Deferred from: code review of 41-2-discovery-service-blacklist-filtering (2026-06-06)
+
+- Schema lacks case-normalized unique index on `company_blacklist.company_name` — if a user inserts "Acme Corp" and "acme corp" as separate entries, both are stored; DB-level uniqueness enforced on raw string only (Story 41.1 design gap). [`src/db/migrations/0030_uneven_beyonder.sql`]
+- `bySource` counts vs insert count mismatch when `userId` is undefined — pre-existing: `newJobs` is populated but the insert loop is skipped when `userId` is undefined, so `bySource` shows non-zero counts even when nothing was written. [`discovery-service.ts`]
+
 ## Deferred from: code review of 40-5-ux-relevance-column-drawer-layout-and-discover-button-guard (2026-05-29, updated 2026-05-30)
 
 - `NaN` relevanceScore renders as "NaN" in the table cell and corrupts the sort comparator — `v != null` passes for `NaN`; `NaN ?? -Infinity` does not coerce (nullish coalescing only catches null/undefined); root cause is in the embedding service layer, not this UI story. [`PipelineTable.tsx` lines 125, 129-133]

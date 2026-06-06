@@ -132,6 +132,15 @@ const CREATE_USER_EMBEDDINGS_TABLE = `
   )
 `
 
+const CREATE_COMPANY_BLACKLIST_TABLE = `
+  CREATE TABLE IF NOT EXISTS company_blacklist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL DEFAULT 1,
+    company_name TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )
+`
+
 beforeAll(() => {
   prodSqlite.run(CREATE_JOBS_TABLE)
   prodSqlite.run(CREATE_SEARCH_CONFIGS_TABLE)
@@ -139,6 +148,7 @@ beforeAll(() => {
   prodSqlite.run(CREATE_SOURCE_SETTINGS_TABLE)
   prodSqlite.run(CREATE_PROFILE_TABLE)
   prodSqlite.run(CREATE_USER_EMBEDDINGS_TABLE)
+  prodSqlite.run(CREATE_COMPANY_BLACKLIST_TABLE)
   prodSqlite.run(`INSERT OR IGNORE INTO source_settings (source, enabled) VALUES ('linkedin',1),('indeed',1),('indeed_nl',1),('arc',1)`)
   prodSqlite.run(`INSERT INTO search_configs (source, query, enabled) VALUES ('linkedin', 'genai python', 1)`)
   process.env.SCRAPER_URL = 'http://test-scraper.invalid'
@@ -154,6 +164,7 @@ beforeEach(() => {
   prodSqlite.run('DELETE FROM user_secrets')
   prodSqlite.run('DELETE FROM profile')
   prodSqlite.run('DELETE FROM user_embeddings')
+  prodSqlite.run('DELETE FROM company_blacklist')
   mockEmbed.mockReset()
   mockEmbed.mockImplementation(async (_text: string) => new Array(384).fill(0.1))
   mockGetOrComputeResumeEmbedding.mockReset()
@@ -509,6 +520,94 @@ describe('runDiscovery()', () => {
     expect(errors[0].source).toBe('linkedin')
     expect(errors[0].error).toBe('Failed to read LinkedIn session — re-upload in Config > Connections')
     expect(inserted).toBe(0)
+  })
+
+  describe('blacklist filtering', () => {
+    test('blacklisted company (title case) is not inserted — case-insensitive match', async () => {
+      prodSqlite.run(
+        `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+      )
+      prodSqlite.run(`INSERT INTO company_blacklist (user_id, company_name, created_at) VALUES (1, 'acme corp', '2026-01-01T00:00:00.000Z')`)
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(
+          JSON.stringify({ results: [{ id: 'bl-1', title: 'SWE', company: 'Acme Corp', location: null, url: null }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      )
+
+      const { inserted } = await runDiscovery(undefined, 1)
+      expect(inserted).toBe(0)
+      const rows = prodSqlite.prepare('SELECT * FROM jobs WHERE external_job_id = ?').all('bl-1')
+      expect(rows).toHaveLength(0)
+    })
+
+    test('blacklisted company (ALL CAPS) is not inserted — case-insensitive', async () => {
+      prodSqlite.run(
+        `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+      )
+      prodSqlite.run(`INSERT INTO company_blacklist (user_id, company_name, created_at) VALUES (1, 'acme corp', '2026-01-01T00:00:00.000Z')`)
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(
+          JSON.stringify({ results: [{ id: 'bl-2', title: 'SWE', company: 'ACME CORP', location: null, url: null }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      )
+
+      const { inserted } = await runDiscovery(undefined, 1)
+      expect(inserted).toBe(0)
+    })
+
+    test('partial name match is NOT blocked — exact normalized match required', async () => {
+      prodSqlite.run(
+        `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+      )
+      prodSqlite.run(`INSERT INTO company_blacklist (user_id, company_name, created_at) VALUES (1, 'acme corp', '2026-01-01T00:00:00.000Z')`)
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(
+          JSON.stringify({ results: [{ id: 'bl-3', title: 'SWE', company: 'Acme Corporation', location: null, url: null }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      )
+
+      const { inserted } = await runDiscovery(undefined, 1)
+      expect(inserted).toBe(1)
+      const rows = prodSqlite.prepare('SELECT * FROM jobs WHERE external_job_id = ?').all('bl-3')
+      expect(rows).toHaveLength(1)
+    })
+
+    test('no userId — blacklist not applied even when entries exist for a user', async () => {
+      prodSqlite.run(`INSERT INTO company_blacklist (user_id, company_name, created_at) VALUES (1, 'acme corp', '2026-01-01T00:00:00.000Z')`)
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(
+          JSON.stringify({ results: [{ id: 'bl-4', title: 'SWE', company: 'Acme Corp', location: null, url: null }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      )
+
+      const { inserted, bySource } = await runDiscovery(undefined, undefined)
+      expect(inserted).toBe(0)
+      expect(bySource['linkedin']).toBe(1)
+    })
+
+    test('empty blacklist — all deduped results are inserted normally', async () => {
+      prodSqlite.run(
+        `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+      )
+
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(
+          JSON.stringify({ results: [{ id: 'bl-5', title: 'SWE', company: 'Some Company', location: null, url: null }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        ))
+      )
+
+      const { inserted } = await runDiscovery(undefined, 1)
+      expect(inserted).toBe(1)
+    })
   })
 
   describe('relevance scoring', () => {

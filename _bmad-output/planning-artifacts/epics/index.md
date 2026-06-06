@@ -108,3 +108,8 @@
     - [Story 40.3B: Embedding Service — Python FastAPI Sidecar (fallback)](./epic-40-relevance-pre-scoring.md#story-403b-embedding-service--python-fastapi-sidecar-fallback)
     - [Story 40.4: Discovery Pipeline Integration — Score Jobs at Insert Time](./epic-40-relevance-pre-scoring.md#story-404-discovery-pipeline-integration--score-jobs-at-insert-time)
     - [Story 40.5: UX — Relevance Column, Drawer Layout & Discover Button Guard](./epic-40-relevance-pre-scoring.md#story-405-ux--relevance-column-drawer-layout--discover-button-guard)
+  - [Epic 41: Company Blacklist](./epic-41-company-blacklist.md)
+    - [Story 41.1: DB Schema, Migration & Blacklist API](./epic-41-company-blacklist.md#story-411-db-schema-migration--blacklist-api)
+    - [Story 41.2: Discovery Service — Blacklist Filtering](./epic-41-company-blacklist.md#story-412-discovery-service--blacklist-filtering)
+    - [Story 41.3: Config UI — /config/job-sources/blacklist Page](./epic-41-company-blacklist.md#story-413-config-ui--configjob-sourcesblacklist-page)
+    - [Story 41.4: Job Drawer — Blacklist Toggle Button](./epic-41-company-blacklist.md#story-414-job-drawer--blacklist-toggle-button)

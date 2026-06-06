@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
-import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, CheckCircle, Circle, Pencil, Info } from 'lucide-react'
+import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, CheckCircle, Circle, Pencil, Info, Ban } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import type { Job } from '@shared/schemas'
@@ -12,6 +12,9 @@ import { useGenerateCoverLetter } from '../../hooks/useGenerateCoverLetter'
 import { useGenerateResume } from '../../hooks/useGenerateResume'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { useJobMutation } from '../../hooks/useJobMutation'
+import { toast } from 'sonner'
+import { useBlacklistQuery } from '../../hooks/useBlacklistQuery'
+import { useAddToBlacklist, useRemoveFromBlacklist } from '../../hooks/useBlacklistMutations'
 
 function JobDetailFields({ job }: { job: Job }) {
   const left = [
@@ -75,6 +78,9 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   const { mutate: generateCoverLetter, isPending, isError, error } = useGenerateCoverLetter(job?.id ?? 0)
   const { mutate: generateResume, isPending: isResumePending, isError: isResumeError, error: resumeError } = useGenerateResume(job?.id ?? 0)
   const { mutate: patchJob, isPending: isPatching } = useJobMutation(job?.id ?? 0)
+  const { data: blacklist = [] } = useBlacklistQuery()
+  const addToBlacklist = useAddToBlacklist()
+  const removeFromBlacklist = useRemoveFromBlacklist()
 
   useEffect(() => {
     setShowFullDescription(false)
@@ -110,6 +116,9 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   function cancelEdit() {
     setEditingDescription(false)
   }
+
+  const isBlacklisted = job ? blacklist.some(e => e.companyName === job.company.toLowerCase()) : false
+  const blacklistEntry = job ? blacklist.find(e => e.companyName === job.company.toLowerCase()) : undefined
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
@@ -175,6 +184,33 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                   ? <><ArchiveRestore size={13} />{isPatching ? 'Unarchiving…' : 'Unarchive'}</>
                   : <><Archive size={13} />{isPatching ? 'Archiving…' : 'Archive'}</>
                 }
+              </button>
+              <button
+                onClick={() => {
+                  if (isBlacklisted && blacklistEntry) {
+                    removeFromBlacklist.mutate(blacklistEntry.id, {
+                      onSuccess: () => toast.success(`${job.company} removed from blacklist`),
+                      onError: (err: Error) => toast.error(err.message),
+                    })
+                  } else {
+                    addToBlacklist.mutate(
+                      { companyName: job.company },
+                      {
+                        onSuccess: () => toast.success(`Added ${job.company} to blacklist`),
+                        onError: (err: Error) => toast.error(err.message),
+                      },
+                    )
+                  }
+                }}
+                disabled={addToBlacklist.isPending || removeFromBlacklist.isPending}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isBlacklisted
+                    ? 'border-red-700/60 text-red-400 hover:border-zinc-600 hover:text-zinc-400'
+                    : 'border-zinc-700 text-zinc-400 hover:border-red-700/60 hover:text-red-400'
+                }`}
+              >
+                <Ban size={13} />
+                {isBlacklisted ? 'Remove from Blacklist' : 'Add Company to Blacklist'}
               </button>
             </div>
           )}

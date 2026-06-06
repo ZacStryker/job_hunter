@@ -280,3 +280,15 @@ export type OnboardingStatusResponse = {
   hasIndeedAuth: boolean
   onboardingComplete: boolean
 }
+
+export const blacklistEntrySchema = z.object({
+  id: z.number().int(),
+  userId: z.number().int(),
+  companyName: z.string(),
+  createdAt: z.string(),
+})
+export const blacklistEntryInputSchema = z.object({
+  companyName: z.string().min(1).refine(s => s.trim().length > 0, 'Company name cannot be blank'),
+})
+export type BlacklistEntry = z.infer<typeof blacklistEntrySchema>
+export type BlacklistEntryInput = z.infer<typeof blacklistEntryInputSchema>

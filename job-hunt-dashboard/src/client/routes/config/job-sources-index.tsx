@@ -68,6 +68,28 @@ export function ConfigJobSourcesIndexRoute() {
               }
             </div>
           </Link>
+          <Link to="/config/job-sources/blacklist" className="border border-zinc-800 rounded-lg p-4 block hover:border-zinc-700 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-zinc-200">Blacklist</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="What is this?"
+                      onClick={e => { e.preventDefault(); e.stopPropagation() }}
+                      className="text-zinc-600 hover:text-zinc-400 transition-colors"
+                    >
+                      <CircleHelp className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    Companies blocked from appearing in discovery results.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+          </Link>
         </div>
       </div>
     </TooltipProvider>

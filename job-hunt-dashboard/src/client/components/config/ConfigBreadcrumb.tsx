@@ -9,6 +9,7 @@ const PATH_LABELS: Record<string, string> = {
   '/config/job-sources': 'Job Sources',
   '/config/job-sources/auth-setup': 'Auth Setup',
   '/config/job-sources/searches': 'Searches',
+  '/config/job-sources/blacklist': 'Blacklist',
   '/config/prompts': 'Prompts',
   '/config/prompts/analysis': 'Analyze Jobs',
   '/config/prompts/cover-letter': 'Generate Cover Letter',
