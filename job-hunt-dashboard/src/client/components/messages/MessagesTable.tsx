@@ -165,7 +165,7 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
         map.set(job.company, [job])
       }
     }
-    for (const list of map.values()) list.sort((a, b) => a.jobTitle.localeCompare(b.jobTitle))
+    for (const list of map.values()) list.sort((a, b) => (b.dateScraped ?? '').localeCompare(a.dateScraped ?? ''))
     return map
   }, [jobs])
 
