@@ -272,13 +272,13 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
                         <Check className="h-4 w-4" />
                       </SelectPrimitive.ItemIndicator>
                     </span>
-                    <SelectPrimitive.ItemText>{job.jobTitle}</SelectPrimitive.ItemText>
-                    <div className="flex items-center gap-2 ml-auto pl-3">
-                      <span className="text-zinc-400 text-xs tabular-nums shrink-0">
+                    <div className="flex items-center gap-2 mr-2 shrink-0">
+                      <div className={`w-2 h-2 rounded-full ${getStatusDotClass(job.latestStatus)}`} />
+                      <span className="text-zinc-400 text-xs tabular-nums">
                         {formatDateScraped(job.dateScraped, multiYear)}
                       </span>
-                      <div className={`w-2 h-2 rounded-full shrink-0 ${getStatusDotClass(job.latestStatus)}`} />
                     </div>
+                    <SelectPrimitive.ItemText>{job.jobTitle}</SelectPrimitive.ItemText>
                   </SelectPrimitive.Item>
                 ))}
               </SelectContent>
