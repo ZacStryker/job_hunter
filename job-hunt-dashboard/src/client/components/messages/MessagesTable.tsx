@@ -240,6 +240,9 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
         const row = info.row.original
         const hasCompany = Boolean(row.company)
         const filteredJobs = hasCompany ? (companyToJobs.get(row.company!) ?? []) : []
+        const selectedMissingFromList = row.jobTitle !== null &&
+          row.jobTitle !== undefined &&
+          !filteredJobs.some((j) => j.jobTitle === row.jobTitle)
         const uniqueYears = new Set(
           filteredJobs
             .filter((j) => j.dateScraped)
@@ -261,6 +264,9 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
               </SelectTrigger>
               <SelectContent className="max-h-60 overflow-y-auto w-[320px]">
                 <SelectItem value={NONE_SENTINEL}>—</SelectItem>
+                {selectedMissingFromList && (
+                  <SelectItem value={row.jobTitle!} className="hidden">{row.jobTitle}</SelectItem>
+                )}
                 {filteredJobs.map((job) => (
                   <SelectPrimitive.Item
                     key={job.jobTitle}
