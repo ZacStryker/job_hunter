@@ -19,6 +19,23 @@ import { useMessageMutation } from '../../hooks/useMessageMutation'
 const NONE_SENTINEL = '__none__'
 const PAGE_SIZE = 20
 
+function formatDateScraped(dateStr: string | null, includeYear: boolean): string {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr + 'T00:00:00Z')
+  const month = d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })
+  const day = d.getUTCDate()
+  if (includeYear) return `${month} ${day} ${d.getUTCFullYear()}`
+  return `${month} ${day}`
+}
+
+function getStatusDotClass(status: string | null): string {
+  if (!status) return 'bg-yellow-400'
+  const s = status.toLowerCase()
+  if (s === 'submitted') return 'bg-blue-400'
+  if (s === 'screening' || s === 'interview') return 'bg-green-400'
+  return 'bg-orange-400'
+}
+
 function formatReceived(isoString: string): string {
   const d = new Date(isoString)
   const year = d.getFullYear()
@@ -135,17 +152,17 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
     [jobs]
   )
 
-  const companyToTitles = useMemo(() => {
-    const map = new Map<string, string[]>()
+  const companyToJobs = useMemo(() => {
+    const map = new Map<string, Job[]>()
     for (const job of jobs) {
       const list = map.get(job.company)
       if (list) {
-        if (!list.includes(job.jobTitle)) list.push(job.jobTitle)
+        if (!list.some((j) => j.jobTitle === job.jobTitle)) list.push(job)
       } else {
-        map.set(job.company, [job.jobTitle])
+        map.set(job.company, [job])
       }
     }
-    for (const list of map.values()) list.sort()
+    for (const list of map.values()) list.sort((a, b) => a.jobTitle.localeCompare(b.jobTitle))
     return map
   }, [jobs])
 
@@ -219,7 +236,13 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
       cell: (info) => {
         const row = info.row.original
         const hasCompany = Boolean(row.company)
-        const filteredTitles = hasCompany ? (companyToTitles.get(row.company!) ?? []) : []
+        const filteredJobs = hasCompany ? (companyToJobs.get(row.company!) ?? []) : []
+        const uniqueYears = new Set(
+          filteredJobs
+            .filter((j) => j.dateScraped)
+            .map((j) => new Date(j.dateScraped! + 'T00:00:00Z').getUTCFullYear())
+        )
+        const multiYear = uniqueYears.size > 1
         const value = row.jobTitle ?? NONE_SENTINEL
         return (
           <div onClick={(e) => e.stopPropagation()}>
@@ -233,11 +256,19 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
               <SelectTrigger className="h-7 w-[180px] bg-zinc-800 border-zinc-700 text-zinc-200 text-xs disabled:opacity-40 disabled:cursor-not-allowed [&>span]:text-left">
                 <SelectValue placeholder="—" />
               </SelectTrigger>
-              <SelectContent className="max-h-60 overflow-y-auto">
+              <SelectContent className="max-h-60 overflow-y-auto w-[320px]">
                 <SelectItem value={NONE_SENTINEL}>—</SelectItem>
-                {filteredTitles.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
+                {filteredJobs.map((job) => (
+                  <SelectItem key={job.jobTitle} value={job.jobTitle}>
+                    <div className="flex items-center gap-2 min-w-0 w-full">
+                      <span className="truncate flex-1">{job.jobTitle}</span>
+                      <span className="text-zinc-400 text-xs shrink-0 tabular-nums">
+                        {formatDateScraped(job.dateScraped, multiYear)}
+                      </span>
+                      <div
+                        className={`w-2 h-2 rounded-full shrink-0 ${getStatusDotClass(job.latestStatus)}`}
+                      />
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -246,7 +277,7 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
         )
       },
     }),
-  ], [mutate, distinctCompanies, companyToTitles])
+  ], [mutate, distinctCompanies, companyToJobs])
 
   const table = useReactTable({
     data: messages,
