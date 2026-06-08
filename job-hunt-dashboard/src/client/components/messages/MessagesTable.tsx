@@ -21,7 +21,8 @@ const PAGE_SIZE = 20
 
 function formatDateScraped(dateStr: string | null, includeYear: boolean): string {
   if (!dateStr) return '—'
-  const d = new Date(dateStr + 'T00:00:00Z')
+  const datePart = dateStr.slice(0, 10)
+  const d = new Date(datePart + 'T00:00:00Z')
   const month = d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })
   const day = d.getUTCDate()
   if (includeYear) return `${month} ${day} ${d.getUTCFullYear()}`
@@ -240,7 +241,7 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
         const uniqueYears = new Set(
           filteredJobs
             .filter((j) => j.dateScraped)
-            .map((j) => new Date(j.dateScraped! + 'T00:00:00Z').getUTCFullYear())
+            .map((j) => new Date(j.dateScraped!.slice(0, 10) + 'T00:00:00Z').getUTCFullYear())
         )
         const multiYear = uniqueYears.size > 1
         const value = row.jobTitle ?? NONE_SENTINEL
