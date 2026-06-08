@@ -10,6 +10,8 @@ import type { SortingState } from '@tanstack/react-table'
 import { useState, useMemo, useRef } from 'react'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import * as SelectPrimitive from '@radix-ui/react-select'
+import { Check } from 'lucide-react'
 import { Button } from '../ui/button'
 import type { Message } from '@shared/schemas'
 import type { Job } from '@shared/schemas'
@@ -260,17 +262,24 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
               <SelectContent className="max-h-60 overflow-y-auto w-[320px]">
                 <SelectItem value={NONE_SENTINEL}>—</SelectItem>
                 {filteredJobs.map((job) => (
-                  <SelectItem key={job.jobTitle} value={job.jobTitle}>
-                    <div className="flex items-center gap-2 min-w-0 w-full">
-                      <span className="truncate flex-1">{job.jobTitle}</span>
-                      <span className="text-zinc-400 text-xs shrink-0 tabular-nums">
+                  <SelectPrimitive.Item
+                    key={job.jobTitle}
+                    value={job.jobTitle}
+                    className="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                  >
+                    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                      <SelectPrimitive.ItemIndicator>
+                        <Check className="h-4 w-4" />
+                      </SelectPrimitive.ItemIndicator>
+                    </span>
+                    <SelectPrimitive.ItemText>{job.jobTitle}</SelectPrimitive.ItemText>
+                    <div className="flex items-center gap-2 ml-auto pl-3">
+                      <span className="text-zinc-400 text-xs tabular-nums shrink-0">
                         {formatDateScraped(job.dateScraped, multiYear)}
                       </span>
-                      <div
-                        className={`w-2 h-2 rounded-full shrink-0 ${getStatusDotClass(job.latestStatus)}`}
-                      />
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${getStatusDotClass(job.latestStatus)}`} />
                     </div>
-                  </SelectItem>
+                  </SelectPrimitive.Item>
                 ))}
               </SelectContent>
             </Select>
