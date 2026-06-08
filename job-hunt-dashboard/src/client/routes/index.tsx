@@ -82,7 +82,7 @@ export function PipelineRoute() {
   const { data: profile } = useProfileQuery()
   const hasResumeText = Boolean(profile?.summary || profile?.experience || profile?.skills)
 
-  const activeJobs = (jobs ?? []).filter(j => !j.archived && j.fitScore == null)
+  const activeJobs = (jobs ?? []).filter(j => !j.archived && (j.fitScore == null || (!j.applied && j.recommendation === 'skip')))
 
   useEffect(() => {
     if (selectedJobId !== null && !activeJobs.find((j) => j.id === selectedJobId)) {
