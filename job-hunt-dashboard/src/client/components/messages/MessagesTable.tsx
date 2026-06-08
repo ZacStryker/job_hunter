@@ -157,7 +157,7 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
 
   const companyToJobs = useMemo(() => {
     const map = new Map<string, Job[]>()
-    for (const job of jobs) {
+    for (const job of jobs.filter((j) => !j.archived)) {
       const list = map.get(job.company)
       if (list) {
         if (!list.some((j) => j.jobTitle === job.jobTitle)) list.push(job)
