@@ -94,7 +94,7 @@ export async function generateResume(job: Job, userId?: number): Promise<{ pdf: 
     throw new Error('Resume generation failed: title_02 contains "and" or "&" — violates template rendering rule')
   }
 
-  const templatePath = join(import.meta.dir, '../../../../resume_templates/resume_template(1).html')
+  const templatePath = join(import.meta.dir, '../../../resume_templates/resume_template(1).html')
   const templateHtml = await readFile(templatePath, 'utf-8')
   const injectedHtml = templateHtml.replace(
     /<script id="resume-data" type="application\/json">[\s\S]*?<\/script>/,

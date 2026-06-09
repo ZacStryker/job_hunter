@@ -139,7 +139,7 @@ async function evaluatePageCount(injectedHtml: string): Promise<number> {
 }
 
 async function buildInjectedHtml(resumeData: object): Promise<string> {
-  const templatePath = join(import.meta.dir, '../../../../resume_templates/resume_template(1).html')
+  const templatePath = join(import.meta.dir, '../../../resume_templates/resume_template(1).html')
   const templateHtml = await readFile(templatePath, 'utf-8')
   return templateHtml.replace(
     /<script id="resume-data" type="application\/json">[\s\S]*?<\/script>/,

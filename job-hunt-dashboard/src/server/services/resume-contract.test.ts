@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import schemaJson from '../../shared/resume-schema.json'
 import { DEFAULT_PROMPTS } from './prompt-defaults'
 
-const TEMPLATE_PATH = join(import.meta.dir, '../../../../resume_templates/resume_template(1).html')
+const TEMPLATE_PATH = join(import.meta.dir, '../../../resume_templates/resume_template(1).html')
 
 let templateHtml: string
 

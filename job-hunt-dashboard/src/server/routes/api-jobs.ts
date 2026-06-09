@@ -418,7 +418,7 @@ app.post('/:id/generate-resume', async (c) => {
       return c.json({ error: 'Resume generation is not configured' }, 503)
     }
     recordRun({ userId, name: `Resume - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - resumeStartMs })
-    return c.json({ error: 'Resume generation failed' }, 502)
+    return c.json({ error: message }, 502)
   }
 
   const { pdf: pdfBuffer, inputTokens: resumeInputTokens, outputTokens: resumeOutputTokens } = resumeResult

@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: fix-resume-production-path-and-error-surfacing (2026-06-09)
+
+- `api-cover-letter.test.ts` `CREATE_WEBHOOK_RUNS_TABLE` is missing the `user_id` column — `recordRun` fails silently in that test file, masking any cover-letter failure recording. Same fix applied to `api-resume.test.ts` in this story. [`api-cover-letter.test.ts`]
+- `resume-service.ts` uses `import.meta.dir` (Bun-specific non-standard alias) rather than `import.meta.dirname` — would break path resolution if the server ever runs from a bundled dist output. Pre-existing; no current impact. [`resume-service.ts:97`]
+
 ## Deferred from: code review of 42-4-end-to-end-tests-and-contract-drift-guard (2026-06-09)
 
 - `buildInjectedHtml` regex replacement silently no-ops if the `<script id="resume-data" type="application/json">` tag format changes — downstream `evaluatePageCount` would run on an un-injected template, failing with an opaque timeout rather than a clear diagnostic. [`resume-e2e.test.ts`]
