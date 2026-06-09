@@ -15,7 +15,7 @@ const FLOW_LABELS: Record<PromptFlow, string> = {
 const SYSTEM_PROMPT_PLACEHOLDERS: Record<PromptFlow, string | null> = {
   analysis: null,
   cover_letter: '{{CANDIDATE_PROFILE}}',
-  resume: '{{CANDIDATE_PROFILE}}  (HTML template appended automatically)',
+  resume: '{{CANDIDATE_PROFILE}}',
 }
 
 const USER_MESSAGE_PLACEHOLDERS: Record<PromptFlow, string> = {
