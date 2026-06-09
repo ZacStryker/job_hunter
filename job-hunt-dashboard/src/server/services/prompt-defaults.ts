@@ -59,6 +59,7 @@ export const DEFAULT_PROMPTS: Record<PromptFlow, PromptConfig> = {
       'HARD RULES \u2014 never violate:\n' +
       '- Return ONLY the JSON object. No text before or after it.\n' +
       '- No invented content \u2014 every value must come from the candidate profile.\n' +
+      '- experience: output one object for every work entry in the candidate profile, including contract, freelance, and part-time roles; do not omit, merge, or combine any entry.\n' +
       '- experience: ordered most-recent first (descending by start date).\n' +
       '- title_02: must not contain "and" or "&" \u2014 the template renders "title_01 and title_02".\n' +
       '- skills: "/" only when one is a direct subset/superset/prerequisite of the other ' +
@@ -77,7 +78,7 @@ export const DEFAULT_PROMPTS: Record<PromptFlow, PromptConfig> = {
       '- title_02: secondary title for dual expertise or sub-specialization (no "and"/"&").\n' +
       '- skill_groups: infer relevant group labels from the job description; populate each with skills from the profile.\n' +
       '- summary: 2\u20134 sentences, high-impact professional tone, reference relevant achievements.\n' +
-      '- bullets: maximize relevance to the role; never trim metrics, named technologies, or most-recent-job entries unless no other option remains.\n' +
+      '- bullets: maximize relevance to the role; never trim metrics, named technologies, or most-recent-job entries; never remove an entire experience entry to create space.\n' +
       '- projects: choose those most relevant to the job; filter out the rest. stack is a "\u00b7"-separated string (e.g. "TypeScript \u00b7 Bun \u00b7 SQLite").',
     userMessage:
       'Tailor a resume for this role. Return ONLY the JSON object as specified.\n\n' +

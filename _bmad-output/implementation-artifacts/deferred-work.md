@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: update-resume-prompt-include-all-jobs (2026-06-09)
+
+- **Sparse-entry bullet floor conflict**: the `CONTENT LIMITS` rule mandates 3-5 bullets per experience entry, but the `no invented content` HARD RULE forbids padding. For old/short profile entries this creates an impossible constraint. Resolution: add a clause allowing fewer bullets when the profile entry has insufficient documented detail. [`prompt-defaults.ts` resume config]
+- **No override mechanism for deliberate user exclusions**: there is no way for a user to mark a profile experience entry as "exclude from resume." The new mandatory-inclusion rule would force it in regardless. Future story: add an `excludeFromResume` flag to profile experience entries. [`prompt-defaults.ts`, profile schema]
+
 ## Deferred from: fix-resume-production-path-and-error-surfacing (2026-06-09)
 
 - `api-cover-letter.test.ts` `CREATE_WEBHOOK_RUNS_TABLE` is missing the `user_id` column — `recordRun` fails silently in that test file, masking any cover-letter failure recording. Same fix applied to `api-resume.test.ts` in this story. [`api-cover-letter.test.ts`]
