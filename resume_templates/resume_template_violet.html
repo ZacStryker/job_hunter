@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zac Stryker — Resume (Violet)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --dark:      #1F1F1E;
+    --white:     #ffffff;
+    --accent:    #7c4daa;
+    --text-dim:  #9080aa;
+    --text-body: #433d52;
+    --page-w: 794px;
+    --page-h: 1123px;
+    --sidebar-w: 210px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: #d4dbe6; /* page surround, not a named color */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 36px 16px 48px;
+    gap: 28px;
+  }
+
+  .page {
+    width: var(--page-w);
+    height: var(--page-h);
+    background: var(--white);
+    box-shadow: 0 8px 48px rgba(0,0,0,0.22);
+    display: grid;
+    grid-template-columns: var(--sidebar-w) 1fr;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+
+  /* ── PAGE 1 HEADER ── */
+  .page-header {
+    grid-column: 1 / -1;
+    background: var(--dark);
+    padding: 28px 34px 22px 34px;
+    display: flex;
+    align-items: flex-end;
+    position: relative;
+    overflow: hidden;
+  }
+  .page-header::before, .page-header::after { display: none; }
+  .header-name { position: relative; z-index: 1; }
+  .name-first {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 300;
+    font-size: 44px;
+    color: var(--white);
+    letter-spacing: 6px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .name-last {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 54px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .header-title {
+    position: relative;
+    z-index: 1;
+    margin-left: 18px;
+    padding-left: 18px;
+    border-left: 2px solid rgba(124,77,170,0.25);
+    align-self: center;
+    font-weight: 300;
+    font-size: 11.5px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    line-height: 1.75;
+  }
+
+  /* ── PAGE 2 MINI HEADER ── */
+  .page-header-mini {
+    grid-column: 1 / -1;
+    background: var(--dark);
+    padding: 12px 34px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .mini-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .mini-label {
+    font-size: 9.5px;
+    font-weight: 300;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* ── SIDEBAR ── */
+  aside {
+    background: var(--dark);
+    padding: 24px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow: hidden;
+  }
+
+  .contact-item { display: flex; flex-direction: column; gap: 2px; }
+  .contact-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .contact-value {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--white);
+    letter-spacing: 0.3px;
+    line-height: 1.5;
+  }
+
+  .sidebar-divider {
+    border: none;
+    border-top: 1px solid rgba(124,77,170,0.15);
+    flex-shrink: 0;
+  }
+
+  .sidebar-section-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .skill-group { margin-bottom: 10px; }
+  .skill-group:last-child { margin-bottom: 0; }
+  .skill-group-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .skill-list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+  .skill-list li {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--white);
+    padding-left: 9px;
+    position: relative;
+    line-height: 1.45;
+  }
+  .skill-list li::before {
+    content: '›';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    opacity: 0.7;
+  }
+
+  .edu-school {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--white);
+    letter-spacing: 0.5px;
+  }
+  .edu-degree { font-size: 11.5px; font-weight: 300; font-style: italic; color: var(--white); margin-top: 2px; }
+  .edu-field { font-size: 11.5px; font-weight: 400; color: var(--text-dim); }
+  .edu-year {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10.5px;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-top: 3px;
+  }
+
+  /* ── NOTABLE PROJECTS ── */
+  .project-entry { margin-bottom: 12px; }
+  .project-entry:last-child { margin-bottom: 0; }
+  .project-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 12.5px;
+    color: var(--white);
+    letter-spacing: 0.4px;
+  }
+  .project-desc {
+    font-size: 11px;
+    font-weight: 300;
+    color: var(--white);
+    line-height: 1.5;
+    margin-top: 2px;
+  }
+  .project-stack {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--accent);
+    opacity: 0.85;
+    margin-top: 3px;
+    letter-spacing: 0.3px;
+  }
+
+  /* ── MAIN ── */
+  main {
+    background: var(--white);
+    padding: 26px 28px 24px 24px;
+    overflow: hidden;
+  }
+
+  .section-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 3.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  /* ── CONTINUED BAR ── */
+  .continued-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .continued-bar .section-title { margin-bottom: 0; flex-shrink: 0; }
+  .continued-rule {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, rgba(124,77,170,0.4), transparent);
+  }
+  .continued-pg {
+    font-size: 9.5px;
+    font-weight: 300;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .profile-text {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--text-body);
+    line-height: 1.65;
+    margin-bottom: 20px;
+  }
+
+  .job {
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px dashed rgba(124,77,170,0.3);
+  }
+  .job:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .job-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1px;
+  }
+  .job-company {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--dark);
+    letter-spacing: 0.5px;
+  }
+  .job-meta { text-align: right; }
+  .job-location {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .job-dates {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11.5px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-top: 1px;
+  }
+  .job-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .job-bulletss { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+  .job-bulletss li {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--text-body);
+    line-height: 1.5;
+    padding-left: 12px;
+    position: relative;
+  }
+  .job-bulletss li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  @media print {
+    body { background: white; padding: 0; gap: 0; }
+    .page { box-shadow: none; page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: avoid; break-after: avoid; }
+  }
+  @page { size: A4; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ PAGE 1 ══════════════ -->
+<div class="page">
+
+  <header class="page-header">
+    <div class="header-name">
+      <div class="name-first">[[first_name]]</div>
+      <div class="name-last">[[last_name]]</div>
+    </div>
+    <div class="header-title">
+      [[title_01]]<br>and [[title_02]]
+    </div>
+  </header>
+
+  <aside>
+    <div class="contact-item">
+      <span class="contact-label">Email</span>
+      <span class="contact-value">[[email]]</span>
+    </div>
+    <div class="contact-item">
+      <span class="contact-label">Website</span>
+      <span class="contact-value">[[website]]</span>
+    </div>
+    <div class="contact-item">
+      <span class="contact-label">LinkedIn</span>
+      <span class="contact-value">[[linkedin]]</span>
+    </div>
+    <div class="contact-item">
+      <span class="contact-label">Location</span>
+      <span class="contact-value">[[location]]</span>
+    </div>
+
+    <hr class="sidebar-divider">
+
+    <div>
+      <div class="sidebar-section-title">Skills</div>
+
+      <div class="skill-group">
+        <div class="skill-group-label">[[skill_group_01_title]]</div>
+        <ul class="skill-list">
+          <li>[[skill_group_01_entry]]</li>
+        </ul>
+      </div>
+
+      <div class="skill-group">
+        <div class="skill-group-label">[[skill_group_02_title]]</div>
+        <ul class="skill-list">
+          <li>[[skill_group_02_entry]]</li>
+        </ul>
+      </div>
+
+      <div class="skill-group">
+        <div class="skill-group-label">[[skill_group_03_title]]</div>
+        <ul class="skill-list">
+          <li>[[skill_group_03_entry]]</li>
+        </ul>
+      </div>
+
+      <div class="skill-group">
+        <div class="skill-group-label">[[skill_group_04_title]]</div>
+        <ul class="skill-list">
+          <li>[[skill_group_04_entry]]</li>
+        </ul>
+      </div>
+    </div>
+
+    <hr class="sidebar-divider">
+
+    <div>
+      <div class="sidebar-section-title">Education</div>
+      <div class="edu-school">[[education_01_school]]</div>
+      <div class="edu-degree">[[education_01_degree]]</div>
+      <div class="edu-year">[[education_01_year]]</div>
+    </div>
+
+    <hr class="sidebar-divider">
+
+    <div>
+      <div class="sidebar-section-title">Projects</div>
+
+      <div class="project-entry">
+        <div class="project-name">[[project_01_name]]</div>
+        <div class="project-desc">[[project_01_desc]]</div>
+        <div class="project-stack">[[project_01_skills]]</div>
+      </div>
+
+      <div class="project-entry">
+        <div class="project-name">[[project_02_name]]</div>
+        <div class="project-desc">[[project_02_desc]]</div>
+        <div class="project-stack">[[project_02_skills]]</div>
+      </div>
+
+      <div class="project-entry">
+        <div class="project-name">[[project_03_name]]</div>
+        <div class="project-desc">[[project_03_desc]]</div>
+        <div class="project-stack">[[project_03_skills]]</div>
+      </div>
+
+
+
+  </aside>
+
+  <main>
+    <div class="section-title">Profile</div>
+    <p class="profile-text">[[summary]]</p>
+
+    <div class="section-title">Work Experience</div>
+
+    <div class="job">
+      <div class="job-header">
+        <div class="job-company">[[experience_01_company]]</div>
+        <div class="job-meta">
+          <div class="job-location">[[experience_01_location]]</div>
+          <div class="job-dates">[[experience_01_dates]]</div>
+        </div>
+      </div>
+      <div class="job-title">[[experience_01_role]]</div>
+      <ul class="job-bulletss">
+        <li>[[experience_01_bullets]]</li>
+      </ul>
+    </div>
+
+    <div class="job">
+      <div class="job-header">
+        <div class="job-company">[[experience_02_company]]</div>
+        <div class="job-meta">
+          <div class="job-location">[[experience_02_location]]</div>
+          <div class="job-dates">[[experience_02_dates]]</div>
+        </div>
+      </div>
+      <div class="job-title">[[experience_02_role]]</div>
+      <ul class="job-bulletss">
+        <li>[[experience_02_bullets]]</li>
+      </ul>
+    </div>
+      <div class="job">
+      <div class="job-header">
+        <div class="job-company">[[experience_03_company]]</div>
+        <div class="job-meta">
+          <div class="job-location">[[experience_03_location]]</div>
+          <div class="job-dates">[[experience_03_dates]]</div>
+        </div>
+      </div>
+      <div class="job-title">[[experience_03_role]]</div>
+      <ul class="job-bulletss">
+        <li>[[experience_03_bullets]]</li>
+      </ul>
+    </div>
+
+    <div class="job">
+      <div class="job-header">
+        <div class="job-company">[[experience_04_company]]</div>
+        <div class="job-meta">
+          <div class="job-location">[[experience_04_location]]</div>
+          <div class="job-dates">[[experience_04_dates]]</div>
+        </div>
+      </div>
+      <div class="job-title">[[experience_04_role]]</div>
+      <ul class="job-bulletss">
+        <li>[[experience_04_bullets]]</li>
+      </ul>
+    </div>
+
+     <div class="job">
+      <div class="job-header">
+        <div class="job-company">[[experience_05_company]]</div>
+        <div class="job-meta">
+          <div class="job-location">[[experience_05_location]]</div>
+          <div class="job-dates">[[experience_05_dates]]</div>
+        </div>
+      </div>
+      <div class="job-title">[[experience_05_role]]</div>
+      <ul class="job-bulletss">
+        <li>[[experience_05_bullets]]</li>
+      </ul>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

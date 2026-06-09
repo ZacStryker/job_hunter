@@ -47,6 +47,22 @@ const MOCK_JOB = {
   dateApplied: null, archived: false,
 } as import('../../shared/schemas').Job
 
+const VALID_RESUME_JSON = {
+  first_name: 'Jane', last_name: 'Doe',
+  title_01: 'Software Engineer', title_02: 'Platform Specialist',
+  email: 'jane@example.com', website: 'https://jane.dev',
+  linkedin: 'linkedin.com/in/janedoe', location: 'Amsterdam, NL',
+  summary: 'Experienced engineer with 8 years building distributed systems.',
+  skill_groups: [{ label: 'Languages', skills: ['TypeScript', 'Python', 'Go'] }],
+  education: [{ school: 'TU Delft', degree: 'BSc Computer Science', year: '2016' }],
+  projects: [],
+  experience: [{
+    company: 'Acme Corp', location: 'Amsterdam', dates: '2021–2024',
+    role: 'Senior Engineer',
+    bullets: ['Built scalable pipeline processing 10M events/day.'],
+  }],
+}
+
 let originalFetch: typeof globalThis.fetch
 
 beforeAll(() => {
@@ -74,32 +90,47 @@ function mockAnthropicSuccess(text: string): void {
   ) as typeof globalThis.fetch
 }
 
-describe('generateResume() — fence stripping', () => {
-  test('strips ```html fence before passing to generatePdf', async () => {
-    mockAnthropicSuccess('```html\n<html><body>Resume</body></html>\n```')
-    await generateResume(MOCK_JOB)
-    expect(capturedHtml).toBe('<html><body>Resume</body></html>')
-  })
-
-  test('strips ``` fence (no language tag) before passing to generatePdf', async () => {
-    mockAnthropicSuccess('```\n<html><body>Resume</body></html>\n```')
-    await generateResume(MOCK_JOB)
-    expect(capturedHtml).toBe('<html><body>Resume</body></html>')
-  })
-
-  test('passes clean HTML unchanged when no fences present', async () => {
-    mockAnthropicSuccess('<html><body>Resume</body></html>')
-    await generateResume(MOCK_JOB)
-    expect(capturedHtml).toBe('<html><body>Resume</body></html>')
-  })
-
-  test('returns pdf Buffer with token counts from generatePdf', async () => {
-    mockAnthropicSuccess('<html><body>Resume</body></html>')
+describe('generateResume() — JSON pipeline', () => {
+  test('parses valid JSON, injects into template, passes to generatePdf', async () => {
+    mockAnthropicSuccess(JSON.stringify(VALID_RESUME_JSON))
     const result = await generateResume(MOCK_JOB)
     expect(result.pdf).toBeInstanceOf(Buffer)
     expect(result.pdf.length).toBeGreaterThan(0)
+    expect(capturedHtml).toContain('<script id="resume-data" type="application/json">')
+    expect(capturedHtml).toContain('"first_name": "Jane"')
+  })
+
+  test('returns correct token counts', async () => {
+    mockAnthropicSuccess(JSON.stringify(VALID_RESUME_JSON))
+    const result = await generateResume(MOCK_JOB)
     expect(result.inputTokens).toBe(100)
     expect(result.outputTokens).toBe(200)
+  })
+
+  test('strips code fences from JSON response if present', async () => {
+    mockAnthropicSuccess('```json\n' + JSON.stringify(VALID_RESUME_JSON) + '\n```')
+    const result = await generateResume(MOCK_JOB)
+    expect(result.pdf).toBeInstanceOf(Buffer)
+  })
+})
+
+describe('generateResume() — validation', () => {
+  test('throws when LLM output is missing required fields', async () => {
+    const invalid = { ...VALID_RESUME_JSON }
+    delete (invalid as unknown as { experience: unknown }).experience
+    mockAnthropicSuccess(JSON.stringify(invalid))
+    await expect(generateResume(MOCK_JOB)).rejects.toThrow('Resume generation failed: LLM output did not conform to schema')
+  })
+
+  test('throws when title_02 contains "and"', async () => {
+    const bad = { ...VALID_RESUME_JSON, title_02: 'Systems Engineer and Architect' }
+    mockAnthropicSuccess(JSON.stringify(bad))
+    await expect(generateResume(MOCK_JOB)).rejects.toThrow('title_02 contains')
+  })
+
+  test('throws when LLM output is not valid JSON', async () => {
+    mockAnthropicSuccess('This is not JSON at all')
+    await expect(generateResume(MOCK_JOB)).rejects.toThrow('Resume generation failed: LLM output was not valid JSON')
   })
 })
 

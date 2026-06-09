@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-06-06 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1–35.6 done; epic 37 added; story 37.1 done; epic 37 done; epic 38 added (config UX polish); story 38.1 done; story 38.2 done; story 38.3 done; epic 39 added (add job manual description); story 39.1 done; story 39.2 done; epic 40 added (relevance pre-scoring); story 40.1 done; story 40.3B skipped; story 40.2 done; story 40.3A done; story 40.4 done; story 40.5 done; epic 41 added (company blacklist); story 41.1 done; story 41.2 done; story 41.3 done; story 41.4 done
+last_updated: 2026-06-09 # stories 31.1–31.5 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1–35.6 done; epic 37 added; story 37.1 done; epic 37 done; epic 38 added (config UX polish); story 38.1 done; story 38.2 done; story 38.3 done; epic 39 added (add job manual description); story 39.1 done; story 39.2 done; epic 40 added (relevance pre-scoring); story 40.1 done; story 40.3B skipped; story 40.2 done; story 40.3A done; story 40.4 done; story 40.5 done; epic 41 added (company blacklist); story 41.1 done; story 41.2 done; story 41.3 done; story 41.4 done; epic 42 added (resume pipeline schema alignment); story 42.1 done; story 42.2 done; story 42.3 done; story 42.4 done
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -279,3 +279,10 @@ development_status:
   41-2-discovery-service-blacklist-filtering: done
   41-3-config-ui-job-sources-blacklist-page: done
   41-4-job-drawer-blacklist-toggle-button: done
+
+  # Epic 42: Resume Pipeline — Schema + Prompt + Template Alignment
+  epic-42: in-progress
+  42-1-define-canonical-resume-json-schema: done
+  42-2-rewrite-llm-prompt-to-emit-canonical-flat-schema: done
+  42-3-migrate-resume-service-to-json-pipeline: done
+  42-4-end-to-end-tests-and-contract-drift-guard: done

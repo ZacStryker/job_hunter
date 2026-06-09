@@ -1,5 +1,36 @@
 # Deferred Work
 
+## Deferred from: code review of 42-4-end-to-end-tests-and-contract-drift-guard (2026-06-09)
+
+- `buildInjectedHtml` regex replacement silently no-ops if the `<script id="resume-data" type="application/json">` tag format changes — downstream `evaluatePageCount` would run on an un-injected template, failing with an opaque timeout rather than a clear diagnostic. [`resume-e2e.test.ts`]
+- E2E tests use `waitUntil: 'domcontentloaded'` while production `generate-pdf.ts` uses `networkidle` — documented intentional tradeoff to avoid font-preconnect TCP hangs in environments without reliable external network access; real-world parity concern for environments where fonts load cleanly. [`resume-e2e.test.ts`, `generate-pdf.ts`]
+
+## Deferred from: code review of 42-3-migrate-resume-service-to-json-pipeline (2026-06-09)
+
+- `__paginationComplete` waitForFunction produces opaque playwright `TimeoutError` if template JS throws inside the browser page — no distinguishable error from a genuine hang; would require page error event listeners or console capture to surface. [`generate-pdf.ts`]
+- `resumeDataSchema` allows empty strings for all required scalar fields (`first_name`, `last_name`, `email`, `title_01`, `title_02`, etc.) — an LLM returning `""` passes validation and the template renders blank fields in the PDF header. Pre-existing from 42.1 schema design; Story 42.4 contract tests are the intended enforcement point. [`schemas.ts`]
+- AC8 test gap: no assertion that the captured HTML for the valid-JSON test originated from `resume_template(1).html` specifically — test verifies `<script id="resume-data">` presence but not any Sage-template-unique structure (e.g., `window.__paginationComplete`). [`resume-service.test.ts`]
+
+## Deferred from: code review of 42-2-rewrite-llm-prompt-to-emit-canonical-flat-schema (2026-06-09)
+
+- `projects[].stack` middle-dot separator (`·`) format not validated in schema — any downstream code that splits on `·` would silently fail if the LLM uses a different separator (comma, bullet `•`, etc.). Add a `.refine()` or normalize at parse time in Story 42.3+. [`schemas.ts`]
+- `experience[].location` is a required field in `resumeDataSchema` but may be legitimately absent from a candidate profile — forces the LLM to either invent a value (violates "no invented content" rule) or return an empty string. Consider making it `z.string().optional()` or providing explicit guidance in the prompt. [`schemas.ts`]
+- `max_tokens: 4096` in `resume-service.ts` could truncate a large JSON payload mid-object for candidates with extensive experience — `JSON.parse()` will throw on a truncated string when 42.3 wires in JSON parsing. Raise the limit or add a truncation-detection fallback in 42.3. [`resume-service.ts`]
+- No validation that `{{CANDIDATE_PROFILE}}`/`{{JOB_DETAILS}}` placeholders resolve to non-empty strings before the prompt is sent to the LLM — an unreplaced literal placeholder produces a resume with invented content and no error signal. Add a guard in the service layer in 42.3. [`resume-service.ts`]
+
+## Deferred from: code review of 42-1-define-canonical-resume-json-schema (2026-06-09)
+
+- Email/website/linkedin accept any string — no format, URL, or pattern constraint in either schema; format validation is Story 42.4+ scope. [`resume-schema.json`, `schemas.ts`]
+- Zod and JSON Schema have no sync enforcement mechanism — two parallel artifacts; Story 42.4 explicitly adds the contract test to catch drift. [`schemas.ts`, `resume-schema.json`]
+- `title_02` "no and/&" rule is advisory-only — `$comment` in JSON Schema is non-normative; no `.refine()` in Zod; runtime enforcement deferred to Story 42.4. [`resume-schema.json`, `schemas.ts`]
+- Content limit bounds unenforced in schemas — maxItems for skill_groups count, skills per group, bullets per experience, and experience array have no upper bound; Story 42.4 scope. [`resume-schema.json`, `schemas.ts`]
+- All scalar string fields accept empty strings — `minLength: 1` not required by Story 42.1 spec; future validation story. [`resume-schema.json`, `schemas.ts`]
+- `dates` and `year` are free-form strings with no format/pattern constraint — consistent date formatting not required by spec. [`resume-schema.json`]
+- Zod `.strict()` not used — Zod silently strips unknown keys while JSON Schema `additionalProperties: false` rejects them; intentional: ajv handles strict LLM output validation, Zod provides TypeScript types. [`schemas.ts`]
+- `$id` value is a bare string ("resume-schema") rather than a URI reference — non-normative for draft-07 usage, no impact on ajv functionality. [`resume-schema.json`]
+- `skill_groups[].skills` inner array has no `minItems: 1` — a group with label and zero skills passes validation silently; not required by Story 42.1 spec; Story 42.4 scope. [`resume-schema.json`, `schemas.ts`]
+- `title_01` and `title_02` could be identical strings — no cross-field uniqueness check enforceable in standard JSON Schema / Zod without `.superRefine()`. [`schemas.ts`, `resume-schema.json`]
+
 ## Deferred from: code review of 41-4-job-drawer-blacklist-toggle-button (2026-06-06)
 
 - No `type="button"` attribute on the blacklist toggle button in the action row — pre-existing omission across all action buttons in `JobDrawer.tsx`; applied and archive buttons also lack explicit `type`. [`JobDrawer.tsx`]

@@ -37,12 +37,50 @@ export const DEFAULT_PROMPTS: Record<PromptFlow, PromptConfig> = {
   },
   resume: {
     systemPrompt:
-      'You are an expert resume writer. Return ONLY valid HTML \u2014 no markdown, no code fences, no explanatory text.\n\n' +
-      'CANDIDATE PROFILE:\n{{CANDIDATE_PROFILE}}',
+      'You are an expert resume writer. Analyze the candidate profile and job description, ' +
+      'then return ONLY a valid JSON object \u2014 no markdown, no code fences, no explanatory text.\n\n' +
+      'CANDIDATE PROFILE:\n{{CANDIDATE_PROFILE}}\n\n' +
+      'OUTPUT FORMAT \u2014 return exactly this shape:\n' +
+      '{\n' +
+      '  "first_name": "string",\n' +
+      '  "last_name": "string",\n' +
+      '  "title_01": "string",\n' +
+      '  "title_02": "string",\n' +
+      '  "email": "string",\n' +
+      '  "website": "string",\n' +
+      '  "linkedin": "string",\n' +
+      '  "location": "string",\n' +
+      '  "summary": "string",\n' +
+      '  "skill_groups": [{ "label": "string", "skills": ["string"] }],\n' +
+      '  "education": [{ "school": "string", "degree": "string", "year": "string" }],\n' +
+      '  "projects": [{ "name": "string", "desc": "string", "stack": "string" }],\n' +
+      '  "experience": [{ "company": "string", "location": "string", "dates": "string", "role": "string", "bullets": ["string"] }]\n' +
+      '}\n\n' +
+      'HARD RULES \u2014 never violate:\n' +
+      '- Return ONLY the JSON object. No text before or after it.\n' +
+      '- No invented content \u2014 every value must come from the candidate profile.\n' +
+      '- experience: ordered most-recent first (descending by start date).\n' +
+      '- title_02: must not contain "and" or "&" \u2014 the template renders "title_01 and title_02".\n' +
+      '- skills: "/" only when one is a direct subset/superset/prerequisite of the other ' +
+      '(e.g. "TypeScript/JavaScript" \u2714; "Python/SQL" \u2718).\n' +
+      '- No em-dashes (\u2014) in any string \u2014 use a hyphen (-) or restructure.\n' +
+      '- first_name, last_name, email, website, linkedin, location: copy exactly from the candidate profile.\n\n' +
+      'CONTENT LIMITS:\n' +
+      '- skill_groups: 3\u20136 groups (empty array [] omits the Skills section entirely).\n' +
+      '- skills per group: 3\u20135 items.\n' +
+      '- projects: 1\u20134 entries (empty array [] omits the Projects section entirely).\n' +
+      '- bullets per experience entry: 3\u20135.\n' +
+      '- bullet length: ~140\u2013170 characters.\n' +
+      '- education: copy exactly if present in profile; use [] if not present.\n\n' +
+      'TAILORING GUIDANCE:\n' +
+      '- title_01: primary title signaling compatibility with both the candidate background and the target role.\n' +
+      '- title_02: secondary title for dual expertise or sub-specialization (no "and"/"&").\n' +
+      '- skill_groups: infer relevant group labels from the job description; populate each with skills from the profile.\n' +
+      '- summary: 2\u20134 sentences, high-impact professional tone, reference relevant achievements.\n' +
+      '- bullets: maximize relevance to the role; never trim metrics, named technologies, or most-recent-job entries unless no other option remains.\n' +
+      '- projects: choose those most relevant to the job; filter out the rest. stack is a "\u00b7"-separated string (e.g. "TypeScript \u00b7 Bun \u00b7 SQLite").',
     userMessage:
-      'Generate a tailored functional HTML resume for this role. ' +
-      'Reorder and reword skills and bullets for maximum relevance. ' +
-      'No emdashes. Descending chronological order for experience.\n\n' +
+      'Tailor a resume for this role. Return ONLY the JSON object as specified.\n\n' +
       '{{JOB_DETAILS}}',
   },
 }

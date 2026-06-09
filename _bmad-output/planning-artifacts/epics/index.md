@@ -113,3 +113,8 @@
     - [Story 41.2: Discovery Service — Blacklist Filtering](./epic-41-company-blacklist.md#story-412-discovery-service--blacklist-filtering)
     - [Story 41.3: Config UI — /config/job-sources/blacklist Page](./epic-41-company-blacklist.md#story-413-config-ui--configjob-sourcesblacklist-page)
     - [Story 41.4: Job Drawer — Blacklist Toggle Button](./epic-41-company-blacklist.md#story-414-job-drawer--blacklist-toggle-button)
+  - [Epic 42: Resume Pipeline — Schema + Prompt + Template Alignment](./epic-42-resume-pipeline-schema-alignment.md)
+    - [Story 42.1: Define Canonical Resume JSON Schema](./epic-42-resume-pipeline-schema-alignment.md#story-421-define-canonical-resume-json-schema)
+    - [Story 42.2: Rewrite LLM Prompt to Emit Canonical Flat Schema](./epic-42-resume-pipeline-schema-alignment.md#story-422-rewrite-llm-prompt-to-emit-canonical-flat-schema)
+    - [Story 42.3: Migrate Resume Service to JSON Pipeline](./epic-42-resume-pipeline-schema-alignment.md#story-423-migrate-resume-service-to-json-pipeline)
+    - [Story 42.4: End-to-End Tests and Contract Drift Guard](./epic-42-resume-pipeline-schema-alignment.md#story-424-end-to-end-tests-and-contract-drift-guard)

@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resume-schema",
+  "title": "ResumeData",
+  "type": "object",
+  "required": [
+    "first_name", "last_name", "title_01", "title_02",
+    "email", "website", "linkedin", "location", "summary",
+    "skill_groups", "education", "projects", "experience"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "first_name":  { "type": "string" },
+    "last_name":   { "type": "string" },
+    "title_01":    { "type": "string" },
+    "title_02":    { "type": "string", "$comment": "Must not contain 'and' or '&'" },
+    "email":       { "type": "string" },
+    "website":     { "type": "string" },
+    "linkedin":    { "type": "string" },
+    "location":    { "type": "string" },
+    "summary":     { "type": "string" },
+    "skill_groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "skills"],
+        "additionalProperties": false,
+        "properties": {
+          "label":  { "type": "string" },
+          "skills": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "education": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["school", "degree", "year"],
+        "additionalProperties": false,
+        "properties": {
+          "school": { "type": "string" },
+          "degree": { "type": "string" },
+          "year":   { "type": "string" }
+        }
+      }
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "desc", "stack"],
+        "additionalProperties": false,
+        "properties": {
+          "name":  { "type": "string" },
+          "desc":  { "type": "string" },
+          "stack": { "type": "string", "$comment": "' · '-separated string, e.g. 'TypeScript · Bun · SQLite'" }
+        }
+      }
+    },
+    "experience": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["company", "location", "dates", "role", "bullets"],
+        "additionalProperties": false,
+        "properties": {
+          "company":  { "type": "string" },
+          "location": { "type": "string" },
+          "dates":    { "type": "string" },
+          "role":     { "type": "string" },
+          "bullets":  { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        }
+      }
+    }
+  }
+}

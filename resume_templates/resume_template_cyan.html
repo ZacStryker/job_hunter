@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zac Stryker — Resume</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --dark: #1F1F1E;
+          --white: #ffffff;
+          --accent: #0c8fa0;
+          --text-dim: #7a9ab5;
+          --text-body: #4a5568;
+    --page-w: 794px;
+    --page-h: 1123px;
+    --sidebar-w: 210px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: #d4dbe6; /* page surround, not a named color */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 36px 16px 48px;
+    gap: 28px;
+  }
+
+  .page {
+    width: var(--page-w);
+    height: var(--page-h);
+    background: var(--white);
+    box-shadow: 0 8px 48px rgba(0,0,0,0.22);
+    display: grid;
+    grid-template-columns: var(--sidebar-w) 1fr;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+
+  /* ── PAGE 1 HEADER ── */
+  .page-header {
+    grid-column: 1 / -1;
+    background: var(--dark);
+    padding: 28px 34px 22px 34px;
+    display: flex;
+    align-items: flex-end;
+    position: relative;
+    overflow: hidden;
+  }
+  .page-header::before, .page-header::after { display: none; }
+  .header-name { position: relative; z-index: 1; }
+  .name-first {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 400;
+    font-size: 44px;
+    color: var(--white);
+    letter-spacing: 6px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .name-last {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 54px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .header-title {
+    position: relative;
+    z-index: 1;
+    margin-left: 18px;
+    padding-left: 18px;
+    border-left: 2px solid rgba(12,143,160,0.25);
+    align-self: center;
+    font-weight: 600;
+    font-size: 11.5px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    line-height: 1.75;
+  }
+
+  /* ── PAGE 2 MINI HEADER ── */
+  .page-header-mini {
+    grid-column: 1 / -1;
+    background: var(--dark);
+    padding: 12px 34px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .mini-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .mini-label {
+    font-size: 9.5px;
+    font-weight: 300;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* ── SIDEBAR ── */
+  aside {
+    background: var(--dark);
+    padding: 24px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow: hidden;
+  }
+
+  .contact-item { display: flex; flex-direction: column; gap: 2px; }
+  .contact-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .contact-value {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--white);
+    letter-spacing: 0.3px;
+    line-height: 1.5;
+  }
+
+  .sidebar-divider {
+    border: none;
+    border-top: 1px solid rgba(12,143,160,0.15);
+    flex-shrink: 0;
+  }
+
+  .sidebar-section-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .skill-group { margin-bottom: 10px; }
+  .skill-group:last-child { margin-bottom: 0; }
+  .skill-group-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .skill-list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+  .skill-list li {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--white);
+    padding-left: 9px;
+    position: relative;
+    line-height: 1.45;
+  }
+  .skill-list li::before {
+    content: '›';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    opacity: 0.7;
+  }
+
+  .edu-school {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--dark);
+    letter-spacing: 0.5px;
+  }
+  .edu-degree { font-size: 11.5px; font-weight: 300; font-style: italic; color: var(--text-body); margin-top: 2px; }
+  .edu-field { font-size: 11.5px; font-weight: 400; color: var(--text-body); }
+  .edu-year {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10.5px;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-top: 3px;
+  }
+
+  /* ── NOTABLE PROJECTS ── */
+  .project-entry { margin-bottom: 12px; }
+  .project-entry:last-child { margin-bottom: 0; }
+  .project-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 12.5px;
+    color: var(--white);
+    letter-spacing: 0.4px;
+  }
+  .project-desc {
+    font-size: 11px;
+    font-weight: 300;
+    color: var(--white);
+    line-height: 1.5;
+    margin-top: 2px;
+  }
+  .project-stack {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--accent);
+    opacity: 0.85;
+    margin-top: 3px;
+    letter-spacing: 0.3px;
+  }
+
+  /* ── MAIN ── */
+  main {
+    background: var(--white);
+    padding: 26px 28px 24px 24px;
+    overflow: hidden;
+  }
+
+  .section-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 3.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  /* ── CONTINUED BAR ── */
+  .continued-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .continued-bar .section-title { margin-bottom: 0; flex-shrink: 0; }
+  .continued-rule {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, rgba(12,143,160,0.4), transparent);
+  }
+  .continued-pg {
+    font-size: 9.5px;
+    font-weight: 300;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .profile-text {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--text-body);
+    line-height: 1.65;
+    margin-bottom: 20px;
+  }
+
+  .job {
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 2px dashed rgba(12,143,160,0.3);
+  }
+  .job:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .job-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1px;
+  }
+  .job-company {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--dark);
+    letter-spacing: 0.5px;
+  }
+  .job-meta { text-align: right; }
+  .job-location {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .job-dates {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11.5px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-top: 1px;
+  }
+  .job-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .job-bulletss { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+  .job-bulletss li {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--text-body);
+    line-height: 1.5;
+    padding-left: 12px;
+    position: relative;
+  }
+  .job-bulletss li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  @media print {
+    body { background: white; padding: 0; gap: 0; }
+    .page { box-shadow: none; page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: avoid; break-after: avoid; }
+  }
+  @page { size: A4; margin: 0; }
+</style>
+</head>
+<body>
+ 
+   
+  <div class="page">
+   
+    <header class="page-header">
+      <div class="header-name">
+        <div class="name-first">Zac</div>
+        <div class="name-last">Stryker</div>
+      </div>
+      <div class="header-title">
+        GenAI Engineer<br>and Full-Stack AI Systems Developer
+      </div>
+    </header>
+   
+    <aside>
+      <div class="contact-item">
+        <span class="contact-label">Email</span>
+        <span class="contact-value">zac@zacstryker.com</span>
+      </div>
+      <div class="contact-item">
+        <span class="contact-label">LinkedIn</span>
+        <span class="contact-value">linkedin.com/in/zac-stryker-89333398</span>
+      </div>
+      <div class="contact-item">
+        <span class="contact-label">Location</span>
+        <span class="contact-value">Utrecht, Netherlands</span>
+      </div>
+   
+      <hr class="sidebar-divider">
+   
+      <div>
+        <div class="sidebar-section-title">Skills</div>
+   
+        <div class="skill-group">
+          <div class="skill-group-label">AI &amp; LLMs</div>
+          <ul class="skill-list">
+            <li>LLM APIs</li>
+            <li>RAG</li>
+            <li>Vector Search</li>
+            <li>Prompt Engineering</li>
+            <li>NLP</li>
+          </ul>
+        </div>
+   
+        <div class="skill-group">
+          <div class="skill-group-label">ML &amp; Modelling</div>
+          <ul class="skill-list">
+            <li>Transformers</li>
+            <li>Neural Networks</li>
+            <li>Computer Vision</li>
+            <li>TensorFlow</li>
+            <li>scikit-learn</li>
+          </ul>
+        </div>
+   
+        <div class="skill-group">
+          <div class="skill-group-label">Development</div>
+          <ul class="skill-list">
+            <li>Python</li>
+            <li>JavaScript</li>
+            <li>Flask</li>
+            <li>REST APIs</li>
+            <li>Git</li>
+          </ul>
+        </div>
+   
+        <div class="skill-group">
+          <div class="skill-group-label">Cloud &amp; Infrastructure</div>
+          <ul class="skill-list">
+            <li>Microsoft Azure</li>
+            <li>Docker</li>
+            <li>n8n</li>
+            <li>NGINX</li>
+          </ul>
+        </div>
+   
+      </div>
+   
+      <hr class="sidebar-divider">
+   
+      <div>
+        <div class="sidebar-section-title">Projects</div>
+   
+        <div class="project-entry">
+          <div class="project-name">RAG Document Assistant</div>
+          <div class="project-desc">LLM-powered retrieval pipeline with vector search</div>
+          <div class="project-stack">Python, sqlite-vec, sentence-transformers, Flask</div>
+        </div>
+   
+        <div class="project-entry">
+          <div class="project-name">NLP Summarisation Engine</div>
+          <div class="project-desc">Extractive summariser using TextRank and LSA</div>
+          <div class="project-stack">NLTK, Sumy, scikit-learn</div>
+        </div>
+   
+    </aside>
+   
+    <main>
+      <div class="section-title">Profile</div>
+      <p class="profile-text">GenAI engineer with 4+ years building AI-powered applications, cloud pipelines, and data systems. Hands-on with LLMs, RAG, vector search, and Azure deployments. Translates ambiguous client challenges into reliable, production-grade solutions.</p>
+   
+      <div class="section-title">Work Experience</div>
+   
+      <div class="job">
+        <div class="job-header">
+          <div class="job-company">Day Pitney LLP</div>
+          <div class="job-meta">
+            <div class="job-location">Remote</div>
+            <div class="job-dates">Sep 2023 – Present</div>
+          </div>
+        </div>
+        <div class="job-title">Financial Systems Support Specialist</div>
+        <ul class="job-bulletss">
+          <li>Develops web applications and automated cloud solutions for finance operations, reducing manual processing time by 75% across 20+ workflows.</li>
+          <li>Migrated 6 legacy SSIS packages to modern Azure pipelines, cutting maintenance overhead by 50% and improving pipeline reliability in production.</li>
+          <li>Designed reporting solutions spanning 5+ platforms, enabling real-time stakeholder visibility and faster financial close cycles.</li>
+          <li>Led cross-functional delivery across 3 departments, consistently on time with full documentation; resolved cloud and on-premise incidents with avg. 1-hour diagnostic turnaround.</li>
+        </ul>
+      </div>
+   
+      <div class="job">
+        <div class="job-header">
+          <div class="job-company">United States Defense Health Agency</div>
+          <div class="job-meta">
+            <div class="job-location">Remote</div>
+            <div class="job-dates">Dec 2021 – Jul 2023</div>
+          </div>
+        </div>
+        <div class="job-title">Business Intelligence Developer (Contract)</div>
+        <ul class="job-bulletss">
+          <li>Built 12+ Tableau and QlikView dashboards monitoring healthcare quality metrics for 9.5M+ uniformed service members, retirees, and dependants.</li>
+          <li>Engineered ETL pipelines processing 100M+ records across 4 healthcare data sources, improving data consistency by 60% and enabling near-real-time reporting.</li>
+          <li>Implemented HIPAA-compliant data privacy safeguards to anonymise patient data across 5 dashboards; administered environments for 6,000+ providers with automated refresh.</li>
+        </ul>
+      </div>
+   
+      <div class="job">
+        <div class="job-header">
+          <div class="job-company">Florida Department of Health</div>
+          <div class="job-meta">
+            <div class="job-location">Florida, USA</div>
+            <div class="job-dates">Oct 2020 – Dec 2021</div>
+          </div>
+        </div>
+        <div class="job-title">Technical Support Analyst (Contract)</div>
+        <ul class="job-bulletss">
+          <li>Delivered analytics on statewide COVID-19 testing, processing 3M+ daily records across 67 counties to inform public health response decisions.</li>
+          <li>Optimised QVD/QVF data models and REST/SQL integrations, reducing load times by 300% across 4+ Qlik applications; built Power BI sprint dashboards improving predictability by 25%.</li>
+        </ul>
+      </div>
+   
+      <div>
+        <div class="sidebar-section-title">Education</div>
+        <div class="edu-school">Florida State University</div>
+        <div class="edu-degree">Bachelor of Arts in Music (Classical Guitar)</div>
+        <div class="edu-year">2016</div>
+      </div>
+   
+   
+    </main>
+  </div>
+
+
+</body>
+</html>

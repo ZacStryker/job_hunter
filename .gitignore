@@ -7,3 +7,9 @@ job-hunt-dashboard/scraper/sessions/
 
 # Python virtual environment
 venv/
+
+# Resume pipeline development scratch files
+resume_json_prompt
+resume_json_prompt_example
+resume_template_01
+template_variants.json

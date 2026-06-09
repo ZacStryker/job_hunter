@@ -292,3 +292,26 @@ export const blacklistEntryInputSchema = z.object({
 })
 export type BlacklistEntry = z.infer<typeof blacklistEntrySchema>
 export type BlacklistEntryInput = z.infer<typeof blacklistEntryInputSchema>
+
+export const resumeDataSchema = z.object({
+  first_name:   z.string(),
+  last_name:    z.string(),
+  title_01:     z.string(),
+  title_02:     z.string(),
+  email:        z.string(),
+  website:      z.string(),
+  linkedin:     z.string(),
+  location:     z.string(),
+  summary:      z.string(),
+  skill_groups: z.array(z.object({ label: z.string(), skills: z.array(z.string()) })),
+  education:    z.array(z.object({ school: z.string(), degree: z.string(), year: z.string() })),
+  projects:     z.array(z.object({ name: z.string(), desc: z.string(), stack: z.string() })),
+  experience:   z.array(z.object({
+    company:  z.string(),
+    location: z.string(),
+    dates:    z.string(),
+    role:     z.string(),
+    bullets:  z.array(z.string()).min(1),
+  })).min(1),
+})
+export type ResumeData = z.infer<typeof resumeDataSchema>

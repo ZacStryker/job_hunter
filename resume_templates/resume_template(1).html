@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zac Stryker — Resume (Sage)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --dark:      #1F1F1E;
+    --white:     #ffffff;
+    --accent:    #5a8a5e;
+    --text-dim:  #7d9080;
+    --text-body: #404840;
+    --page-w: 794px;
+    --page-h: 1123px;
+    --sidebar-w: 210px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: #d4dbe6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 36px 16px 48px;
+    gap: 28px;
+  }
+
+  .page {
+    width: var(--page-w);
+    height: var(--page-h);
+    background: var(--white);
+    box-shadow: 0 8px 48px rgba(0,0,0,0.22);
+    display: grid;
+    grid-template-columns: var(--sidebar-w) 1fr;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+
+  /* ── PAGE 1 HEADER ── */
+  .page-header {
+    grid-column: 1 / -1;
+    background: var(--dark);
+    padding: 28px 34px 22px 34px;
+    display: flex;
+    align-items: flex-end;
+    position: relative;
+    overflow: hidden;
+  }
+  .header-name { position: relative; z-index: 1; }
+  .name-first {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 300;
+    font-size: 44px;
+    color: var(--white);
+    letter-spacing: 6px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .name-last {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 54px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .header-title {
+    position: relative;
+    z-index: 1;
+    margin-left: 18px;
+    padding-left: 18px;
+    border-left: 2px solid rgba(90,138,94,0.25);
+    align-self: center;
+    font-weight: 300;
+    font-size: 11.5px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    line-height: 1.75;
+  }
+
+  /* ── PAGE 2 MINI HEADER ── */
+  .page-header-mini {
+    grid-column: 1 / -1;
+    background: var(--dark);
+    padding: 12px 34px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .mini-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .mini-label {
+    font-size: 9.5px;
+    font-weight: 300;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* ── SIDEBAR ── */
+  aside {
+    background: var(--dark);
+    padding: 24px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow: hidden;
+  }
+
+  .contact-item { display: flex; flex-direction: column; gap: 2px; }
+  .contact-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .contact-value {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--white);
+    letter-spacing: 0.3px;
+    line-height: 1.5;
+  }
+
+  .sidebar-divider {
+    border: none;
+    border-top: 1px solid rgba(90,138,94,0.15);
+    flex-shrink: 0;
+  }
+
+  .sidebar-section-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .skill-group { margin-bottom: 10px; }
+  .skill-group:last-child { margin-bottom: 0; }
+  .skill-group-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .skill-list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+  .skill-list li {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--white);
+    padding-left: 9px;
+    position: relative;
+    line-height: 1.45;
+  }
+  .skill-list li::before {
+    content: '›';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    opacity: 0.7;
+  }
+
+  .edu-school {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--dark);
+    letter-spacing: 0.5px;
+  }
+  .edu-degree { font-size: 11.5px; font-weight: 300; font-style: italic; color: var(--text-body); margin-top: 2px; }
+  .edu-year {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10.5px;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-top: 3px;
+  }
+
+  /* ── NOTABLE PROJECTS ── */
+  .project-entry { margin-bottom: 12px; }
+  .project-entry:last-child { margin-bottom: 0; }
+  .project-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 12.5px;
+    color: var(--white);
+    letter-spacing: 0.4px;
+  }
+  .project-desc {
+    font-size: 11px;
+    font-weight: 300;
+    color: var(--white);
+    line-height: 1.5;
+    margin-top: 2px;
+  }
+  .project-stack {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--accent);
+    opacity: 0.85;
+    margin-top: 3px;
+    letter-spacing: 0.3px;
+  }
+
+  /* ── MAIN ── */
+  main {
+    background: var(--white);
+    padding: 26px 28px 24px 24px;
+    overflow: hidden;
+  }
+
+  .section-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 3.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  /* ── CONTINUED BAR ── */
+  .continued-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .continued-bar .section-title { margin-bottom: 0; flex-shrink: 0; }
+  .continued-rule {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, rgba(90,138,94,0.4), transparent);
+  }
+  .continued-pg {
+    font-size: 9.5px;
+    font-weight: 300;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .profile-text {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--text-body);
+    line-height: 1.65;
+    margin-bottom: 20px;
+  }
+
+  /* Education block when rendered at end of main */
+  .edu-main { margin-top: 4px; }
+  .edu-main .edu-entry { margin-bottom: 8px; }
+  .edu-main .edu-entry:last-child { margin-bottom: 0; }
+
+  .job {
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px dashed rgba(90,138,94,0.3);
+  }
+  .job:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .job-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1px;
+  }
+  .job-company {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--dark);
+    letter-spacing: 0.5px;
+  }
+  .job-meta { text-align: right; }
+  .job-location {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .job-dates {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11.5px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-top: 1px;
+  }
+  .job-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .job-bullets { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+  .job-bullets li {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--text-body);
+    line-height: 1.5;
+    padding-left: 12px;
+    position: relative;
+  }
+  .job-bullets li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  /* hidden measurement stage */
+  #stage { position: absolute; left: -99999px; top: 0; visibility: hidden; }
+
+  @media print {
+    body { background: white; padding: 0; gap: 0; }
+    .page { box-shadow: none; page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: avoid; break-after: avoid; }
+    #stage { display: none; }
+  }
+  @page { size: A4; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- App injects the resume JSON into the script tag below at runtime. -->
+<script id="resume-data" type="application/json">
+{
+  "first_name": "",
+  "last_name": "",
+  "title_01": "",
+  "title_02": "",
+  "email": "",
+  "website": "",
+  "linkedin": "",
+  "location": "",
+  "summary": "",
+  "skill_groups": [],
+  "education": [],
+  "projects": [],
+  "experience": []
+}
+</script>
+
+<div id="stage"></div>
+<div id="output"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  const DATA = JSON.parse(document.getElementById('resume-data').textContent);
+
+  // ---- escaping ----
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // ---- fragment builders (return HTML strings) ----
+  function contactHTML() {
+    const rows = [
+      ['Email', DATA.email],
+      ['Website', DATA.website],
+      ['LinkedIn', DATA.linkedin],
+      ['Location', DATA.location]
+    ].filter(([, v]) => v);
+    return rows.map(([label, v]) => `
+      <div class="contact-item">
+        <span class="contact-label">${esc(label)}</span>
+        <span class="contact-value">${esc(v)}</span>
+      </div>`).join('');
+  }
+
+  function skillsHTML() {
+    if (!DATA.skill_groups || DATA.skill_groups.length === 0) return '';
+    const groups = DATA.skill_groups.map(g => `
+      <div class="skill-group">
+        <div class="skill-group-label">${esc(g.label)}</div>
+        <ul class="skill-list">
+          ${(g.skills || []).map(s => `<li>${esc(s)}</li>`).join('')}
+        </ul>
+      </div>`).join('');
+    return `<div>
+      <div class="sidebar-section-title">Skills</div>
+      ${groups}
+    </div>`;
+  }
+
+  function projectsHTML() {
+    if (!DATA.projects || DATA.projects.length === 0) return '';
+    const entries = DATA.projects.map(p => `
+      <div class="project-entry">
+        <div class="project-name">${esc(p.name)}</div>
+        <div class="project-desc">${esc(p.desc)}</div>
+        <div class="project-stack">${esc(p.stack)}</div>
+      </div>`).join('');
+    return `<div>
+      <div class="sidebar-section-title">Projects</div>
+      ${entries}
+    </div>`;
+  }
+
+  function divider() { return `<hr class="sidebar-divider">`; }
+
+  // Join non-empty sidebar fragments with dividers between them.
+  function sidebarStack(fragments) {
+    const parts = fragments.filter(f => f && f.trim() !== '');
+    return parts.join(divider());
+  }
+
+  function profileHTML() {
+    return `<div class="section-title">Profile</div>
+      <p class="profile-text">${esc(DATA.summary)}</p>`;
+  }
+
+  function jobHTML(job) {
+    return `<div class="job">
+      <div class="job-header">
+        <div class="job-company">${esc(job.company)}</div>
+        <div class="job-meta">
+          <div class="job-location">${esc(job.location)}</div>
+          <div class="job-dates">${esc(job.dates)}</div>
+        </div>
+      </div>
+      <div class="job-title">${esc(job.role)}</div>
+      <ul class="job-bullets">
+        ${(job.bullets || []).map(b => `<li>${esc(b)}</li>`).join('')}
+      </ul>
+    </div>`;
+  }
+
+  function educationHTML() {
+    if (!DATA.education || DATA.education.length === 0) return '';
+    const entries = DATA.education.map(e => `
+      <div class="edu-entry">
+        <div class="edu-school">${esc(e.school)}</div>
+        <div class="edu-degree">${esc(e.degree)}</div>
+        <div class="edu-year">${esc(e.year)}</div>
+      </div>`).join('');
+    return `<div class="section-title">Education</div>
+      <div class="edu-main">${entries}</div>`;
+  }
+
+  function headerHTML() {
+    return `<header class="page-header">
+      <div class="header-name">
+        <div class="name-first">${esc(DATA.first_name)}</div>
+        <div class="name-last">${esc(DATA.last_name)}</div>
+      </div>
+      <div class="header-title">
+        ${esc(DATA.title_01)}<br>and ${esc(DATA.title_02)}
+      </div>
+    </header>`;
+  }
+
+  function miniHeaderHTML(pageNum) {
+    const fullName = `${esc(DATA.first_name)} ${esc(DATA.last_name)}`;
+    return `<header class="page-header-mini">
+      <div class="mini-name">${fullName}</div>
+      <div class="mini-label">Page ${pageNum}</div>
+    </header>`;
+  }
+
+  // ---- measurement helpers ----
+  // Available content height inside main/aside = page height - header height - vertical padding.
+  // We measure by actually rendering into real .page boxes on the hidden stage and
+  // comparing scrollHeight to clientHeight.
+  function overflows(el) {
+    // 1px tolerance band removed per spec: any excess counts.
+    return el.scrollHeight > el.clientHeight;
+  }
+
+  // Build a single-page DOM (page 1 only) and return the .page element.
+  function buildSinglePage(jobs) {
+    const page = document.createElement('div');
+    page.className = 'page';
+    page.innerHTML = `
+      ${headerHTML()}
+      <aside>${sidebarStack([contactHTML(), skillsHTML(), projectsHTML()])}</aside>
+      <main>
+        ${profileHTML()}
+        <div class="section-title">Work Experience</div>
+        ${jobs.map(jobHTML).join('')}
+        ${educationHTML()}
+      </main>`;
+    return page;
+  }
+
+  // Build page 1 of a two-page layout (Skills removed from sidebar).
+  function buildTwoPage1(jobs) {
+    const page = document.createElement('div');
+    page.className = 'page';
+    page.innerHTML = `
+      ${headerHTML()}
+      <aside>${sidebarStack([contactHTML(), projectsHTML()])}</aside>
+      <main>
+        ${profileHTML()}
+        <div class="section-title">Work Experience</div>
+        ${jobs.map(jobHTML).join('')}
+      </main>`;
+    return page;
+  }
+
+  // Build page 2 of a two-page layout (Skills in sidebar; remaining jobs + Education in main).
+  function buildTwoPage2(jobs) {
+    const page = document.createElement('div');
+    page.className = 'page';
+    page.innerHTML = `
+      ${miniHeaderHTML(2)}
+      <aside>${sidebarStack([skillsHTML()])}</aside>
+      <main>
+        <div class="continued-bar">
+          <div class="section-title">Work Experience</div>
+          <div class="continued-rule"></div>
+          <div class="continued-pg">Continued</div>
+        </div>
+        ${jobs.map(jobHTML).join('')}
+        ${educationHTML()}
+      </main>`;
+    return page;
+  }
+
+  // ---- pagination engine ----
+  function paginate() {
+    const stage = document.getElementById('stage');
+    const output = document.getElementById('output');
+    stage.innerHTML = '';
+    output.innerHTML = '';
+
+    const allJobs = DATA.experience || [];
+
+    // 1) Try single page with everything.
+    const single = buildSinglePage(allJobs);
+    stage.appendChild(single);
+    const sMain = single.querySelector('main');
+    const sAside = single.querySelector('aside');
+    const singleFits = !overflows(sMain) && !overflows(sAside);
+    stage.removeChild(single);
+
+    if (singleFits) {
+      output.appendChild(buildSinglePage(allJobs));
+      finish(1);
+      return;
+    }
+
+    // 2) Two-page layout. Place as many whole jobs on page 1 as fit.
+    //    Page 1 sidebar = Contact + Projects (no Skills) -> measure its overflow too.
+    let split = allJobs.length; // number of jobs on page 1
+    let page1Jobs, page2Jobs;
+
+    // Reduce page-1 jobs until BOTH columns of page 1 fit.
+    for (split = allJobs.length; split >= 0; split--) {
+      page1Jobs = allJobs.slice(0, split);
+      const p1 = buildTwoPage1(page1Jobs);
+      stage.appendChild(p1);
+      const fits = !overflows(p1.querySelector('main')) && !overflows(p1.querySelector('aside'));
+      stage.removeChild(p1);
+      if (fits) break;
+    }
+    if (split < 0) split = 0;
+    page1Jobs = allJobs.slice(0, split);
+    page2Jobs = allJobs.slice(split);
+
+    // 3) Verify page 2 fits. (Cap at two pages per spec; warn if it doesn't.)
+    const p2check = buildTwoPage2(page2Jobs);
+    stage.appendChild(p2check);
+    const p2Fits = !overflows(p2check.querySelector('main')) && !overflows(p2check.querySelector('aside'));
+    stage.removeChild(p2check);
+    if (!p2Fits) {
+      console.warn('[resume] Content exceeds two pages; page 2 overflows. ' +
+                   'Trim content or extend to a three-page layout.');
+    }
+
+    output.appendChild(buildTwoPage1(page1Jobs));
+    output.appendChild(buildTwoPage2(page2Jobs));
+    finish(2);
+  }
+
+  function finish(pageCount) {
+    document.body.setAttribute('data-pages', String(pageCount));
+    window.__resumePageCount = pageCount;
+    window.__paginationComplete = true;
+    document.body.classList.add('pagination-complete');
+    document.dispatchEvent(new CustomEvent('pagination:complete', { detail: { pages: pageCount } }));
+  }
+
+  // Gate on fonts so measurements use the real typefaces.
+  function run() {
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(paginate).catch(paginate);
+    } else {
+      paginate();
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', run);
+  } else {
+    run();
+  }
+
+  // Re-measure right before printing (Playwright page.pdf triggers this too).
+  window.addEventListener('beforeprint', function () {
+    // Re-run synchronously; fonts are already loaded by print time.
+    paginate();
+  });
+})();
+</script>
+
+</body>
+</html>
