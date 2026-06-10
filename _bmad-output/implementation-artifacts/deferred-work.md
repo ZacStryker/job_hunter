@@ -1,9 +1,5 @@
 # Deferred Work
 
-## Deferred from: resume-pdf-tab-title-remove-sage (2026-06-10)
-
-- **Hardcoded candidate name in `<title>` tag** — `resume_template(1).html` hardcodes `Zac Stryker` in `<title>Zac Stryker — Resume</title>`. In a multi-user deployment (Epics 24–27), the title should dynamically reflect the active user's profile name. Either update `resume-service.ts` to replace a `{{CANDIDATE_NAME}}` placeholder at render time, or inject the name via a script-driven `document.title` assignment using the injected `resume-data` JSON. [`resume_templates/resume_template(1).html`, `resume-service.ts`]
-
 ## Deferred from: update-resume-prompt-include-all-jobs (2026-06-09)
 
 - **Sparse-entry bullet floor conflict**: the `CONTENT LIMITS` rule mandates 3-5 bullets per experience entry, but the `no invented content` HARD RULE forbids padding. For old/short profile entries this creates an impossible constraint. Resolution: add a clause allowing fewer bullets when the profile entry has insufficient documented detail. [`prompt-defaults.ts` resume config]
