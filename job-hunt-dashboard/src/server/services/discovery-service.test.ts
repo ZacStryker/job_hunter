@@ -224,7 +224,7 @@ describe('runDiscovery()', () => {
     expect(rows.map(r => r.external_job_id)).toContain('job-2')
   })
 
-  test('scraper error: throws when any search returns non-ok status', async () => {
+  test('scraper error: returns inserted=0 and non-empty errors when all searches fail', async () => {
     prodSqlite.run(
       `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
     )
@@ -232,7 +232,29 @@ describe('runDiscovery()', () => {
       Promise.resolve(new Response(null, { status: 500 }))
     )
 
-    await expect(runDiscovery(undefined, 1)).rejects.toThrow()
+    const { inserted, errors } = await runDiscovery(undefined, 1)
+    expect(inserted).toBe(0)
+    expect(errors.length).toBeGreaterThan(0)
+    expect(errors[0].error).toContain('500')
+  })
+
+  test('onJobsInserted: called once per source that inserts new jobs', async () => {
+    prodSqlite.run(
+      `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+    )
+    globalThis.fetch = mock(() =>
+      Promise.resolve(new Response(
+        JSON.stringify({ results: [{ id: 'job-cb1', title: 'Dev', company: 'CallbackCo', location: null, url: null }] }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      ))
+    )
+
+    const calls: Array<{ count: number; source: string }> = []
+    await runDiscovery(undefined, 1, (count, source) => calls.push({ count, source }))
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].count).toBe(1)
+    expect(calls[0].source).toBe('linkedin')
   })
 
   test('missing SCRAPER_URL: throws', async () => {

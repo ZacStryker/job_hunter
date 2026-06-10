@@ -23,7 +23,11 @@ async function hashText(text: string): Promise<string> {
   return Buffer.from(buf).toString('hex')
 }
 
-export async function runDiscovery(onProgress?: (msg: string) => void, userId?: number): Promise<{ inserted: number; bySource: Record<string, number>; errors: Array<{ source: string; error: string }> }> {
+export async function runDiscovery(
+  onProgress?: (msg: string) => void,
+  userId?: number,
+  onJobsInserted?: (count: number, source: string) => void,
+): Promise<{ inserted: number; bySource: Record<string, number>; errors: Array<{ source: string; error: string }> }> {
   const scraperUrl = process.env.SCRAPER_URL
   const scraperToken = process.env.SCRAPER_TOKEN
   if (!scraperUrl) throw new Error('SCRAPER_URL not configured')
@@ -125,74 +129,95 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
       })
     : searches
 
-  const responses = await Promise.all(
-      activeSearches.map((s) => {
-        onProgress?.(`Searching ${s.source}: ${s.query}…`)
-        const requestBody: Record<string, unknown> = {
-          source: s.source, query: s.query, location: s.location,
-        }
-        if (s.source === 'linkedin' && storageStateContent) {
-          requestBody.storageStateContent = storageStateContent
-        }
-        if ((s.source === 'indeed' || s.source === 'indeed_nl') && indeedStorageStateContent) {
-          requestBody.storageStateContent = indeedStorageStateContent
-        }
-        const _fetchStart = Date.now()
-        console.log(`[DISCOVERY] → fetch ${s.source} query="${s.query}" location="${s.location ?? ''}"`)
-        return fetch(`${scraperUrl}/scrape/search`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(scraperToken ? { Authorization: `Bearer ${scraperToken}` } : {}),
-          },
-          body: JSON.stringify(requestBody),
-          signal: AbortSignal.timeout(120_000),
-        }).then(async (res) => {
-          const elapsed = Date.now() - _fetchStart
-          console.log(`[DISCOVERY] ← ${s.source} HTTP ${res.status} (${elapsed}ms)`)
-          if (!res.ok) {
-            const body = await res.text().catch(() => '')
-            console.error(`[DISCOVERY] ← ${s.source} error body: ${body.slice(0, 200)}`)
-            throw new Error(`Scraper error ${res.status} for "${s.query}"`)
-          }
-          const data = await res.json() as { results?: ScraperResult[]; updatedStorageStateContent?: string }
-          console.log(`[DISCOVERY] ← ${s.source} results: ${data.results?.length ?? 0} jobs`)
-          return { source: DB_SOURCE[s.source as ScraperSource] ?? s.source, results: data.results ?? [], updatedStorageStateContent: data.updatedStorageStateContent }
-        }).catch((err: unknown) => {
-          const msg = err instanceof Error ? err.message : String(err)
-          console.error(`[DISCOVERY] ← ${s.source} fetch threw: ${msg} (after ${Date.now() - _fetchStart}ms)`)
-          throw err
-        })
+  // Load shared filtering state before any fetches begin
+  const existing = db
+    .select({ externalJobId: jobs.externalJobId })
+    .from(jobs)
+    .where(and(
+      isNotNull(jobs.externalJobId),
+      userId !== undefined ? eq(jobs.userId, userId) : sql`1=1`,
+    ))
+    .all()
+  const existingIds = new Set(existing.map((r) => r.externalJobId!))
+
+  const blacklistedNames = userId !== undefined
+    ? new Set(
+        db.select({ companyName: companyBlacklist.companyName })
+          .from(companyBlacklist)
+          .where(eq(companyBlacklist.userId, userId))
+          .all()
+          .map((r) => r.companyName.toLowerCase())
+      )
+    : new Set<string>()
+
+  // Shared state mutated synchronously between await points — safe in single-threaded JS
+  const seen = new Set<string>()
+  const bySource: Record<string, number> = {}
+  const allInsertedJobs: Array<{ id: string; title: string }> = []
+  let totalInserted = 0
+
+  const dateScraped = new Date().toISOString()
+
+  const processSearch = async (s: typeof activeSearches[number]) => {
+    const dbSource = DB_SOURCE[s.source as ScraperSource] ?? s.source
+    onProgress?.(`Searching ${s.source}: ${s.query}…`)
+
+    const requestBody: Record<string, unknown> = {
+      source: s.source, query: s.query, location: s.location,
+    }
+    if (s.source === 'linkedin' && storageStateContent) {
+      requestBody.storageStateContent = storageStateContent
+    }
+    if ((s.source === 'indeed' || s.source === 'indeed_nl') && indeedStorageStateContent) {
+      requestBody.storageStateContent = indeedStorageStateContent
+    }
+
+    const _fetchStart = Date.now()
+    console.log(`[DISCOVERY] → fetch ${s.source} query="${s.query}" location="${s.location ?? ''}"`)
+
+    let res: Response
+    try {
+      res = await fetch(`${scraperUrl}/scrape/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(scraperToken ? { Authorization: `Bearer ${scraperToken}` } : {}),
+        },
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(120_000),
       })
-    )
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[DISCOVERY] ← ${s.source} fetch threw: ${msg} (after ${Date.now() - _fetchStart}ms)`)
+      errors.push({ source: s.source, error: msg })
+      return
+    }
 
-    const allResults = responses.flatMap((r) =>
-      r.results.map((job) => ({ ...job, source: r.source }))
-    )
+    const elapsed = Date.now() - _fetchStart
+    console.log(`[DISCOVERY] ← ${s.source} HTTP ${res.status} (${elapsed}ms)`)
 
-    if (userId !== undefined) {
-      const linkedinResponse = responses.find((r) => r.source === 'linkedin')
-      if (linkedinResponse?.updatedStorageStateContent) {
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      console.error(`[DISCOVERY] ← ${s.source} error body: ${body.slice(0, 200)}`)
+      errors.push({ source: s.source, error: `Scraper error ${res.status} for "${s.query}"` })
+      return
+    }
+
+    const data = await res.json() as { results?: ScraperResult[]; updatedStorageStateContent?: string }
+    console.log(`[DISCOVERY] ← ${s.source} results: ${data.results?.length ?? 0} jobs`)
+
+    if (userId !== undefined && data.updatedStorageStateContent) {
+      const keyName = s.source === 'linkedin'
+        ? 'linkedin_storage_state'
+        : (s.source === 'indeed' || s.source === 'indeed_nl')
+          ? 'indeed_storage_state'
+          : null
+      if (keyName) {
         try {
-          const ciphertext = encrypt(linkedinResponse.updatedStorageStateContent)
+          const ciphertext = encrypt(data.updatedStorageStateContent)
           const updatedAt = new Date().toISOString()
           db.insert(userSecrets)
-            .values({ userId, keyName: 'linkedin_storage_state', ciphertext, updatedAt })
-            .onConflictDoUpdate({
-              target: [userSecrets.userId, userSecrets.keyName],
-              set: { ciphertext, updatedAt },
-            })
-            .run()
-        } catch { /* best-effort */ }
-      }
-
-      const indeedResponse = responses.findLast((r) => r.source === 'indeed' || r.source === 'indeed_nl')
-      if (indeedResponse?.updatedStorageStateContent) {
-        try {
-          const ciphertext = encrypt(indeedResponse.updatedStorageStateContent)
-          const updatedAt = new Date().toISOString()
-          db.insert(userSecrets)
-            .values({ userId, keyName: 'indeed_storage_state', ciphertext, updatedAt })
+            .values({ userId, keyName, ciphertext, updatedAt })
             .onConflictDoUpdate({
               target: [userSecrets.userId, userSecrets.keyName],
               set: { ciphertext, updatedAt },
@@ -202,47 +227,21 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
       }
     }
 
-    const existing = db
-      .select({ externalJobId: jobs.externalJobId })
-      .from(jobs)
-      .where(and(
-        isNotNull(jobs.externalJobId),
-        userId !== undefined ? eq(jobs.userId, userId) : sql`1=1`,
-      ))
-      .all()
-    const existingIds = new Set(existing.map((r) => r.externalJobId!))
-
-    const blacklistedNames = userId !== undefined
-      ? new Set(
-          db.select({ companyName: companyBlacklist.companyName })
-            .from(companyBlacklist)
-            .where(eq(companyBlacklist.userId, userId))
-            .all()
-            .map((r) => r.companyName.toLowerCase())
-        )
-      : new Set<string>()
-
-    const seen = new Set<string>()
-    const newJobs = allResults.filter((r) => {
+    const newForSource = (data.results ?? []).filter((r) => {
       if (!r.id || !r.company || !r.title || existingIds.has(r.id) || seen.has(r.id)) return false
       if (blacklistedNames.size > 0 && blacklistedNames.has(r.company.toLowerCase())) return false
       seen.add(r.id)
       return true
     })
 
-    console.log(`[DISCOVERY] scraped total=${allResults.length}, after dedup new=${newJobs.length}`)
-    if (newJobs.length === 0) {
-      console.log(`[DISCOVERY] done — 0 new jobs, ${Date.now() - _debugStart}ms total`)
-      return { inserted: 0, bySource: {}, errors }
+    if (newForSource.length > 0) {
+      bySource[dbSource] = (bySource[dbSource] ?? 0) + newForSource.length
     }
 
-    onProgress?.(`Inserting ${newJobs.length} new jobs…`)
-
-    const dateScraped = new Date().toISOString()
-
-    if (userId !== undefined) {
+    if (newForSource.length > 0 && userId !== undefined) {
+      onProgress?.(`Inserting ${newForSource.length} jobs from ${dbSource}…`)
       db.transaction((tx) => {
-        for (const job of newJobs) {
+        for (const job of newForSource) {
           tx
             .insert(jobs)
             .values({
@@ -250,7 +249,7 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
               jobTitle: job.title,
               location: job.location ?? null,
               sourceUrl: job.url ?? null,
-              source: job.source,
+              source: dbSource,
               externalJobId: job.id,
               dateScraped,
               analysisStatus: 'pending',
@@ -260,49 +259,51 @@ export async function runDiscovery(onProgress?: (msg: string) => void, userId?: 
             .run()
         }
       })
+      totalInserted += newForSource.length
+      for (const job of newForSource) {
+        allInsertedJobs.push({ id: job.id, title: job.title })
+      }
+      onJobsInserted?.(newForSource.length, dbSource)
     }
-    if (userId !== undefined && newJobs.length > 0) {
-      const profileRow = db.select().from(profile)
-        .where(eq(profile.userId, userId)).get()
+  }
 
-      const resumeText = profileRow
-        ? [profileRow.summary, profileRow.experience, profileRow.skills]
-            .filter(Boolean).join('\n')
-        : ''
+  await Promise.allSettled(activeSearches.map(processSearch))
 
-      if (resumeText) {
-        try {
-          const profileHash = await hashText(resumeText)
-          const resumeEmbedding = await getOrComputeResumeEmbedding(userId, resumeText, profileHash)
+  console.log(`[DISCOVERY] all sources done, deduped new=${totalInserted}`)
 
-          // No wrapping transaction — scoring is intentionally best-effort per job.
-          // A transaction would roll back all scores if any single embed fails,
-          // violating the requirement that other jobs in the batch are scored normally.
-          for (const job of newJobs) {
-            try {
-              const titleEmbedding = await embed(job.title)
-              const score = cosineSimilarity(resumeEmbedding, titleEmbedding)
-              db.update(jobs)
-                .set({ relevanceScore: score })
-                .where(and(eq(jobs.userId, userId), eq(jobs.externalJobId, job.id)))
-                .run()
-            } catch {
-              console.error(`[DISCOVERY] embed failed for job "${job.id}"; stays with null relevanceScore`)
-            }
+  if (userId !== undefined && allInsertedJobs.length > 0) {
+    const profileRow = db.select().from(profile)
+      .where(eq(profile.userId, userId)).get()
+
+    const resumeText = profileRow
+      ? [profileRow.summary, profileRow.experience, profileRow.skills]
+          .filter(Boolean).join('\n')
+      : ''
+
+    if (resumeText) {
+      try {
+        const profileHash = await hashText(resumeText)
+        const resumeEmbedding = await getOrComputeResumeEmbedding(userId, resumeText, profileHash)
+
+        for (const job of allInsertedJobs) {
+          try {
+            const titleEmbedding = await embed(job.title)
+            const score = cosineSimilarity(resumeEmbedding, titleEmbedding)
+            db.update(jobs)
+              .set({ relevanceScore: score })
+              .where(and(eq(jobs.userId, userId), eq(jobs.externalJobId, job.id)))
+              .run()
+          } catch {
+            console.error(`[DISCOVERY] embed failed for job "${job.id}"; stays with null relevanceScore`)
           }
-        } catch {
-          console.error('[DISCOVERY] resume embedding failed; batch stays with null relevanceScore')
         }
+      } catch {
+        console.error('[DISCOVERY] resume embedding failed; batch stays with null relevanceScore')
       }
     }
-    // userId undefined: inserts skipped (userId is NOT NULL) — bySource still computed below
+  }
 
-    const bySource: Record<string, number> = {}
-    for (const job of newJobs) {
-      bySource[job.source] = (bySource[job.source] ?? 0) + 1
-    }
-
-    const inserted = userId !== undefined ? newJobs.length : 0
-    console.log(`[DISCOVERY] done — inserted=${inserted} bySource=${JSON.stringify(bySource)} errors=${errors.length} total=${Date.now() - _debugStart}ms`)
-    return { inserted, bySource, errors }
+  const inserted = userId !== undefined ? totalInserted : 0
+  console.log(`[DISCOVERY] done — inserted=${inserted} bySource=${JSON.stringify(bySource)} errors=${errors.length} total=${Date.now() - _debugStart}ms`)
+  return { inserted, bySource, errors }
 }

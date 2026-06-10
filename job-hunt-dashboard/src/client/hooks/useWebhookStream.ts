@@ -86,6 +86,8 @@ export function useWebhookStream(url: string): WebhookStreamState {
           console.log(`[discovery-stream] event @${Date.now() - _streamStart}ms:`, ev)
           if (typeof ev.status === 'string') {
             setStatusMessage(ev.status)
+          } else if (ev.jobsReady === true) {
+            queryClient.invalidateQueries({ queryKey: ['jobs'] })
           } else if (ev.done === true) {
             gotDone = true
             const summary = buildDoneSummary(ev)
@@ -109,7 +111,9 @@ export function useWebhookStream(url: string): WebhookStreamState {
       if (remaining.trim()) {
         try {
           const ev = JSON.parse(remaining) as Record<string, unknown>
-          if (ev.done === true) {
+          if (ev.jobsReady === true) {
+            queryClient.invalidateQueries({ queryKey: ['jobs'] })
+          } else if (ev.done === true) {
             gotDone = true
             const summary = buildDoneSummary(ev)
             setStatusMessage(summary)

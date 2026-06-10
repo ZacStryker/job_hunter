@@ -21,8 +21,14 @@ app.post('/discovery', (c) => {
     const write = (ev: object) => s.writeln(JSON.stringify(ev))
     const startMs = Date.now()
     try {
-      const { inserted, bySource } = await runDiscovery((msg) => write({ status: msg }), userId)
-      recordRun({ userId, name: 'Discovery', success: true, itemCount: inserted, errorMessage: null, durationMs: Date.now() - startMs, sourceBreakdown: Object.keys(bySource).length > 0 ? bySource : null })
+      const { inserted, bySource, errors } = await runDiscovery(
+        (msg) => write({ status: msg }),
+        userId,
+        (count, source) => write({ jobsReady: true, count, source }),
+      )
+      const success = !(inserted === 0 && errors.length > 0)
+      const errorMessage = success ? null : (errors[0]?.error ?? null)
+      recordRun({ userId, name: 'Discovery', success, itemCount: inserted, errorMessage, durationMs: Date.now() - startMs, sourceBreakdown: Object.keys(bySource).length > 0 ? bySource : null })
       write({ done: true, inserted })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
