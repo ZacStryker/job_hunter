@@ -39,6 +39,7 @@ function buildCoverLetterHtml(content: string, p: typeof profile.$inferSelect | 
   <hr />
   <div class="date">${date}</div>
   <div class="body">${escHtml(content)}</div>
+<script>window.__paginationComplete = true;</script>
 </body>
 </html>`
 }
