@@ -18,6 +18,15 @@ type DegreeEntry = z.infer<typeof degreeEntrySchema>
 type ProjectEntry = z.infer<typeof projectEntrySchema>
 type CertEntry = z.infer<typeof certEntrySchema>
 
+function formatJobDate(yyyyMm: string | null | undefined, isCurrent: boolean): string {
+  if (isCurrent) return 'Present'
+  if (!yyyyMm) return '?'
+  const parts = yyyyMm.split('-')
+  if (parts.length < 2) return yyyyMm
+  return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1)
+    .toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+}
+
 const EXPERIENCE_SECTIONS = [
   { key: 'jobs', label: 'Jobs', addLabel: 'Add Job' },
   { key: 'education', label: 'Education', addLabel: 'Add Education' },
@@ -66,7 +75,8 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
   const skillsEditing = editingSection === 'skills'
 
   const [showAddJob, setShowAddJob] = useState(false)
-  const [editingJobIdx, setEditingJobIdx] = useState<number | null>(null)
+  const [expandedJobIdx, setExpandedJobIdx] = useState<number | null>(null)
+  const [jobEditingIdx, setJobEditingIdx] = useState<number | null>(null)
 
   const [showAddEdu, setShowAddEdu] = useState(false)
   const [editingEduIdx, setEditingEduIdx] = useState<number | null>(null)
@@ -202,7 +212,7 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
     mutation.mutate(
       { personal: buildPersonal(), experience: updated },
       {
-        onSuccess: () => { toast.success('Job updated'); setEditingJobIdx(null) },
+        onSuccess: () => { toast.success('Job updated'); setJobEditingIdx(null) },
         onError: (err) => toast.error(err.message),
       }
     )
@@ -213,7 +223,8 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
     const job = exp.jobs[idx]
     if (!job) return
     if (job.bullets.length >= 2 && !window.confirm('Remove this job entry?')) return
-    if (editingJobIdx !== null && editingJobIdx >= idx) setEditingJobIdx(null)
+    if (expandedJobIdx === idx) setExpandedJobIdx(null)
+    if (jobEditingIdx === idx) setJobEditingIdx(null)
     const updated = { ...exp, jobs: exp.jobs.filter((_, i) => i !== idx) }
     mutation.mutate(
       { personal: buildPersonal(), experience: updated },
@@ -414,6 +425,16 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
   }
 
   const liveExp = (liveProfile ?? profileData).experience
+
+  const sortedJobs = [...liveExp.jobs]
+    .map((job, originalIdx) => ({ job, originalIdx }))
+    .sort((a, b) => {
+      if (a.job.current && !b.job.current) return -1
+      if (!a.job.current && b.job.current) return 1
+      const aEnd = a.job.current ? a.job.startDate : (a.job.endDate ?? '')
+      const bEnd = b.job.current ? b.job.startDate : (b.job.endDate ?? '')
+      return bEnd.localeCompare(aEnd)
+    })
 
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-6">
@@ -678,15 +699,32 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
                     {liveExp.jobs.length === 0 && (
                       <p className="text-sm text-zinc-400 my-3">No entries yet.</p>
                     )}
-                    {liveExp.jobs.map((job, idx) => (
+                    {sortedJobs.length > 0 && (
+                      <div className="grid grid-cols-[2fr_2fr_auto] gap-4 pt-3 pb-1 mb-1 border-b border-zinc-700">
+                        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Title</span>
+                        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Company</span>
+                        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Dates</span>
+                      </div>
+                    )}
+                    {sortedJobs.map(({ job, originalIdx }) => (
                       <JobEntryRow
-                        key={editingJobIdx === idx ? `edit-${idx}` : `view-${idx}`}
+                        key={`job-${originalIdx}-${jobEditingIdx === originalIdx ? 'editing' : 'view'}`}
                         job={job}
-                        isEditing={editingJobIdx === idx}
-                        onToggleEdit={() => setEditingJobIdx(editingJobIdx === idx ? null : idx)}
-                        onSave={(updated) => handleSaveJobEntry(idx, updated)}
-                        onCancel={() => setEditingJobIdx(null)}
-                        onDelete={() => handleDeleteJob(idx)}
+                        isExpanded={expandedJobIdx === originalIdx}
+                        isEditing={jobEditingIdx === originalIdx}
+                        onToggleExpand={() => {
+                          if (expandedJobIdx === originalIdx) {
+                            if (jobEditingIdx === originalIdx) return
+                            setExpandedJobIdx(null)
+                          } else {
+                            setExpandedJobIdx(originalIdx)
+                            setJobEditingIdx(null)
+                          }
+                        }}
+                        onStartEdit={() => setJobEditingIdx(originalIdx)}
+                        onSave={(updated) => handleSaveJobEntry(originalIdx, updated)}
+                        onCancel={() => setJobEditingIdx(null)}
+                        onDelete={() => handleDeleteJob(originalIdx)}
                         disabled={mutation.isPending}
                       />
                     ))}
@@ -904,10 +942,12 @@ function AddJobSheet({ open, onClose, onSave }: {
   )
 }
 
-function JobEntryRow({ job, isEditing, onToggleEdit, onSave, onCancel, onDelete, disabled }: {
+function JobEntryRow({ job, isExpanded, isEditing, onToggleExpand, onStartEdit, onSave, onCancel, onDelete, disabled }: {
   job: JobEntry
+  isExpanded: boolean
   isEditing: boolean
-  onToggleEdit: () => void
+  onToggleExpand: () => void
+  onStartEdit: () => void
   onSave: (entry: JobEntry) => void
   onCancel: () => void
   onDelete: () => void
@@ -922,8 +962,9 @@ function JobEntryRow({ job, isEditing, onToggleEdit, onSave, onCancel, onDelete,
   const [bullets, setBullets] = useState(job.bullets.length > 0 ? [...job.bullets] : [''])
   const [errors, setErrors] = useState<string[]>([])
 
-  const endLabel = job.current ? 'Present' : (job.endDate ?? '?')
-  const summary = `${job.company} — ${job.title} (${job.startDate} – ${endLabel})`
+  const startFormatted = formatJobDate(job.startDate, false)
+  const endFormatted = formatJobDate(job.endDate, job.current)
+  const dateRange = `${startFormatted} – ${endFormatted}`
 
   function handleSave() {
     const errs: string[] = []
@@ -942,102 +983,145 @@ function JobEntryRow({ job, isEditing, onToggleEdit, onSave, onCancel, onDelete,
     })
   }
 
-  if (!isEditing) {
-    return (
-      <div className="flex items-center gap-2 py-2 border-b border-zinc-800 last:border-0">
-        <button
-          type="button"
-          className="flex-1 text-left text-sm text-zinc-300 hover:text-zinc-100 truncate"
-          onClick={onToggleEdit}
-          disabled={disabled}
-        >
-          {summary}
-        </button>
-        <button
-          type="button"
-          onClick={onToggleEdit}
-          disabled={disabled}
-          className="text-zinc-500 hover:text-zinc-300 disabled:opacity-50 shrink-0"
-        >
-          <ChevronDown className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={disabled}
-          className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50 shrink-0"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
-    )
+  function handleCancel() {
+    setTitle(job.title)
+    setCompany(job.company)
+    setStartDate(job.startDate)
+    setEndDate(job.endDate ?? '')
+    setCurrent(job.current)
+    setEmploymentType(job.employmentType ?? '')
+    setBullets(job.bullets.length > 0 ? [...job.bullets] : [''])
+    setErrors([])
+    onCancel()
   }
 
   return (
-    <div className="py-3 border-b border-zinc-800 last:border-0 space-y-3">
-      {errors.length > 0 && (
-        <div className="text-xs text-red-400 space-y-1">
-          {errors.map((e, i) => <p key={i}>{e}</p>)}
+    <div className="border-b border-zinc-800 last:border-0">
+      <button
+        type="button"
+        className="w-full grid grid-cols-[2fr_2fr_auto] gap-4 py-2 text-left hover:bg-zinc-800/30 rounded transition-colors disabled:opacity-50"
+        onClick={onToggleExpand}
+        disabled={disabled}
+      >
+        <span className="text-sm text-zinc-200 truncate">{job.title}</span>
+        <span className="text-sm text-zinc-400 truncate">{job.company}</span>
+        <span className="text-sm text-zinc-500 whitespace-nowrap">{dateRange}</span>
+      </button>
+
+      {isExpanded && !isEditing && (
+        <div className="pb-3 pt-1 space-y-3">
+          <div className="flex items-center justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={onStartEdit} disabled={disabled}>Edit</Button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={disabled}
+              className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">Title</label>
+              <Input value={job.title} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">Company</label>
+              <Input value={job.company} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">Start Date</label>
+              <Input value={startFormatted} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">End Date</label>
+              <Input value={endFormatted} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+            </div>
+          </div>
+          {job.employmentType && (
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">Employment Type</label>
+              <Input value={job.employmentType} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+            </div>
+          )}
+          {job.bullets.length > 0 && (
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">Bullets</label>
+              <ul className="space-y-1 mt-1">
+                {job.bullets.map((b, i) => (
+                  <li key={i} className="text-sm text-zinc-300">• {b}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs text-zinc-400 mb-1">Title *</label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-zinc-900 border-zinc-700" />
-        </div>
-        <div>
-          <label className="block text-xs text-zinc-400 mb-1">Company *</label>
-          <Input value={company} onChange={(e) => setCompany(e.target.value)} className="bg-zinc-900 border-zinc-700" />
-        </div>
-        <div>
-          <label className="block text-xs text-zinc-400 mb-1">Start Date * (YYYY-MM)</label>
-          <Input value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="YYYY-MM" />
-        </div>
-        <div>
-          <label className="block text-xs text-zinc-400 mb-1">End Date (YYYY-MM)</label>
-          <Input value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="YYYY-MM" disabled={current} />
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        <Switch
-          checked={current}
-          onCheckedChange={(checked) => { setCurrent(checked); if (checked) setEndDate('') }}
-        />
-        <label className="text-xs text-zinc-400">Currently employed here</label>
-      </div>
-      <div>
-        <label className="block text-xs text-zinc-400 mb-1">Employment Type</label>
-        <Input value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="e.g. Full-time" />
-      </div>
-      <div>
-        <label className="block text-xs text-zinc-400 mb-1">Bullets</label>
-        <div className="space-y-2">
-          {bullets.map((bullet, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <Input
-                value={bullet}
-                onChange={(e) => setBullets(bullets.map((b, j) => j === i ? e.target.value : b))}
-                className="bg-zinc-900 border-zinc-700 flex-1"
-              />
-              <button
-                type="button"
-                onClick={() => setBullets(bullets.filter((_, j) => j !== i))}
-                disabled={bullets.length <= 1}
-                className="text-zinc-500 hover:text-red-400 disabled:opacity-30 shrink-0"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+
+      {isExpanded && isEditing && (
+        <div className="pb-3 pt-1 space-y-3">
+          {errors.length > 0 && (
+            <div className="text-xs text-red-400 space-y-1">
+              {errors.map((e, i) => <p key={i}>{e}</p>)}
             </div>
-          ))}
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">Title *</label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-zinc-900 border-zinc-700" />
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">Company *</label>
+              <Input value={company} onChange={(e) => setCompany(e.target.value)} className="bg-zinc-900 border-zinc-700" />
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">Start Date * (YYYY-MM)</label>
+              <Input value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="YYYY-MM" />
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-400 mb-1">End Date (YYYY-MM)</label>
+              <Input value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="YYYY-MM" disabled={current} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch checked={current} onCheckedChange={(checked) => { setCurrent(checked); if (checked) setEndDate('') }} />
+            <label className="text-xs text-zinc-400">Currently employed here</label>
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1">Employment Type</label>
+            <Input value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="e.g. Full-time" />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1">Bullets</label>
+            <div className="space-y-2">
+              {bullets.map((bullet, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    value={bullet}
+                    onChange={(e) => setBullets(bullets.map((b, j) => j === i ? e.target.value : b))}
+                    className="bg-zinc-900 border-zinc-700 flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setBullets(bullets.filter((_, j) => j !== i))}
+                    disabled={bullets.length <= 1}
+                    className="text-zinc-500 hover:text-red-400 disabled:opacity-30 shrink-0"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <Button size="sm" variant="outline" className="mt-2" onClick={() => setBullets([...bullets, ''])}>
+              Add Bullet
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleSave} disabled={disabled}>Save</Button>
+            <Button size="sm" variant="ghost" onClick={handleCancel}>Cancel</Button>
+          </div>
         </div>
-        <Button size="sm" variant="outline" className="mt-2" onClick={() => setBullets([...bullets, ''])}>
-          Add Bullet
-        </Button>
-      </div>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={handleSave} disabled={disabled}>Save</Button>
-        <Button size="sm" variant="ghost" onClick={() => { setErrors([]); onCancel() }}>Cancel</Button>
-      </div>
+      )}
     </div>
   )
 }
