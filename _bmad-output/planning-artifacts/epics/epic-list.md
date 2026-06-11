@@ -120,6 +120,14 @@ Users can add a job to the pipeline with a pasted job description — either alo
 
 ---
 
+## Epic 43: Profile Schema Redesign & Form UI
+User can manage their candidate profile as structured data — personal details with a repeatable websites list, plus six experience sections (jobs, education, projects, certifications, licences, awards) each with per-entry Add and Delete controls. All downstream AI flows (analysis, cover letter, resume, discovery embedding) are updated to consume the new structured shape.
+**FRs covered:** FR1–FR16 (epic-43 scope)
+**NFRs addressed:** NFR1–NFR5 (epic-43 scope)
+**Architecture:** New `profile_data TEXT` JSON column on `profile` table (additive migration → destructive cleanup in 43.5); `profileDataSchema` replaces flat `profileSchema`; `PUT /api/profile` API contract updated; all four downstream services updated.
+
+---
+
 ## Epic 40: Relevance Pre-Scoring in Discovery Pipeline
 Users can pre-screen newly discovered jobs against their resume before running expensive AI analysis. Each job gets a lightweight relevance score at discovery time (embedding cosine similarity, no Claude API). The score appears as a sortable column in the Jobs table and as a sibling card to Fit Score in the drawer. The Discover button requires a profile/resume to be configured.
 **Source:** User request 2026-05-27

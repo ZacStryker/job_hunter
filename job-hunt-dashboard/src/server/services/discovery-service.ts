@@ -2,9 +2,23 @@ import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { jobs, searchConfigs, userSecrets, sourceSettings, profile, companyBlacklist } from '../../db/schema'
 import { decrypt, encrypt } from '../lib/crypto'
-import type { ScraperSource } from '../../shared/schemas'
+import { profileDataSchema } from '../../shared/schemas'
+import type { ScraperSource, ProfileData } from '../../shared/schemas'
 import { getOrComputeResumeEmbedding } from './resume-embedding-cache'
 import { embed, cosineSimilarity } from './embedding-service'
+
+const EMPTY_PROFILE_DATA: ProfileData = {
+  personal: { fullName: '', email: '', phone: null, location: null, summary: null, websites: [] },
+  experience: { jobs: [], education: [], projects: [], certifications: [], licences: [], awards: [] },
+}
+
+function parseProfileData(raw: string | null | undefined): ProfileData {
+  if (!raw) return EMPTY_PROFILE_DATA
+  try {
+    const p = profileDataSchema.safeParse(JSON.parse(raw))
+    return p.success ? p.data : EMPTY_PROFILE_DATA
+  } catch { return EMPTY_PROFILE_DATA }
+}
 
 interface ScraperResult {
   id: string
@@ -275,10 +289,13 @@ export async function runDiscovery(
     const profileRow = db.select().from(profile)
       .where(eq(profile.userId, userId)).get()
 
-    const resumeText = profileRow
-      ? [profileRow.summary, profileRow.experience, profileRow.skills]
-          .filter(Boolean).join('\n')
-      : ''
+    const profileData = parseProfileData(profileRow?.profileData)
+    const resumeText = [
+      ...profileData.experience.jobs.map(j =>
+        [j.title, j.company, ...j.bullets].join(' ')
+      ),
+      ...profileData.experience.projects.map(p => `${p.name} ${p.description}`),
+    ].join('\n').trim()
 
     if (resumeText) {
       try {

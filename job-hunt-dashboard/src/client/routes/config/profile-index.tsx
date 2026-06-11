@@ -8,7 +8,7 @@ export function ConfigProfileIndexRoute() {
   const { data: status } = useOnboardingStatusQuery()
   const { data: profile } = useProfileQuery()
 
-  const resumeConfigured = !!profile?.name
+  const resumeConfigured = !!profile?.personal?.fullName
   const apiKeysConfigured = !!status?.hasAnthropicKey
   const inboxConfigured = !!status?.hasImap
 

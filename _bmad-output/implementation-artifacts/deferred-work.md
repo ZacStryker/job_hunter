@@ -1,5 +1,48 @@
 # Deferred Work
 
+## Deferred from: code review of 43-5-update-downstream-consumers-and-drop-old-columns (2026-06-11)
+
+- `getExperience()` stale closure race in all mutation handlers — `liveProfile` captured at render time; two concurrent mutations compute payloads from same snapshot and last-write-wins; pre-existing pattern documented in prior deferred-work entries. [`profile-resume.tsx`]
+- `handleDeleteJob` only prompts confirmation when `bullets.length >= 2`, no confirmation for other delete handlers — inconsistent UX; `window.confirm` is sync-blocking and won't work in test environments. [`profile-resume.tsx:385`]
+- `profileDataInputSchema` is a no-op alias for `profileDataSchema` — functionally harmless (no `id` field to omit), but removes the semantic distinction between input and output shape. [`shared/schemas.ts`]
+- `buildProfileText` duplicated verbatim between `cover-letter-service.ts` and `resume-service.ts` — intentional per story dev notes; future bug fixes must be applied in both places. [`cover-letter-service.ts`, `resume-service.ts`]
+- No `profile_data` INSERT fixture in `analysis-service.test.ts` or `cover-letter-service.test.ts` — new `profileJson` shape (Jobs, Education, Projects, etc.) and new `buildCoverLetterHtml` personal-arg signature are exercised only with `EMPTY_PROFILE_DATA` in test runs; a regression in structured-data rendering would not be caught.
+- Old flat column data (`experience`, `skills`, `education`) silently dropped by `0033_curly_punisher.sql` migration — no backfill to new structured `experience.jobs`/`education`/`projects` arrays; existing users who had free-text data in old columns lose it on deploy.
+- AC8 "does NOT update old flat columns" test was never added in story 43.1; story 43.5 cannot satisfy the AC8 removal clause.
+
+## Deferred from: code review of 43-4-profile-form-ui-projects-certifications-licences-and-awards (2026-06-11)
+
+- `openSections` does not auto-open when first item is added to a previously empty section — section count updates in header but section remains collapsed, requiring a manual click; UX gap not covered by AC6. [`profile-resume.tsx`]
+- Dead `year.trim() &&` guard before regex in `AddCertSheet.handleSave` and `CertEntryRow.handleSave` — the format check is only reached when year is already non-empty (prior required-field check blocks empty year), so the outer guard is always truthy when the regex runs; harmless today but latent if the required-field check is ever removed. [`profile-resume.tsx:1306`, `profile-resume.tsx:1426`]
+- `CertEntryRow` view-mode summary renders empty parens if `entry.year` is an empty string — displays "Name — Issuer ()" for imported/migrated data with a blank year; save validation prevents user-created empty-year entries. [`profile-resume.tsx:1419`]
+- Parallel mutations not serialized — `getExperience()` reads the current React Query cache; two concurrent mutations can each compute a payload from the same snapshot and last response to settle wins, silently discarding the other's changes; pre-existing pattern across all sections. [`profile-resume.tsx`]
+- No server-error feedback inside Sheet components — `AddProjectSheet` and `AddCertSheet` save buttons are not disabled while `mutation.isPending` from the parent scope; a server error only shows a toast outside the Sheet; pre-existing pattern matching `AddJobSheet` and `AddEducationSheet`. [`profile-resume.tsx`]
+
+## Deferred from: code review of 43-3-profile-form-ui-jobs-and-education (2026-06-11)
+
+- Concurrent mutation last-write-wins — the single shared `mutation` instance means an in-flight personal-save can be overwritten by an experience mutation (or vice versa); pre-existing architectural pattern. [`profile-resume.tsx`]
+- `openSections` not auto-opened when first entry is added in session — after the first job/education entry is saved, the section stays in whatever open/closed state the user left it; section doesn't auto-expand to reveal the new entry. [`profile-resume.tsx`]
+
+## Deferred from: code review of 43-2-profile-form-ui-personal-section (2026-06-11)
+
+- Stale `profileData.experience` prop in all mutations — every `mutation.mutate` passes the mount-time `profileData.experience` snapshot; safe in 43.2 (experience arrays always empty) but will silently overwrite server-side experience data once 43.3/43.4 enable editing. Fix in 43.3: use `queryClient.getQueryData(['profile'])` or a ref to get fresh experience at call time. [`profile-resume.tsx`]
+- No URL format validation on `websiteSchema.url` — `z.string()` accepts non-URL values; consistent with project-wide schema pattern but allows garbage to be persisted. [`shared/schemas.ts:websiteSchema`]
+- No error state on initial fetch failure — `ProfileResumeRoute` shows skeleton indefinitely if `GET /api/profile` fails; pre-existing pattern across config routes. [`profile-resume.tsx`]
+- No `aria-label` on icon-only trash button — the `<button>` rendering `<Trash2>` has no accessible label; pre-existing a11y gap across the project. [`profile-resume.tsx`]
+- `licenceEntrySchema`/`awardEntrySchema` alias `certEntrySchema` by reference — future mutations to `certEntrySchema` silently affect all three types. [`shared/schemas.ts`]
+- `educationEntrySchema.name` semantics unclear alongside `school` — ambiguous whether `name` is degree/program name or institution alias; 43.1 schema design. [`shared/schemas.ts:educationEntrySchema`]
+
+## Deferred from: code review of 43-1-profile-schema-db-migration-and-api-layer (2026-06-10)
+
+- `resume-service.ts` still reads flat profile columns (`name`, `email`, `phone`, `location`, `linkedinUrl`, `githubUrl`, `summary`, `experience`, `skills`, `education`) — LLM receives blank candidate profile for any user who saved via new PUT handler; planned for Story 43.5. [`resume-service.ts`]
+- `cover-letter-service.ts` still reads flat columns for `buildCoverLetterHtml` and `generateCoverLetter` — cover letter header and LLM prompt blank after new-schema saves; planned for Story 43.5. [`cover-letter-service.ts`]
+- `discovery-service.ts` builds `resumeText` from flat columns (`summary`, `experience`, `skills`) — always empty string after first new-schema save, causing all new jobs to get `null` relevanceScore; planned for Story 43.5. [`discovery-service.ts`]
+- `analysis-service.ts` reads flat columns for LLM candidate context — silently degrades analysis quality for post-migration users; planned for Story 43.5. [`analysis-service.ts`]
+- `api-jobs.ts` PDF and cover-letter `Content-Disposition` filenames use flat `profileRow.name` — degrades to generic filename for post-migration users; planned for Story 43.5. [`api-jobs.ts:428`, `api-jobs.ts:480`, `api-jobs.ts:546`]
+- `profile-resume.tsx` still imports `ProfileInput` and references flat fields (`data.name`, `data.linkedinUrl`, etc.) — broken UI until replaced; planned for Story 43.2. [`profile-resume.tsx`]
+- `profilePersonalSchema.email` uses `z.string()` with no `.email()` format validation — accepts any string; schema hardening for a future story. [`shared/schemas.ts`]
+- `jobEntrySchema.endDate` is nullable but no cross-field invariant enforces `current === true` — incoherent state possible (`endDate: null, current: false`); schema refinement for a future story. [`shared/schemas.ts`]
+
 ## Deferred from: update-resume-prompt-include-all-jobs (2026-06-09)
 
 - **Sparse-entry bullet floor conflict**: the `CONTENT LIMITS` rule mandates 3-5 bullets per experience entry, but the `no invented content` HARD RULE forbids padding. For old/short profile entries this creates an impossible constraint. Resolution: add a clause allowing fewer bullets when the profile entry has insufficient documented detail. [`prompt-defaults.ts` resume config]

@@ -51,9 +51,7 @@ const CREATE_PROFILE_TABLE = `
   CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL DEFAULT 1,
-    name TEXT, email TEXT, phone TEXT, location TEXT,
-    linkedin_url TEXT, github_url TEXT, summary TEXT,
-    experience TEXT, skills TEXT, education TEXT,
+    profile_data TEXT,
     UNIQUE(user_id)
   )
 `
@@ -120,7 +118,7 @@ describe('POST /:id/generate-resume', () => {
   })
 
   test('filename includes candidate name when profile exists', async () => {
-    prodSqlite.run(`INSERT INTO profile (name) VALUES ('Jane Doe')`)
+    prodSqlite.run(`INSERT INTO profile (profile_data) VALUES ('{"personal":{"fullName":"Jane Doe","email":"jane@example.com","phone":null,"location":null,"summary":null,"websites":[]},"experience":{"jobs":[],"education":[],"projects":[],"certifications":[],"licences":[],"awards":[]}}')`)
     prodSqlite.run(`INSERT INTO jobs (company, job_title, job_description) VALUES ('Corp', 'PM', 'Lead product')`)
     const row = prodSqlite.query('SELECT id FROM jobs LIMIT 1').get() as { id: number }
     const res = await jobsApp.request(`/${row.id}/generate-resume`, { method: 'POST' })

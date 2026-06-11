@@ -173,24 +173,72 @@ export const statsSchema = z.object({
 })
 export type Stats = z.infer<typeof statsSchema>
 
-export const profileSchema = z.object({
-  id: z.number().int().nullable(),
-  name: z.string().nullable(),
-  email: z.string().nullable(),
-  phone: z.string().nullable(),
-  location: z.string().nullable(),
-  linkedinUrl: z.string().nullable(),
-  githubUrl: z.string().nullable(),
-  summary: z.string().nullable(),
-  experience: z.string().nullable(),
-  skills: z.string().nullable(),
-  education: z.string().nullable(),
+export const websiteSchema = z.object({ label: z.string(), url: z.string() })
+
+export const jobEntrySchema = z.object({
+  title: z.string(),
+  company: z.string(),
+  startDate: z.string(),
+  endDate: z.string().nullable(),
+  current: z.boolean().default(false),
+  employmentType: z.string().optional(),
+  bullets: z.array(z.string()).default([]),
 })
 
-export const profileInputSchema = profileSchema.omit({ id: true })
+export const degreeEntrySchema = z.object({
+  degreeType: z.string(),
+  degreeSubject: z.string(),
+  graduationDate: z.string().nullable(),
+})
 
-export type Profile = z.infer<typeof profileSchema>
-export type ProfileInput = z.infer<typeof profileInputSchema>
+export const educationEntrySchema = z.object({
+  name: z.string(),
+  school: z.string(),
+  current: z.boolean().default(false),
+  degrees: z.array(degreeEntrySchema).default([]),
+})
+
+export const projectEntrySchema = z.object({
+  name: z.string(),
+  description: z.string(),
+})
+
+export const certEntrySchema = z.object({
+  name: z.string(),
+  issuer: z.string(),
+  year: z.string(),
+})
+
+export const licenceEntrySchema = certEntrySchema
+export const awardEntrySchema = certEntrySchema
+
+export const profilePersonalSchema = z.object({
+  fullName: z.string(),
+  email: z.string(),
+  phone: z.string().nullable(),
+  location: z.string().nullable(),
+  summary: z.string().nullable(),
+  websites: z.array(websiteSchema).default([]),
+})
+
+export const profileExperienceSchema = z.object({
+  jobs: z.array(jobEntrySchema).default([]),
+  education: z.array(educationEntrySchema).default([]),
+  projects: z.array(projectEntrySchema).default([]),
+  certifications: z.array(certEntrySchema).default([]),
+  licences: z.array(licenceEntrySchema).default([]),
+  awards: z.array(awardEntrySchema).default([]),
+})
+
+export const profileDataSchema = z.object({
+  personal: profilePersonalSchema,
+  experience: profileExperienceSchema,
+})
+
+export const profileDataInputSchema = profileDataSchema
+
+export type ProfileData = z.infer<typeof profileDataSchema>
+export type ProfileDataInput = z.infer<typeof profileDataInputSchema>
 
 export const jobDetailSchema = jobSchema.pick({
   company: true,

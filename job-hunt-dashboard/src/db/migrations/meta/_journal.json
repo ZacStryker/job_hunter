@@ -225,6 +225,20 @@
       "when": 1781049600000,
       "tag": "0031_clear_resume_prompt",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1781109011178,
+      "tag": "0032_steady_bromley",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1781199016649,
+      "tag": "0033_curly_punisher",
+      "breakpoints": true
     }
   ]
 }

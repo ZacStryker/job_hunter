@@ -19,16 +19,7 @@ const CREATE_PROFILE_TABLE = `
   CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL DEFAULT 1,
-    name TEXT,
-    email TEXT,
-    phone TEXT,
-    location TEXT,
-    linkedin_url TEXT,
-    github_url TEXT,
-    summary TEXT,
-    experience TEXT,
-    skills TEXT,
-    education TEXT,
+    profile_data TEXT,
     UNIQUE(user_id)
   )
 `
@@ -41,87 +32,55 @@ beforeEach(() => {
   prodSqlite.run('DELETE FROM profile')
 })
 
-describe('getProfile (business logic)', () => {
-  test('returns null-filled profile when DB is empty', () => {
-    const { db } = require('../../db/client')
-    const { profile } = require('../../db/schema')
-    const rows = db.select().from(profile).limit(1).all()
-    expect(rows).toHaveLength(0)
-  })
-
-  test('returns stored profile after upsert', () => {
-    prodSqlite.run(
-      `INSERT INTO profile (user_id, name, email) VALUES (1, 'Alice', 'alice@example.com')`
-    )
-    const { db } = require('../../db/client')
-    const { profile } = require('../../db/schema')
-    const rows = db.select().from(profile).limit(1).all()
-    expect(rows[0].name).toBe('Alice')
-    expect(rows[0].email).toBe('alice@example.com')
-  })
-
-  test('second upsert updates row via PUT handler', async () => {
-    prodSqlite.run(`INSERT INTO profile (user_id, name) VALUES (1, 'Alice')`)
-    const res = await profileApp.request('/', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Bob', email: null, phone: null, location: null, linkedinUrl: null, githubUrl: null, summary: null, experience: null, skills: null, education: null }),
-    })
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.name).toBe('Bob')
-    const { db } = require('../../db/client')
-    const { profile } = require('../../db/schema')
-    const rows = db.select().from(profile).limit(1).all()
-    expect(rows).toHaveLength(1)
-    expect(rows[0].name).toBe('Bob')
-  })
-})
-
-describe('GET /api/profile (HTTP contract)', () => {
-  test('returns 200 with null-filled profile when DB is empty', async () => {
+describe('GET /api/profile', () => {
+  test('returns EMPTY_PROFILE_DATA when no row exists', async () => {
     const res = await profileApp.request('/', { method: 'GET' })
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.id).toBeNull()
-    expect(body.name).toBeNull()
-    expect(body.email).toBeNull()
-    expect(body.phone).toBeNull()
-    expect(body.location).toBeNull()
-    expect(body.linkedinUrl).toBeNull()
-    expect(body.githubUrl).toBeNull()
-    expect(body.summary).toBeNull()
-    expect(body.experience).toBeNull()
-    expect(body.skills).toBeNull()
-    expect(body.education).toBeNull()
+    expect(body.personal.fullName).toBe('')
+    expect(body.personal.email).toBe('')
+    expect(body.personal.phone).toBeNull()
+    expect(body.personal.location).toBeNull()
+    expect(body.personal.summary).toBeNull()
+    expect(body.personal.websites).toEqual([])
+    expect(body.experience.jobs).toEqual([])
+    expect(body.experience.education).toEqual([])
+    expect(body.experience.projects).toEqual([])
+    expect(body.experience.certifications).toEqual([])
+    expect(body.experience.licences).toEqual([])
+    expect(body.experience.awards).toEqual([])
   })
 
-  test('returns 200 with stored profile data', async () => {
-    prodSqlite.run(
-      `INSERT INTO profile (user_id, name, email, phone) VALUES (1, 'Alice', 'alice@example.com', '555-1234')`
-    )
+  test('returns EMPTY_PROFILE_DATA when row exists but profile_data is null', async () => {
+    prodSqlite.run(`INSERT INTO profile (user_id) VALUES (1)`)
     const res = await profileApp.request('/', { method: 'GET' })
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.name).toBe('Alice')
-    expect(body.email).toBe('alice@example.com')
-    expect(body.phone).toBe('555-1234')
+    expect(body.personal.fullName).toBe('')
+    expect(body.personal.email).toBe('')
+    expect(body.experience.jobs).toEqual([])
+  })
+
+  test('returns parsed ProfileData from profile_data column', async () => {
+    const profileData = {
+      personal: { fullName: 'Alice', email: 'alice@example.com', phone: null, location: null, summary: null, websites: [] },
+      experience: { jobs: [], education: [], projects: [], certifications: [], licences: [], awards: [] },
+    }
+    prodSqlite.run(`INSERT INTO profile (user_id, profile_data) VALUES (1, ?)`, [JSON.stringify(profileData)])
+    const res = await profileApp.request('/', { method: 'GET' })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.personal.fullName).toBe('Alice')
+    expect(body.personal.email).toBe('alice@example.com')
+    expect(body.experience.jobs).toEqual([])
   })
 })
 
-describe('PUT /api/profile (HTTP contract)', () => {
-  test('creates profile row when none exists and returns 200 with updated profile', async () => {
+describe('PUT /api/profile', () => {
+  test('creates row and returns ProfileData', async () => {
     const payload = {
-      name: 'Alice',
-      email: 'alice@example.com',
-      phone: '555-1234',
-      location: 'Remote',
-      linkedinUrl: 'https://linkedin.com/in/alice',
-      githubUrl: 'https://github.com/alice',
-      summary: 'A great engineer.',
-      experience: '5 years at Acme.',
-      skills: 'TypeScript, React',
-      education: 'BS Computer Science',
+      personal: { fullName: 'Alice', email: 'alice@example.com', phone: null, location: null, summary: null, websites: [] },
+      experience: { jobs: [], education: [], projects: [], certifications: [], licences: [], awards: [] },
     }
     const res = await profileApp.request('/', {
       method: 'PUT',
@@ -130,30 +89,37 @@ describe('PUT /api/profile (HTTP contract)', () => {
     })
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.id).toBeDefined()
-    expect(body.name).toBe('Alice')
-    expect(body.email).toBe('alice@example.com')
-    expect(body.linkedinUrl).toBe('https://linkedin.com/in/alice')
+    expect(body.personal.fullName).toBe('Alice')
+    expect(body.personal.email).toBe('alice@example.com')
+    expect(body.experience.jobs).toEqual([])
   })
 
-  test('second PUT updates existing row', async () => {
-    prodSqlite.run(`INSERT INTO profile (user_id, name) VALUES (1, 'Alice')`)
+  test('upserts existing row and returns updated ProfileData', async () => {
+    const initial = {
+      personal: { fullName: 'Alice', email: 'alice@example.com', phone: null, location: null, summary: null, websites: [] },
+      experience: { jobs: [], education: [], projects: [], certifications: [], licences: [], awards: [] },
+    }
+    prodSqlite.run(`INSERT INTO profile (user_id, profile_data) VALUES (1, ?)`, [JSON.stringify(initial)])
+    const updated = {
+      personal: { fullName: 'Bob', email: 'bob@example.com', phone: '555-9999', location: 'NYC', summary: 'Dev', websites: [] },
+      experience: { jobs: [], education: [], projects: [], certifications: [], licences: [], awards: [] },
+    }
     const res = await profileApp.request('/', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Bob', email: null, phone: null, location: null, linkedinUrl: null, githubUrl: null, summary: null, experience: null, skills: null, education: null }),
+      body: JSON.stringify(updated),
     })
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.name).toBe('Bob')
-    expect(body.id).toBeDefined()
+    expect(body.personal.fullName).toBe('Bob')
+    expect(body.personal.email).toBe('bob@example.com')
   })
 
-  test('returns 400 with error key for invalid payload', async () => {
+  test('returns 400 with error key when personal.email missing', async () => {
     const res = await profileApp.request('/', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 123 }),
+      body: JSON.stringify({ personal: { fullName: 'x' }, experience: {} }),
     })
     expect(res.status).toBe(400)
     const body = await res.json()
@@ -170,5 +136,23 @@ describe('PUT /api/profile (HTTP contract)', () => {
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body).toHaveProperty('error')
+    expect(body).not.toHaveProperty('message')
+  })
+
+  test('stores JSON in profile_data column', async () => {
+    const payload = {
+      personal: { fullName: 'Carol', email: 'carol@example.com', phone: null, location: null, summary: null, websites: [] },
+      experience: { jobs: [], education: [], projects: [], certifications: [], licences: [], awards: [] },
+    }
+    await profileApp.request('/', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const row = prodSqlite.query('SELECT profile_data FROM profile WHERE user_id = 1').get() as { profile_data: string }
+    expect(row.profile_data).toBeDefined()
+    const parsed = JSON.parse(row.profile_data)
+    expect(parsed.personal.fullName).toBe('Carol')
+    expect(parsed.personal.email).toBe('carol@example.com')
   })
 })

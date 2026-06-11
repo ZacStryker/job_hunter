@@ -3,6 +3,21 @@ import { db } from '../../db/client'
 import { jobs, profile, userSecrets } from '../../db/schema'
 import { decrypt } from '../lib/crypto'
 import { loadEffectivePrompt } from './prompt-defaults'
+import { profileDataSchema } from '../../shared/schemas'
+import type { ProfileData } from '../../shared/schemas'
+
+const EMPTY_PROFILE_DATA: ProfileData = {
+  personal: { fullName: '', email: '', phone: null, location: null, summary: null, websites: [] },
+  experience: { jobs: [], education: [], projects: [], certifications: [], licences: [], awards: [] },
+}
+
+function parseProfileData(raw: string | null | undefined): ProfileData {
+  if (!raw) return EMPTY_PROFILE_DATA
+  try {
+    const p = profileDataSchema.safeParse(JSON.parse(raw))
+    return p.success ? p.data : EMPTY_PROFILE_DATA
+  } catch { return EMPTY_PROFILE_DATA }
+}
 
 interface AnthropicMessage {
   content: Array<{ type: string; text: string }>
@@ -124,16 +139,21 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
         }
       }
 
-      const candidateName = profileRow?.name ?? 'a candidate'
+      const profileData = parseProfileData(profileRow?.profileData)
+      const candidateName = profileData.personal.fullName || 'a candidate'
       const profileJson = JSON.stringify({
-        Name: profileRow?.name ?? null,
-        Email: profileRow?.email ?? null,
-        Phone: profileRow?.phone ?? null,
-        Location: profileRow?.location ?? null,
-        Summary: profileRow?.summary ?? null,
-        Experience: profileRow?.experience ?? null,
-        Skills: profileRow?.skills ?? null,
-        Education: profileRow?.education ?? null,
+        Name: profileData.personal.fullName || null,
+        Email: profileData.personal.email || null,
+        Phone: profileData.personal.phone,
+        Location: profileData.personal.location,
+        Summary: profileData.personal.summary,
+        Websites: profileData.personal.websites,
+        Jobs: profileData.experience.jobs,
+        Education: profileData.experience.education,
+        Projects: profileData.experience.projects,
+        Certifications: profileData.experience.certifications,
+        Licences: profileData.experience.licences,
+        Awards: profileData.experience.awards,
       })
       const jobJson = JSON.stringify({
         Company: job.company,

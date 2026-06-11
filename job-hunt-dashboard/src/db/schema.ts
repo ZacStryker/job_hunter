@@ -81,16 +81,7 @@ export const webhookRuns = sqliteTable('webhook_runs', {
 export const profile = sqliteTable('profile', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: integer('user_id').notNull().references(() => users.id),
-  name: text('name'),
-  email: text('email'),
-  phone: text('phone'),
-  location: text('location'),
-  linkedinUrl: text('linkedin_url'),
-  githubUrl: text('github_url'),
-  summary: text('summary'),
-  experience: text('experience'),
-  skills: text('skills'),
-  education: text('education'),
+  profileData: text('profile_data'),
 }, (table) => [
   uniqueIndex('profile_user_id_idx').on(table.userId),
 ])

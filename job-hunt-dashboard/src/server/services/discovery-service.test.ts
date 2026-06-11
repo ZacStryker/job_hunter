@@ -110,16 +110,7 @@ const CREATE_PROFILE_TABLE = `
   CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    name TEXT,
-    email TEXT,
-    phone TEXT,
-    location TEXT,
-    linkedin_url TEXT,
-    github_url TEXT,
-    summary TEXT,
-    experience TEXT,
-    skills TEXT,
-    education TEXT,
+    profile_data TEXT,
     UNIQUE(user_id)
   )
 `
@@ -638,7 +629,7 @@ describe('runDiscovery()', () => {
         `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
       )
       prodSqlite.run(
-        `INSERT INTO profile (user_id, summary, experience, skills) VALUES (1, 'software engineer', 'backend 5yrs', 'TypeScript')`
+        `INSERT INTO profile (user_id, profile_data) VALUES (1, '{"personal":{"fullName":"","email":"","phone":null,"location":null,"summary":"software engineer","websites":[]},"experience":{"jobs":[{"title":"Backend Developer","company":"Acme","startDate":"2020-01","endDate":null,"current":true,"bullets":["backend 5yrs","TypeScript"]}],"education":[],"projects":[],"certifications":[],"licences":[],"awards":[]}}')`
       )
 
       globalThis.fetch = mock(() =>
@@ -690,7 +681,7 @@ describe('runDiscovery()', () => {
         `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
       )
       // Profile exists but no resume text (only name/email)
-      prodSqlite.run(`INSERT INTO profile (user_id, name, email) VALUES (1, 'Alice', 'alice@example.com')`)
+      prodSqlite.run(`INSERT INTO profile (user_id, profile_data) VALUES (1, '{"personal":{"fullName":"Alice","email":"alice@example.com","phone":null,"location":null,"summary":null,"websites":[]},"experience":{"jobs":[],"education":[],"projects":[],"certifications":[],"licences":[],"awards":[]}}')`)
 
       globalThis.fetch = mock(() =>
         Promise.resolve(new Response(
@@ -713,7 +704,7 @@ describe('runDiscovery()', () => {
         `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
       )
       prodSqlite.run(
-        `INSERT INTO profile (user_id, summary) VALUES (1, 'software engineer')`
+        `INSERT INTO profile (user_id, profile_data) VALUES (1, '{"personal":{"fullName":"","email":"","phone":null,"location":null,"summary":"software engineer","websites":[]},"experience":{"jobs":[{"title":"Engineer","company":"Acme","startDate":"2020-01","endDate":null,"current":true,"bullets":["backend engineer"]}],"education":[],"projects":[],"certifications":[],"licences":[],"awards":[]}}')`
       )
 
       let embedCallCount = 0
@@ -754,7 +745,7 @@ describe('runDiscovery()', () => {
         `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
       )
       prodSqlite.run(
-        `INSERT INTO profile (user_id, summary) VALUES (1, 'software engineer')`
+        `INSERT INTO profile (user_id, profile_data) VALUES (1, '{"personal":{"fullName":"","email":"","phone":null,"location":null,"summary":"software engineer","websites":[]},"experience":{"jobs":[{"title":"Engineer","company":"Acme","startDate":"2020-01","endDate":null,"current":true,"bullets":["backend engineer"]}],"education":[],"projects":[],"certifications":[],"licences":[],"awards":[]}}')`
       )
 
       globalThis.fetch = mock(() =>
@@ -804,7 +795,7 @@ describe('runDiscovery()', () => {
         `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
       )
       prodSqlite.run(
-        `INSERT INTO profile (user_id, summary) VALUES (1, 'software engineer')`
+        `INSERT INTO profile (user_id, profile_data) VALUES (1, '{"personal":{"fullName":"","email":"","phone":null,"location":null,"summary":"software engineer","websites":[]},"experience":{"jobs":[{"title":"Engineer","company":"Acme","startDate":"2020-01","endDate":null,"current":true,"bullets":["backend engineer"]}],"education":[],"projects":[],"certifications":[],"licences":[],"awards":[]}}')`
       )
       // Pre-insert an existing job
       prodSqlite.run(

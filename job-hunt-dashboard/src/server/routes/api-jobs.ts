@@ -8,8 +8,22 @@ import { jobs, statusEvents, coverLetters, messages, profile } from '../../db/sc
 import { generateCoverLetter } from '../services/cover-letter-service'
 import { generateResume } from '../services/resume-service'
 import { recordRun } from './api-webhook-runs'
-import type { Job } from '../../shared/schemas'
+import { profileDataSchema } from '../../shared/schemas'
+import type { Job, ProfileData } from '../../shared/schemas'
 import type { AppEnv } from '../types'
+
+const EMPTY_PROFILE_DATA: ProfileData = {
+  personal: { fullName: '', email: '', phone: null, location: null, summary: null, websites: [] },
+  experience: { jobs: [], education: [], projects: [], certifications: [], licences: [], awards: [] },
+}
+
+function parseProfileData(raw: string | null | undefined): ProfileData {
+  if (!raw) return EMPTY_PROFILE_DATA
+  try {
+    const p = profileDataSchema.safeParse(JSON.parse(raw))
+    return p.success ? p.data : EMPTY_PROFILE_DATA
+  } catch { return EMPTY_PROFILE_DATA }
+}
 
 const DATA_DIR = join(import.meta.dirname, '../../../data')
 
@@ -424,8 +438,8 @@ app.post('/:id/generate-resume', async (c) => {
   const { pdf: pdfBuffer, inputTokens: resumeInputTokens, outputTokens: resumeOutputTokens } = resumeResult
   const resumeCostUsd = resumeInputTokens * SONNET_4_6_INPUT + resumeOutputTokens * SONNET_4_6_OUTPUT
 
-  const profileRow = db.select().from(profile).where(eq(profile.userId, userId)).get()
-  const candidateName = profileRow?.name ?? 'Resume'
+  const profileRow = db.select({ profileData: profile.profileData }).from(profile).where(eq(profile.userId, userId)).get()
+  const candidateName = parseProfileData(profileRow?.profileData).personal.fullName || 'Resume'
   const fileName = `${candidateName} - Resume - ${job.company} - ${job.jobTitle}.pdf`
     .replace(/[–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/"/g, "'")
 
@@ -476,8 +490,8 @@ app.get('/:id/resume', async (c) => {
   } catch {
     return c.json({ error: 'Resume not found' }, 404)
   }
-  const profileRow = db.select().from(profile).where(eq(profile.userId, userId)).get()
-  const candidateName = profileRow?.name ?? 'Resume'
+  const profileRow = db.select({ profileData: profile.profileData }).from(profile).where(eq(profile.userId, userId)).get()
+  const candidateName = parseProfileData(profileRow?.profileData).personal.fullName || 'Resume'
   const fileName = `${candidateName} - Resume - ${job.company} - ${job.jobTitle}.pdf`
     .replace(/[–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/"/g, "'")
 
@@ -542,8 +556,8 @@ app.get('/:id/cover-letter/pdf', async (c) => {
     return c.json({ error: 'Cover letter PDF not found' }, 404)
   }
 
-  const profileRow = db.select().from(profile).where(eq(profile.userId, userId)).get()
-  const candidateName = profileRow?.name ?? 'Cover Letter'
+  const profileRow = db.select({ profileData: profile.profileData }).from(profile).where(eq(profile.userId, userId)).get()
+  const candidateName = parseProfileData(profileRow?.profileData).personal.fullName || 'Cover Letter'
   const fileName = `${candidateName} - Cover Letter - ${job.company} - ${job.jobTitle}.pdf`
     .replace(/[–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/"/g, "'")
 
