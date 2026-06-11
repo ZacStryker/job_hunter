@@ -60,6 +60,11 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
     )
   )
 
+  const [editingSection, setEditingSection] = useState<'personal' | 'summary' | 'skills' | null>(null)
+  const personalEditing = editingSection === 'personal'
+  const summaryEditing = editingSection === 'summary'
+  const skillsEditing = editingSection === 'skills'
+
   const [showAddJob, setShowAddJob] = useState(false)
   const [editingJobIdx, setEditingJobIdx] = useState<number | null>(null)
 
@@ -98,13 +103,54 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
   }
 
   function handleSavePersonal() {
+    if (!fullName.trim()) { toast.error('Full name is required'); return }
+    if (!email.trim()) { toast.error('Email is required'); return }
     mutation.mutate(
       { personal: buildPersonal(), experience: getExperience() },
       {
-        onSuccess: () => toast.success('Personal info saved'),
+        onSuccess: () => { toast.success('Personal info saved'); setEditingSection(null) },
         onError: (err) => toast.error(err.message),
       }
     )
+  }
+
+  function handleCancelPersonal() {
+    const p = (liveProfile ?? profileData).personal
+    setFullName(p.fullName)
+    setEmail(p.email)
+    setPhone(p.phone ?? '')
+    setLocation(p.location ?? '')
+    setEditingSection(null)
+  }
+
+  function handleSaveSummary() {
+    mutation.mutate(
+      { personal: buildPersonal(), experience: getExperience() },
+      {
+        onSuccess: () => { toast.success('Summary saved'); setEditingSection(null) },
+        onError: (err) => toast.error(err.message),
+      }
+    )
+  }
+
+  function handleCancelSummary() {
+    setSummary((liveProfile ?? profileData).personal.summary ?? '')
+    setEditingSection(null)
+  }
+
+  function handleSaveSkills() {
+    mutation.mutate(
+      { personal: buildPersonal(), experience: getExperience() },
+      {
+        onSuccess: () => { toast.success('Skills saved'); setEditingSection(null) },
+        onError: (err) => toast.error(err.message),
+      }
+    )
+  }
+
+  function handleCancelSkills() {
+    setSkills((liveProfile ?? profileData).personal.skills ?? '')
+    setEditingSection(null)
   }
 
   function handleDeleteWebsite(idx: number) {
@@ -375,16 +421,20 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
       <div className="border border-zinc-800 rounded-lg p-4">
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm font-medium text-zinc-200">Personal</span>
-          <Button size="sm" onClick={handleSavePersonal} disabled={mutation.isPending}>
-            {mutation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving…
-              </>
-            ) : (
-              'Save'
-            )}
-          </Button>
+          {personalEditing ? (
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSavePersonal} disabled={mutation.isPending}>
+                {mutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : 'Save'}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleCancelPersonal}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => setEditingSection('personal')}>
+              Edit
+            </Button>
+          )}
         </div>
 
         <div className="space-y-4">
@@ -394,7 +444,8 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
               <Input
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="bg-zinc-900 border-zinc-700"
+                readOnly={!personalEditing}
+                className={personalEditing ? 'bg-zinc-900 border-zinc-700' : 'bg-transparent border-zinc-800 cursor-default'}
               />
             </div>
             <div>
@@ -402,7 +453,8 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
               <Input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="bg-zinc-900 border-zinc-700"
+                readOnly={!personalEditing}
+                className={personalEditing ? 'bg-zinc-900 border-zinc-700' : 'bg-transparent border-zinc-800 cursor-default'}
               />
             </div>
             <div>
@@ -410,7 +462,8 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
               <Input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="bg-zinc-900 border-zinc-700"
+                readOnly={!personalEditing}
+                className={personalEditing ? 'bg-zinc-900 border-zinc-700' : 'bg-transparent border-zinc-800 cursor-default'}
               />
             </div>
             <div>
@@ -418,30 +471,10 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
               <Input
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                className="bg-zinc-900 border-zinc-700"
+                readOnly={!personalEditing}
+                className={personalEditing ? 'bg-zinc-900 border-zinc-700' : 'bg-transparent border-zinc-800 cursor-default'}
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-zinc-400 mb-1">Summary</label>
-            <Textarea
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              rows={4}
-              className="bg-zinc-900 border-zinc-700"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs text-zinc-400 mb-1">Skills</label>
-            <Textarea
-              value={skills}
-              onChange={(e) => setSkills(e.target.value)}
-              rows={3}
-              className="bg-zinc-900 border-zinc-700"
-              placeholder="e.g. TypeScript, Go, Python, React, PostgreSQL, Docker, Kubernetes"
-            />
           </div>
 
           <div>
@@ -515,6 +548,63 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Summary section */}
+      <div className="border border-zinc-800 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-sm font-medium text-zinc-200">Summary</span>
+          {summaryEditing ? (
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSaveSummary} disabled={mutation.isPending}>
+                {mutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : 'Save'}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleCancelSummary}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => setEditingSection('summary')}>
+              Edit
+            </Button>
+          )}
+        </div>
+        <Textarea
+          value={summary}
+          onChange={(e) => setSummary(e.target.value)}
+          rows={4}
+          readOnly={!summaryEditing}
+          className={summaryEditing ? 'bg-zinc-900 border-zinc-700' : 'bg-transparent border-zinc-800 cursor-default resize-none'}
+        />
+      </div>
+
+      {/* Skills section */}
+      <div className="border border-zinc-800 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-sm font-medium text-zinc-200">Skills</span>
+          {skillsEditing ? (
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSaveSkills} disabled={mutation.isPending}>
+                {mutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : 'Save'}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleCancelSkills}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => setEditingSection('skills')}>
+              Edit
+            </Button>
+          )}
+        </div>
+        <Textarea
+          value={skills}
+          onChange={(e) => setSkills(e.target.value)}
+          rows={3}
+          readOnly={!skillsEditing}
+          placeholder={skillsEditing ? 'e.g. TypeScript, Go, Python, React, PostgreSQL, Docker, Kubernetes' : ''}
+          className={skillsEditing ? 'bg-zinc-900 border-zinc-700' : 'bg-transparent border-zinc-800 cursor-default resize-none'}
+        />
       </div>
 
       {/* Experience sections */}
