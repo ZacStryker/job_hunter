@@ -8,7 +8,7 @@ import { getOrComputeResumeEmbedding } from './resume-embedding-cache'
 import { embed, cosineSimilarity } from './embedding-service'
 
 const EMPTY_PROFILE_DATA: ProfileData = {
-  personal: { fullName: '', email: '', phone: null, location: null, summary: null, websites: [] },
+  personal: { fullName: '', email: '', phone: null, location: null, summary: null, skills: null, websites: [] },
   experience: { jobs: [], education: [], projects: [], certifications: [], licences: [], awards: [] },
 }
 

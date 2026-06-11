@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: code review of profile-skills-field (2026-06-11)
+
+- Whitespace-only `skills` value (`"   "`) bypasses the `skills || null` null-coercion in `buildPersonal()` and is stored + sent to LLM as `Skills:    ` — pre-existing pattern for all other personal fields (`phone`, `location`, `summary`); add `.trim()` before `|| null` in a future hardening pass. [`profile-resume.tsx`]
+- `skills` local state is initialized from `profileData.personal.skills` at mount and never reset if the server value changes (e.g. concurrent edit from another tab) — pre-existing pattern across all personal fields. [`profile-resume.tsx`]
+
 ## Deferred from: code review of 43-5-update-downstream-consumers-and-drop-old-columns (2026-06-11)
 
 - `getExperience()` stale closure race in all mutation handlers — `liveProfile` captured at render time; two concurrent mutations compute payloads from same snapshot and last-write-wins; pre-existing pattern documented in prior deferred-work entries. [`profile-resume.tsx`]

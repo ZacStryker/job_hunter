@@ -80,7 +80,7 @@ export function PipelineRoute() {
   const [drawerKey, setDrawerKey] = useState(0)
 
   const { data: profile } = useProfileQuery()
-  const hasResumeText = Boolean(profile?.summary || profile?.experience || profile?.skills)
+  const hasResumeText = Boolean(profile?.personal.summary || profile?.experience?.jobs?.length || profile?.personal.skills)
 
   const activeJobs = (jobs ?? []).filter(j => !j.archived && (j.fitScore == null || (!j.applied && j.recommendation === 'skip')))
 

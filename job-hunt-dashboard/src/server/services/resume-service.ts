@@ -10,7 +10,7 @@ import { resumeDataSchema, profileDataSchema } from '../../shared/schemas'
 import type { Job, ProfileData } from '../../shared/schemas'
 
 const EMPTY_PROFILE_DATA: ProfileData = {
-  personal: { fullName: '', email: '', phone: null, location: null, summary: null, websites: [] },
+  personal: { fullName: '', email: '', phone: null, location: null, summary: null, skills: null, websites: [] },
   experience: { jobs: [], education: [], projects: [], certifications: [], licences: [], awards: [] },
 }
 
@@ -40,6 +40,7 @@ function buildProfileText(pd: ProfileData): string {
     pd.personal.phone ? `Phone: ${pd.personal.phone}` : null,
     pd.personal.location ? `Location: ${pd.personal.location}` : null,
     pd.personal.summary ? `Summary: ${pd.personal.summary}` : null,
+    pd.personal.skills ? `Skills: ${pd.personal.skills}` : null,
     websiteLines ? `Websites:\n${websiteLines}` : null,
     jobLines ? `Jobs:\n${jobLines}` : null,
     projectLines ? `Projects:\n${projectLines}` : null,

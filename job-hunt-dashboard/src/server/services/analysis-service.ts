@@ -7,7 +7,7 @@ import { profileDataSchema } from '../../shared/schemas'
 import type { ProfileData } from '../../shared/schemas'
 
 const EMPTY_PROFILE_DATA: ProfileData = {
-  personal: { fullName: '', email: '', phone: null, location: null, summary: null, websites: [] },
+  personal: { fullName: '', email: '', phone: null, location: null, summary: null, skills: null, websites: [] },
   experience: { jobs: [], education: [], projects: [], certifications: [], licences: [], awards: [] },
 }
 
@@ -147,6 +147,7 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
         Phone: profileData.personal.phone,
         Location: profileData.personal.location,
         Summary: profileData.personal.summary,
+        ...(profileData.personal.skills ? { Skills: profileData.personal.skills } : {}),
         Websites: profileData.personal.websites,
         Jobs: profileData.experience.jobs,
         Education: profileData.experience.education,

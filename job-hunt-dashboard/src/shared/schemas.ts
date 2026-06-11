@@ -218,6 +218,7 @@ export const profilePersonalSchema = z.object({
   phone: z.string().nullable(),
   location: z.string().nullable(),
   summary: z.string().nullable(),
+  skills: z.string().nullable().default(null),
   websites: z.array(websiteSchema).default([]),
 })
 

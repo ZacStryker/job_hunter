@@ -13,7 +13,7 @@ import type { Job, ProfileData } from '../../shared/schemas'
 import type { AppEnv } from '../types'
 
 const EMPTY_PROFILE_DATA: ProfileData = {
-  personal: { fullName: '', email: '', phone: null, location: null, summary: null, websites: [] },
+  personal: { fullName: '', email: '', phone: null, location: null, summary: null, skills: null, websites: [] },
   experience: { jobs: [], education: [], projects: [], certifications: [], licences: [], awards: [] },
 }
 

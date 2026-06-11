@@ -47,6 +47,7 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
   const [phone, setPhone] = useState(profileData.personal.phone ?? '')
   const [location, setLocation] = useState(profileData.personal.location ?? '')
   const [summary, setSummary] = useState(profileData.personal.summary ?? '')
+  const [skills, setSkills] = useState(profileData.personal.skills ?? '')
   const [websites, setWebsites] = useState(profileData.personal.websites)
 
   const [showAddWebsite, setShowAddWebsite] = useState(false)
@@ -91,6 +92,7 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
       phone: phone || null,
       location: location || null,
       summary: summary || null,
+      skills: skills || null,
       websites: updatedWebsites,
     }
   }
@@ -428,6 +430,17 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
               onChange={(e) => setSummary(e.target.value)}
               rows={4}
               className="bg-zinc-900 border-zinc-700"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1">Skills</label>
+            <Textarea
+              value={skills}
+              onChange={(e) => setSkills(e.target.value)}
+              rows={3}
+              className="bg-zinc-900 border-zinc-700"
+              placeholder="e.g. TypeScript, Go, Python, React, PostgreSQL, Docker, Kubernetes"
             />
           </div>
 

@@ -14,6 +14,7 @@ const EMPTY_PROFILE_DATA = {
     phone: null,
     location: null,
     summary: null,
+    skills: null,
     websites: [],
   },
   experience: {
