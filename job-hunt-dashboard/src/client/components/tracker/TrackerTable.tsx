@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useLayoutEffect } from 'react'
 import {
   createColumnHelper,
   flexRender,
@@ -142,6 +142,7 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
   const appliedJobs = useMemo(() => jobs.filter((j) => j.applied), [jobs])
   const [sorting, setSorting] = useState<SortingState>([{ id: 'dateApplied', desc: true }])
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing())
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const table = useReactTable({
     data: appliedJobs,
@@ -168,6 +169,28 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
     },
   })
 
+  useLayoutEffect(() => {
+    if (Object.keys(columnSizing).length > 0 || !containerRef.current) return
+    const containerWidth = containerRef.current.clientWidth
+    if (containerWidth === 0) return
+    const visibleCols = table.getVisibleLeafColumns()
+    const totalSize = visibleCols.reduce((sum, col) => sum + col.getSize(), 0)
+    if (totalSize === 0) return
+    const newSizing: ColumnSizingState = {}
+    let allocated = 0
+    visibleCols.forEach((col, i) => {
+      if (i === visibleCols.length - 1) {
+        newSizing[col.id] = Math.max(col.columnDef.minSize ?? 40, containerWidth - allocated)
+      } else {
+        const w = Math.max(col.columnDef.minSize ?? 40, Math.floor(col.getSize() / totalSize * containerWidth))
+        newSizing[col.id] = w
+        allocated += w
+      }
+    })
+    setColumnSizing(newSizing)
+    saveSizing(newSizing)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const { pageIndex, pageSize } = table.getState().pagination
   const totalRows = table.getFilteredRowModel().rows.length
   const from = totalRows === 0 ? 0 : pageIndex * pageSize + 1
@@ -187,7 +210,7 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col max-h-[calc(100vh-88px)]">
-      <div className="overflow-auto flex-1">
+      <div ref={containerRef} className="overflow-auto flex-1">
         <table className="caption-bottom text-sm" style={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <TableHeader className="sticky top-0 backdrop-blur-sm bg-zinc-900/80 border-b border-zinc-800">
             {table.getHeaderGroups().map((headerGroup) => (

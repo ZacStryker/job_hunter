@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
 import {
   createColumnHelper,
   flexRender,
@@ -281,6 +281,7 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing(sizingStorageKey))
   const lastSelectedIndexRef = useRef<number | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   function handleVisibilityChange(updater: Updater<VisibilityState>) {
     setColumnVisibility((prev) => {
@@ -390,6 +391,28 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
     },
   })
 
+  useLayoutEffect(() => {
+    if (Object.keys(columnSizing).length > 0 || !containerRef.current) return
+    const containerWidth = containerRef.current.clientWidth
+    if (containerWidth === 0) return
+    const visibleCols = table.getVisibleLeafColumns()
+    const totalSize = visibleCols.reduce((sum, col) => sum + col.getSize(), 0)
+    if (totalSize === 0) return
+    const newSizing: ColumnSizingState = {}
+    let allocated = 0
+    visibleCols.forEach((col, i) => {
+      if (i === visibleCols.length - 1) {
+        newSizing[col.id] = Math.max(col.columnDef.minSize ?? 40, containerWidth - allocated)
+      } else {
+        const w = Math.max(col.columnDef.minSize ?? 40, Math.floor(col.getSize() / totalSize * containerWidth))
+        newSizing[col.id] = w
+        allocated += w
+      }
+    })
+    setColumnSizing(newSizing)
+    saveSizing(sizingStorageKey, newSizing)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const { pageIndex, pageSize } = table.getState().pagination
   const totalRows = table.getFilteredRowModel().rows.length
   const from = totalRows === 0 ? 0 : pageIndex * pageSize + 1
@@ -415,7 +438,7 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
         </div>
         {!fixedColumns && <ColumnVisibilityToggle table={table} />}
       </div>
-      <div className="overflow-auto flex-1">
+      <div ref={containerRef} className="overflow-auto flex-1">
         <table className="caption-bottom text-sm" style={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <TableHeader className="sticky top-0 backdrop-blur-sm bg-zinc-900/80 border-b border-zinc-800">
             {table.getHeaderGroups().map((headerGroup) => (

@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { SortingState, ColumnSizingState } from '@tanstack/react-table'
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useLayoutEffect } from 'react'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import * as SelectPrimitive from '@radix-ui/react-select'
@@ -174,6 +174,7 @@ interface MessagesTableProps {
 export function MessagesTable({ messages, jobs }: MessagesTableProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'receivedAt', desc: true }])
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing())
+  const containerRef = useRef<HTMLDivElement>(null)
   const { mutate } = useMessageMutation()
 
   const distinctCompanies = useMemo(
@@ -352,6 +353,28 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
     },
   })
 
+  useLayoutEffect(() => {
+    if (Object.keys(columnSizing).length > 0 || !containerRef.current) return
+    const containerWidth = containerRef.current.clientWidth
+    if (containerWidth === 0) return
+    const visibleCols = table.getVisibleLeafColumns()
+    const totalSize = visibleCols.reduce((sum, col) => sum + col.getSize(), 0)
+    if (totalSize === 0) return
+    const newSizing: ColumnSizingState = {}
+    let allocated = 0
+    visibleCols.forEach((col, i) => {
+      if (i === visibleCols.length - 1) {
+        newSizing[col.id] = Math.max(col.columnDef.minSize ?? 40, containerWidth - allocated)
+      } else {
+        const w = Math.max(col.columnDef.minSize ?? 40, Math.floor(col.getSize() / totalSize * containerWidth))
+        newSizing[col.id] = w
+        allocated += w
+      }
+    })
+    setColumnSizing(newSizing)
+    saveSizing(newSizing)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const { pageIndex, pageSize } = table.getState().pagination
   const totalRows = table.getFilteredRowModel().rows.length
   const from = totalRows === 0 ? 0 : pageIndex * pageSize + 1
@@ -359,7 +382,7 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col">
-      <div className="overflow-auto">
+      <div ref={containerRef} className="overflow-auto">
         <table className="caption-bottom text-sm" style={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <TableHeader className="border-b border-zinc-800">
             {table.getHeaderGroups().map((headerGroup) => (
