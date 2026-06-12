@@ -109,6 +109,9 @@ export function RegisterRoute() {
         <Link to="/login" className="text-sm text-zinc-500 hover:text-zinc-300 mt-4 block text-center">
           Already have an account? Sign in
         </Link>
+        <Link to="/tour" className="text-sm text-zinc-500 hover:text-zinc-300 mt-2 block text-center">
+          See how it works →
+        </Link>
       </form>
     </AuthFormCard>
   )

@@ -16,6 +16,7 @@ import { fetchSession } from '../hooks/useSessionQuery'
 import { fetchOnboardingStatus } from '../hooks/useOnboardingStatusQuery'
 import { LoginRoute } from '../routes/login'
 import { RegisterRoute } from '../routes/register'
+import { TourRoute } from '../routes/tour'
 import { RegisterPendingRoute } from '../routes/register-pending'
 import { OnboardingRoute } from '../routes/onboarding'
 import { AdminUsersRoute } from '../routes/admin-users'
@@ -98,6 +99,12 @@ const registerPendingRoute = createRoute({
   validateSearch: (search: Record<string, unknown>) => ({
     email: typeof search.email === 'string' ? search.email : '',
   }),
+})
+
+const tourRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tour',
+  component: TourRoute,
 })
 
 const onboardingRoute = createRoute({
@@ -312,6 +319,7 @@ const routeTree = rootRoute.addChildren([
   registerRoute,
   registerPendingRoute,
   onboardingRoute,
+  tourRoute,
   protectedRoute.addChildren([
     dashboardRoute,
     indexRoute,

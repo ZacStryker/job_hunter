@@ -124,3 +124,8 @@
     - [Story 43.3: Profile Form UI — Jobs & Education Sections](./epic-43-profile-schema-redesign-form-ui.md#story-433-profile-form-ui--jobs--education-sections)
     - [Story 43.4: Profile Form UI — Projects, Certifications, Licences & Awards](./epic-43-profile-schema-redesign-form-ui.md#story-434-profile-form-ui--projects-certifications-licences--awards)
     - [Story 43.5: Update Downstream Consumers & Drop Old Columns](./epic-43-profile-schema-redesign-form-ui.md#story-435-update-downstream-consumers--drop-old-columns)
+  - [Epic 44: Public-Facing Tour Page](./epic-44-tour-page.md)
+    - [Story 44.1: Tour Route Scaffold & Hero Section](./epic-44-tour-page.md#story-441-tour-route-scaffold--hero-section)
+    - [Story 44.2: Feature Sections 2–5 — Static Content & Scroll Animations](./epic-44-tour-page.md#story-442-feature-sections-25--static-content--scroll-animations)
+    - [Story 44.3: Interactive Demo](./epic-44-tour-page.md#story-443-interactive-demo)
+    - [Story 44.4: FAQ Section, Closing CTA & Copy Finalization](./epic-44-tour-page.md#story-444-faq-section-closing-cta--copy-finalization)

@@ -1,234 +1,245 @@
 ---
 stepsCompleted: [step-01, step-02, step-03, step-04]
 inputDocuments:
-  - /home/zac/Documents/Scraper Bot Report.md
-  - _bmad-output/planning-artifacts/architecture.md
+  - "Epic brief (provided via command arguments — Epic 44: Public-facing Tour Page)"
+  - "_bmad-output/planning-artifacts/architecture.md"
+  - "_bmad-output/planning-artifacts/architecture-distillate.md"
+  - "_bmad-output/planning-artifacts/ux-design-specification/index.md"
 ---
 
-# bmad - Epic Breakdown (Scraper Reliability Sprint)
+# HITLOBSTER - Epic 44: Public-Facing Tour Page
 
 ## Overview
 
-This document provides the epic and story breakdown derived from the Scraper Bot Detection & Reliability Investigation Report (2026-05-08), decomposing 6 identified issues into implementable stories.
+This document captures the requirements and story breakdown for Epic 44 — a public-facing /tour route that communicates HITLOBSTER's core value proposition to unauthenticated visitors and converts them to signups. No changes to authenticated routes or backend.
 
 ## Requirements Inventory
 
 ### Functional Requirements
 
-FR1: Switch fetchLinkedInListing and fetchLinkedInJobDetails (linkedin.js lines 30–67) from withPage (Chromium + stealth) to withFirefoxPage to match the fix already applied to searchLinkedIn. [HIGH]
+FR1: A public /tour route is accessible without authentication — no beforeLoad session check, no redirect to /login; mounted directly on rootRoute (same level as loginRoute, registerRoute).
 
-FR2: Parameterize locale and timezoneId in getFirefoxPage (pool.js lines 50–61) so callers pass their own values rather than always receiving 'nl-NL'/'Europe/Amsterdam'. indeed_nl should pass the Dutch values explicitly; LinkedIn/other callers use 'en-US'/'America/New_York'. [MEDIUM]
+FR2: Hero section — final-draft headline, 1-line value prop, primary "Get started" CTA (→ /register), secondary "See how it works ↓" CTA that smooth-scrolls / anchors to section 2.
 
-FR3: Implement a Firefox browser pool of ≥2 instances (pool.js line 9), mirroring the existing Chromium POOL_SIZE=2 pattern, so concurrent LinkedIn/Indeed/Indeed-NL operations do not serialize on a single browser process. [MEDIUM]
+FR3: Hero visual — static HTML/JSX mockup of the Matches table with an open Job Drawer showing a Fit Score badge, Reqs Met/Missed list, and a Recommendation pill.
 
-FR4: Fix the discovery temp file race condition in discovery-service.ts (lines 183–185) by moving unlinkSync cleanup to a finally block (or equivalent deferred cleanup) and reducing scrapeWithRetry retries from 3 to 1 to prevent ENOENT errors on in-flight retry attempts after AbortSignal fires. [MEDIUM]
+FR4: Feature section — Job Discovery & Pre-Scoring (text right / visual left) — copy describes configuring job title+location search pairs and relevance pre-scoring before the full AI pipeline; visual: Config screen mockup with search pairs + discovery results list with Relevance Score badges.
 
-FR5: Apply the pending input_tokens column migration to the production webhook_runs table so that webhook-triggered runs are recorded successfully; investigate and fix why the startup migration runner is not catching this schema drift. [LOW/URGENT]
+FR5: Feature section — AI Analysis & Fit Score (text left / visual right; star feature / largest section) — copy describes full job description sent to Claude with candidate profile → Fit Score (0–100), role fit summary, Reqs Met, Reqs Missed, Red Flags, Recommendation (skip/investigate/apply); visual: full Job Drawer mockup with all analysis fields; three sample score badges in green/amber/red showing the scoring range.
 
-FR6: Switch searchArc (arc.js line 1) from withPage (Chromium) to withFirefoxPage for consistency and future-proofing against bot detection. [LOW]
+FR6: Feature section — Tailored Document Generation (text right / visual left) — copy describes one-click resume + cover letter generation from the Job Drawer, tailored to the specific job description, stored against the job record, with visual preview and download; mentions dynamic 1/2-page resume layout; visual: Generate button in drawer alongside rendered resume preview.
 
-### Non-Functional Requirements
+FR7: Feature section — Application Tracking & Email Sync (text left / visual right) — copy describes marking jobs applied, connecting IMAP inbox, moving emails into designated subfolders, manually mapping messages to jobs, status history timeline in the drawer; copy explicitly does NOT imply automatic status detection (mapping is manual); visual: Applications view with Applied→Screening→Interview status badges + status history timeline.
 
-NFR1: indeed_nl scraping must continue to use Dutch locale/timezone — no regression.
+FR8: Interactive demo section — fully static React component; hardcoded demoJobs data (5 jobs: mix of Apply/Investigate/Skip recommendations); no API calls, no auth; functional Matches view replica using TanStack Table v8 + shadcn/ui; row click opens a sliding Job Drawer with pre-written analysis for that specific job; Drawer bottom CTA "Analyse your own profile →" links to /register.
 
-NFR2: LinkedIn search (already on Firefox) must continue working — no regression.
+FR9: FAQ + Closing CTA section — 4–5 shadcn Accordion items covering: "How is my data secured?", "Do I need my own Claude API key?", "What job boards does it search?", "How does email sync work?" plus a closing "Create your profile" CTA button (→ /register).
 
-NFR3: Pool changes must support concurrent discovery runs across multiple users without serialization bottleneck.
+FR10: All copy across all 7 sections is final-draft quality per the section descriptions in the brief — zero lorem ipsum placeholder text anywhere.
 
-NFR4: Schema migration must be idempotent and applied without data loss.
+### NonFunctional Requirements
 
-NFR5: No new bot-detection fingerprinting signals introduced (e.g., mismatched locale for non-Dutch scrapers).
+NFR1: /tour route is registered under rootRoute in router.ts with no beforeLoad — not nested inside protectedRoute.
+
+NFR2: Zero modifications to existing authenticated routes, layouts, or components.
+
+NFR3: Interactive demo has no backend dependency — no TanStack Query hooks, no session hooks, no app-level state, all data is inline constants.
+
+NFR4: Interactive demo may reuse shadcn/ui primitives and TanStack Table directly; it MUST NOT import app-level query hooks (useJobsQuery, etc.) or read/write the localStorage key "job-hunt-column-visibility".
+
+NFR5: Scroll-triggered animations on feature section visuals use pure CSS only (CSS transitions + @keyframes via Intersection Observer or CSS animation-timeline) — no JS animation libraries.
+
+NFR6: Feature section visuals are static HTML/JSX mockups — no live data fetching.
+
+NFR7: No new backend routes, database schema changes, or migrations required.
+
+NFR8: Tour page uses the app's existing dark-mode Tailwind design system — same CSS variables, same semantic color tokens (--score-high, --score-mid, --score-low), no new global CSS files introduced.
 
 ### Additional Requirements
 
-- Side decision: determine whether 2 Chromium instances are still needed given the shift toward Firefox (flagged in report).
-- Startup migration runner investigation: verify the migration file is present in the deployed image and that the runner picks it up on boot.
+- Route registration: add tourRoute to rootRoute.addChildren([...]) in router.ts alongside loginRoute, registerRoute (before protectedRoute block)
+- Component naming: PascalCase.tsx (TourPage, TourHeroSection, TourDemoSection, TourFaqSection, etc.)
+- Route file: src/client/routes/tour.tsx (kebab-case, matching convention)
+- Demo table state is isolated: no shared QueryClient, no shared column visibility state
+- Browser target: Firefox latest only (no polyfills for other browsers)
+- Hono server: no changes required — /tour is a SPA client-side route, Nginx already serves the SPA for all non-/api/* paths
 
 ### UX Design Requirements
 
-N/A — all fixes are backend/infrastructure with no UI surface.
+UX-DR1: Tour page uses the app's dark-mode base (same globals.css variables, same Tailwind config) — no separate light theme.
+
+UX-DR2: Semantic color tokens used for score badges throughout the tour (emerald-500 ≥80, amber-400 60–79, red-500 <60) — consistent with FitScoreBadge in the app.
+
+UX-DR3: Feature sections alternate text-right/visual-left vs text-left/visual-right layout across sections 2–5 for visual rhythm.
+
+UX-DR4: Interactive demo replicates the visual language of the Matches view (same table density, score badge colors, drawer layout) but is visually framed as a contained demo — browser chrome mockup, rounded container with a subtle border/shadow, or an explicit "Interactive Demo" label — so visitors clearly understand it is not the live app interface.
+
+UX-DR5: Scroll-triggered animations: feature section visuals enter with fade-in + slide-up (opacity 0→1, translateY 24px→0) triggered on viewport intersection.
 
 ### FR Coverage Map
 
-FR1: Epic 31 / Story 31.1 — LinkedIn listing/detail fetchers → Firefox
-FR2: Epic 31 / Story 31.2 — Firefox locale/timezone parameterization
-FR3: Epic 31 / Story 31.3 — Firefox browser pool
-FR4: Epic 31 / Story 31.4 — Discovery temp file race condition + retry reduction
-FR5: Epic 32 / Story 32.1 — webhook_runs schema drift hotfix
-FR6: Epic 31 / Story 31.5 — Arc scraper → Firefox
+```
+FR1:  Epic 44 — Public /tour route registered on rootRoute, no auth guard
+FR2:  Epic 44 — Hero section: headline, value prop, dual CTAs
+FR3:  Epic 44 — Hero visual: static Matches table + Job Drawer mockup
+FR4:  Epic 44 — Feature section: Job Discovery & Pre-Scoring
+FR5:  Epic 44 — Feature section: AI Analysis & Fit Score (star section)
+FR6:  Epic 44 — Feature section: Tailored Document Generation
+FR7:  Epic 44 — Feature section: Application Tracking & Email Sync
+FR8:  Epic 44 — Interactive demo: static TanStack Table + Job Drawer, 5 seed jobs
+FR9:  Epic 44 — FAQ accordion + closing CTA
+FR10: Epic 44 — Final-draft copy across all 7 sections (no lorem ipsum)
+
+NFR1–NFR8: Epic 44 — Route isolation, zero backend deps, CSS-only animation,
+            design system consistency
+UX-DR1–UX-DR5: Epic 44 — Dark mode, semantic tokens, alternating layout,
+                demo framing, scroll animations
+```
 
 ## Epic List
 
-### Epic 31: Scraper Reliability & Bot Detection Hardening
-Operators can run discovery across LinkedIn, Indeed, and Arc without bot-detection failures, locale fingerprinting signals, or concurrency bottlenecks. All scrapers run on a consistent browser strategy with a properly pooled Firefox instance.
-**FRs covered:** FR1, FR2, FR3, FR4, FR6
+### Epic 44: Public-Facing Tour Page
+Unauthenticated visitors can navigate to `/tour` and experience a polished, scroll-driven marketing page that communicates HITLOBSTER's core workflow, interact with a live demo of the Matches view, and follow a CTA to register.
 
-### Epic 32: Webhook Run Recording Hotfix
-Webhook-triggered discovery runs are recorded correctly in the database. The schema drift that caused `SQLiteError: table webhook_runs has no column named input_tokens` is resolved and the startup migration runner is verified to catch future drift.
-**FRs covered:** FR5
-
----
-
-## Epic 31: Scraper Reliability & Bot Detection Hardening
-
-Operators can run discovery across LinkedIn, Indeed, and Arc without bot-detection failures, locale fingerprinting signals, or concurrency bottlenecks. All scrapers run on a consistent browser strategy with a properly pooled Firefox instance.
-
-### Story 31.1: Switch LinkedIn Listing/Detail Fetchers to Firefox
-
-As a user running discovery,
-I want LinkedIn listing and job detail fetches to use Firefox (withFirefoxPage),
-So that the analysis flow is not blocked by LinkedIn's bot detection.
-
-**Acceptance Criteria:**
-
-**Given** fetchLinkedInListing is called with a valid LinkedIn URL
-**When** the function executes
-**Then** it uses withFirefoxPage instead of withPage (Chromium + stealth)
-**And** the job listing HTML is returned without a timeout
-
-**Given** fetchLinkedInJobDetails is called with a valid LinkedIn job URL
-**When** the function executes
-**Then** it uses withFirefoxPage
-**And** the full job description and metadata are returned
-
-**Given** a LinkedIn session exists in the DB for the current user
-**When** either function runs
-**Then** the session's storageStatePath is passed to withFirefoxPage
-
-**Given** both functions previously imported/used the stealth plugin
-**When** the refactor is complete
-**Then** no stealth plugin usage remains in these two functions
+**FRs covered:** FR1–FR10
+**NFRs covered:** NFR1–NFR8
+**UX-DRs covered:** UX-DR1–UX-DR5
 
 ---
 
-### Story 31.2: Parameterize Firefox Pool Locale & Timezone
+## Epic 44: Public-Facing Tour Page
 
-As a developer maintaining the scraper pool,
-I want getFirefoxPage to accept locale and timezoneId parameters,
-So that indeed_nl gets Dutch locale and LinkedIn/Arc get English locale without cross-contamination.
+Unauthenticated visitors can navigate to `/tour` and experience a polished, scroll-driven marketing page that communicates HITLOBSTER's core workflow, interact with a live demo of the Matches view, and follow a CTA to register.
 
-**Acceptance Criteria:**
+### Story 44.1: Tour Route Scaffold & Hero Section
 
-**Given** getFirefoxPage is called with no locale/timezone arguments
-**When** it creates the browser context
-**Then** it defaults to locale: 'en-US' and timezoneId: 'America/New_York'
-
-**Given** indeed_nl calls getFirefoxPage
-**When** it executes
-**Then** it explicitly passes locale: 'nl-NL' and timezoneId: 'Europe/Amsterdam'
-
-**Given** searchLinkedIn calls getFirefoxPage
-**When** it executes
-**Then** the default English locale is used (no Dutch locale leaking into LinkedIn results)
-
-**Given** all callers are updated and deployed
-**When** indeed_nl runs a scrape
-**Then** Dutch locale/timezone behavior is preserved — no regression
-
----
-
-### Story 31.3: Firefox Browser Pool (2+ Instances)
-
-As a user of the application,
-I want Firefox browser operations served from a pool of ≥2 instances,
-So that concurrent discovery runs do not serialize on a single browser process.
+As a prospective user,
+I want to navigate to `/tour` without logging in and see a compelling hero section,
+So that I can understand what HITLOBSTER does and decide whether to sign up.
 
 **Acceptance Criteria:**
 
-**Given** a FIREFOX_POOL_SIZE constant (default: 2) is defined in pool.js
-**When** the pool initializes at startup
-**Then** at least 2 Firefox browser instances are launched
+**Given** I visit `/tour` while unauthenticated
+**When** the page loads
+**Then** I see the tour page (not a login redirect)
+**And** no session fetch is triggered by the route
 
-**Given** two concurrent scraping operations (e.g., LinkedIn search + Indeed fetch)
-**When** both execute simultaneously
-**Then** each is served by a separate pool instance with no blocking
+**Given** the `/tour` route in `router.ts`
+**When** it is registered
+**Then** it is a direct child of `rootRoute` (not `protectedRoute`), with no `beforeLoad` function
 
-**Given** all pool instances are busy
-**When** a new request arrives
-**Then** it queues and waits for an available instance (same behavior as the Chromium pool)
+**Given** the hero section
+**When** I view it
+**Then** it displays a headline, a single-line value proposition, and two CTAs: a primary "Get started" button (links to `/register`) and a secondary "See how it works ↓" anchor that smooth-scrolls to the first feature section
 
-**Given** the Chromium pool still runs POOL_SIZE=2
-**When** 31.3 is implemented
-**Then** a comment or config note documents the decision on whether Chromium pool size should be kept, reduced, or removed
+**Given** the hero visual
+**When** I view it
+**Then** it shows a static HTML/JSX mockup of the Matches table with an open Job Drawer, including a Fit Score badge (e.g. 84), a Reqs Met list (3 items), a Reqs Missed list (1 item), and a Recommendation pill showing "Apply"
 
----
+**Given** the tour page
+**When** it renders
+**Then** it uses the app's existing dark-mode CSS variables and Tailwind config — no new global CSS files are introduced
 
-### Story 31.4: Fix Discovery Temp File Race & Reduce Retries
+**Given** the tour page in the router tree
+**When** any existing authenticated route is accessed
+**Then** its behavior is unchanged — no modifications to `protectedRoute`, `Layout`, or any existing route component
 
-As a user running LinkedIn discovery,
-I want the storageState temp file to remain available for all retry attempts,
-So that discovery runs don't produce ENOENT errors and retries have a fair chance to succeed.
+### Story 44.2: Feature Sections 2–5 — Static Content & Scroll Animations
 
-**Acceptance Criteria:**
-
-**Given** a discovery run is in progress with a temp storageState file on disk
-**When** the 60-second AbortSignal fires
-**Then** the unlinkSync call does not execute until after all in-flight attempts complete (deferred to a finally block or equivalent)
-
-**Given** scrapeWithRetry is called for any route
-**When** configured
-**Then** retries is set to 1 (down from 3)
-
-**Given** a discovery run times out
-**When** the AbortSignal fires with a retry in flight
-**Then** no ENOENT error appears in logs for the storageState file
-
-**Given** cleanup is moved to a finally block
-**When** a run completes or errors by any path
-**Then** the temp file is always deleted — no file leaks
-
----
-
-### Story 31.5: Switch Arc Scraper to Firefox
-
-As a user running discovery,
-I want Arc.dev scraping to use Firefox,
-So that it is consistent with the Firefox-first strategy and resilient to future bot detection changes.
+As a prospective user,
+I want to scroll through four feature sections explaining discovery, AI analysis, document generation, and application tracking,
+So that I understand HITLOBSTER's full workflow before deciding to sign up.
 
 **Acceptance Criteria:**
 
-**Given** searchArc is called
-**When** it executes
-**Then** it uses withFirefoxPage instead of withPage (Chromium)
+**Given** feature section 2 — Job Discovery & Pre-Scoring
+**When** I view it
+**Then** it is laid out text-right / visual-left; copy explains configuring job title+location search pairs and relevance pre-scoring before the full AI pipeline; visual is a static mockup of the Config screen showing search pairs and a discovery results list with Relevance Score badges
 
-**Given** Arc.dev requires no authentication
-**When** withFirefoxPage is called
-**Then** no storageStatePath is passed (auth-free operation preserved)
+**Given** feature section 3 — AI Analysis & Fit Score
+**When** I view it
+**Then** it is laid out text-left / visual-right and is visually the largest feature section; copy explains the Claude LLM pipeline output (Fit Score 0–100, role fit summary, Reqs Met, Reqs Missed, Red Flags, Recommendation); visual is a full Job Drawer mockup showing all analysis fields; three sample score badges are shown: one green (≥80), one amber (60–79), one red (<60), using the app's semantic color tokens
 
-**Given** the browser switch
-**When** Arc search results are returned
-**Then** returned job fields match what were returned before the change — no data regression
+**Given** feature section 4 — Tailored Document Generation
+**When** I view it
+**Then** it is laid out text-right / visual-left; copy explains one-click resume and cover letter generation from the Job Drawer, tailored to the specific job description, stored against the job record, with visual preview and download, and mentions the dynamic 1/2-page resume layout; visual shows a Generate button in the drawer alongside a rendered resume preview
 
----
+**Given** feature section 5 — Application Tracking & Email Sync
+**When** I view it
+**Then** it is laid out text-left / visual-right; copy explains marking jobs as applied, connecting an IMAP inbox, moving emails into designated subfolders, and manually mapping messages to jobs; copy does NOT state or imply that status changes are detected automatically; visual shows the Applications view with Applied→Screening→Interview status badges and a status history timeline in the drawer
 
-## Epic 32: Webhook Run Recording Hotfix
+**Given** any feature section visual
+**When** it enters the viewport during scroll
+**Then** it animates in with a fade + slide-up effect (opacity 0→1, translateY 24px→0) using pure CSS (no JS animation libraries added)
 
-Webhook-triggered discovery runs are recorded correctly in the database. The schema drift that caused `SQLiteError: table webhook_runs has no column named input_tokens` is resolved and the startup migration runner is verified to catch future drift.
+**Given** no browser scroll activity
+**When** a feature section visual is off-screen
+**Then** it remains in its pre-animation state (invisible / translated) until it enters the viewport
 
-### Story 32.1: Apply webhook_runs input_tokens Migration & Harden Startup Runner
+**Given** all four feature sections
+**When** I scan the page
+**Then** their text/visual sides strictly alternate (right, left, right, left) and no lorem ipsum text appears anywhere
 
-As an operator monitoring webhook-triggered discovery runs,
-I want webhook runs recorded successfully in the database,
-So that I can audit and track all runs triggered by the n8n webhook.
+### Story 44.3: Interactive Demo
+
+As a prospective user,
+I want to interact with a live demo of the Matches view — without creating an account,
+So that I can experience the product's core interface before committing to sign up.
 
 **Acceptance Criteria:**
 
-**Given** the production DB is missing the input_tokens column in webhook_runs
-**When** the migration is applied
-**Then** the column exists and INSERT statements for run recording succeed
+**Given** the interactive demo section
+**When** it renders
+**Then** it displays a visually contained component — using a rounded border, subtle shadow, and/or an explicit "Interactive Demo" label — that is clearly distinguishable from a live app interface
 
-**Given** a webhook-triggered discovery run completes
-**When** run recording executes
-**Then** no SQLiteError is thrown and the run is persisted to webhook_runs with all expected fields
+**Given** the demo
+**When** the page loads
+**Then** zero API calls, zero session fetches, and zero TanStack Query hooks from the main app are invoked; all data is inline constants defined within the demo component tree
 
-**Given** the application starts
-**When** the startup migration runner executes
-**Then** all pending migrations — including this one — are applied and logged as "Migrations complete"
+**Given** the demo table
+**When** I view it
+**Then** it shows exactly 5 hardcoded jobs with a mix of recommendations: at least one "Apply", at least one "Investigate", and at least one "Skip"; each row shows company, job title, Fit Score badge, and Recommendation chip using the same semantic color tokens as the real app
 
-**Given** the migration file is present in the deployed Docker image
-**When** verified post-deploy
-**Then** the startup log confirms all migrations ran
+**Given** a demo job row
+**When** I click it
+**Then** a Job Drawer slides in from the right showing the pre-written analysis for that specific job: Fit Score, role fit summary, Reqs Met (2–3 items), Reqs Missed (1–2 items), Red Flags (0–1 items), and a Recommendation pill
 
-**Given** the migration is applied to a DB that already has the column (e.g., a fresh install)
-**When** the runner processes it
-**Then** no error is thrown — migration is idempotent
+**Given** the demo Job Drawer
+**When** it is open
+**Then** a CTA at the bottom reads "Analyse your own profile →" and links to `/register`
+
+**Given** the demo table
+**When** it renders
+**Then** it does NOT read from or write to the `localStorage` key `"job-hunt-column-visibility"` (uses isolated in-component state only)
+
+**Given** any app-level query hook or mutation (e.g. `useJobsQuery`, `useJobMutation`)
+**When** the demo renders
+**Then** none of those hooks are imported or called within the demo component tree
+
+### Story 44.4: FAQ Section, Closing CTA & Copy Finalization
+
+As a prospective user,
+I want to read answers to common questions and be given a final invitation to sign up,
+So that any hesitation is addressed and I can take the next step.
+
+**Acceptance Criteria:**
+
+**Given** the FAQ section
+**When** I view it
+**Then** it contains a shadcn Accordion with exactly 4–5 items covering these topics: "How is my data secured?", "Do I need my own Claude API key?", "What job boards does it search?", and "How does email sync work?"
+
+**Given** a FAQ accordion item
+**When** I click it
+**Then** it expands to show a substantive answer to that question (no lorem ipsum or placeholder text)
+
+**Given** the closing CTA block beneath the FAQ
+**When** I view it
+**Then** it includes a headline that echoes the hero section's message and a prominent "Create your profile" button that links to `/register`
+
+**Given** the complete tour page from hero to closing CTA
+**When** I read through all sections
+**Then** every piece of copy is final-draft quality as specified in the epic brief — no lorem ipsum, no placeholder text, no "TODO" markers anywhere on the page
+
+**Given** the `/tour` route
+**When** it is navigated to from `/login` or `/register`
+**Then** a link or nav item is present on those public pages to surface the tour to unauthenticated visitors discovering the app for the first time

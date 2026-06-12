@@ -79,6 +79,9 @@ export function LoginRoute() {
         <Link to="/register" className="text-sm text-zinc-500 hover:text-zinc-300 mt-4 block text-center">
           Register with Invite Key
         </Link>
+        <Link to="/tour" className="text-sm text-zinc-500 hover:text-zinc-300 mt-2 block text-center">
+          See how it works →
+        </Link>
       </form>
     </AuthFormCard>
   )

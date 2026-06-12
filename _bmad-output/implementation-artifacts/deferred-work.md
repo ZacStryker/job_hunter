@@ -1,5 +1,12 @@
 # Deferred Work
 
+## Deferred from: code review of 44-4-faq-section-closing-cta-and-copy-finalization (2026-06-12)
+
+- **Keyboard focus enters invisible DemoDrawer when closed**: `w-0 overflow-hidden` hides the drawer visually but the inner `<Link to="/register">` at `tour.tsx:589` stays in the DOM and is Tab-reachable; keyboard users can focus an invisible element. Pre-existing from story 44.3 — not introduced by 44.4.
+- **ChevronDown SVG has no explicit `aria-hidden`**: Decorative chevron at `accordion.tsx:35` may be announced by screen readers depending on the installed version of lucide-react. Pre-existing shadcn accordion pattern.
+- **`hover:no-underline` override reliability**: Both `hover:underline` (AccordionTrigger base) and `hover:no-underline` (caller override at `tour.tsx:632`) appear in the merged class string; without confirmed `tailwind-merge` in `cn`, stylesheet insertion-order determines which wins. Pre-existing concern across all shadcn component overrides in this project.
+- **`InteractiveDemo` `lastJobRef` stale on React Strict Mode double-invoke**: `lastJobRef.current` at `tour.tsx:439` persists across unmount/remount cycles; in React 18 Strict Mode the drawer may briefly show the wrong job on first render. Pre-existing from story 44.3.
+
 ## Deferred from: resizable-columns (2026-06-12)
 
 - **Stale column sizing keys in localStorage**: Saved `ColumnSizingState` objects are never pruned when column IDs are renamed or removed. Old keys silently coexist in localStorage and are ignored. Low impact — orphaned keys just take up negligible storage. Address if column IDs change in a future refactor.
@@ -10,12 +17,22 @@
 
 - `analysis-service.ts` auto-archive: if a user manually unarchives a job and it is re-analyzed with `recommended_action === 'skip'`, it will be silently re-archived with a fresh `dateArchived`, ignoring the user's action. Guard requires checking `existing.archived` before the DB update.
 
+## Deferred from: code review of 44-2-feature-sections (2026-06-12)
+
+- **FadeInView no-JS invisible content**: All four feature section mockups start with `opacity-0` and rely on `IntersectionObserver` to become visible. Users with JS disabled or blocked see permanently invisible content. SPA architectural limitation; not actionable without SSR or `<noscript>` fallbacks.
+- **ActionChip undefined-value fragility**: `CHIP_STYLES[recommendation]` returns `undefined` for any value outside `'apply' | 'investigate' | 'skip'`, producing broken class strings. Pre-existing issue in `ActionChip` component; not introduced by this story. Fix if live data paths ever pass unexpected values.
+
 ## Deferred from: split-location-type-column (2026-06-12)
 
 - `parseLocation`: "Work from Home" / "WFH" are common LinkedIn/Indeed formats that would classify as `type: null` (not Remote). Add as Remote alias if WFH jobs surface with wrong type column.
 - `parseLocation`: "In-Office" / "In Office" not matched by on-site branch. Add if scrapers produce this format.
 - `parseLocation`: Multi-keyword strings like "Remote / Hybrid" silently pick first match (Remote). No clear winner by spec; defer until a clear preference emerges.
 - `parseLocation` strip charset: brackets `[]`, pipes `|`, bullets `·` not included. Extend if stray characters appear in the place column.
+
+## Deferred from: code review of 44-1-tour-route-scaffold-and-hero-section (2026-06-12)
+
+- Authenticated users visiting `/tour` see a marketing header ("Sign in" / "Get started") with no awareness of session state. A logged-in user sharing the tour URL gets CTAs that either redirect them back (`/login`) or tell them to register when they already have an account. Address when tour page gets UX polish or when auth-aware header logic is added. [`tour.tsx:12`]
+- Hardcoded brand name "HITLOBSTER" as a literal string in the tour header. No single source of truth; if brand name changes this is a silent maintenance gap. Pre-existing pattern across other route files. [`tour.tsx:11`]
 
 ## Deferred from: code review of profile-skills-field (2026-06-11)
 
@@ -887,3 +904,10 @@ If none of `.job_seen_beacon`, `td.resultContent` match, card=null → company=n
 - **bySource counts filtered candidates, not actual DB inserts** [`discovery-service.ts`] — `bySource` is incremented by `newForSource.length` before the transaction; jobs rejected by the `(company, job_title, user_id)` DB unique constraint (e.g., same title from a different externalJobId) are counted in bySource but never land in the DB. Pre-existing behavior (original code had the same gap). Impact is cosmetic only.
 - **LinkedIn storage-state update changes from "first wins" to "last wins" for multi-search configs** [`discovery-service.ts`] — With `Promise.allSettled` and per-source handlers, if a user has two LinkedIn search configs both returning `updatedStorageStateContent`, the last to complete overwrites the first. Original code kept the first LinkedIn response only. Both are equally arbitrary orderings; no practical correctness impact since SQLite serializes the writes.
 - **`allInsertedJobs` may include externalJobIds rejected by DB constraint** [`discovery-service.ts`] — If two scraped jobs share the same company+title but different externalJobIds, the second passes the `seen`/`existingIds` filter but fails `onConflictDoNothing()`. It's pushed into `allInsertedJobs` but the relevance scoring UPDATE finds no matching row (scored by externalJobId). Scoring silently no-ops for that job; it stays with null relevanceScore. Pre-existing edge case given the compound unique constraint.
+
+## Deferred from: code review of 44-3-interactive-demo (2026-06-12)
+
+- **String values used as React `key` on list items** (`reqsMet`, `reqsMissed`, `redFlags` in `DemoDrawer`) — fragile if any two entries in the same array share identical text; safe with current static data. Fix with index keys if data is ever extended.
+- **`DemoTable` row buttons lack ARIA state** — `aria-pressed` or `aria-expanded` would announce to screen readers when the drawer opens/closes. Low accessibility gap; tour page is informational so impact is limited.
+- **`FadeInView` SSR/MQL lifecycle issues** — pre-existing from story 44.1/44.2: `mqlRef` created during render (multiple objects in concurrent mode), SSR flash when server renders elements as `opacity-0`. Not actionable without SSR strategy change.
+- **Mobile overflow — `w-80` drawer has no responsive fallback** — on viewports narrower than ~640px the flex row (table + 320px drawer) overflows. No mobile breakpoints exist anywhere on the tour page yet; address in a future responsive polish pass.
