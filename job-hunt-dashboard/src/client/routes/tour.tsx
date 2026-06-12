@@ -457,14 +457,14 @@ function InteractiveDemo() {
         </div>
 
         <div className="rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl overflow-hidden">
-          <div className="flex">
+          <div className="flex flex-col md:flex-row">
             <DemoTable
               jobs={DEMO_JOBS}
               selectedId={selectedId}
               onSelect={(id) => setSelectedId(prev => prev === id ? null : id)}
             />
-            <div className={`transition-all duration-300 ease-in-out overflow-hidden shrink-0 border-l border-zinc-800 ${selectedId !== null ? 'w-80' : 'w-0'}`}>
-              <div className="w-80 flex flex-col" style={{ minHeight: '100%' }}>
+            <div className={`transition-all duration-300 ease-in-out overflow-hidden shrink-0 border-zinc-800 md:border-l ${selectedId !== null ? 'max-h-[500px] md:max-h-none md:w-80 border-t md:border-t-0' : 'max-h-0 md:max-h-none md:w-0'}`}>
+              <div className="w-full md:w-80 flex flex-col" style={{ minHeight: '100%' }}>
                 {visibleJob && (
                   <DemoDrawer job={visibleJob} onClose={() => setSelectedId(null)} />
                 )}
