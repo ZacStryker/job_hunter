@@ -382,8 +382,8 @@ function FadeInView({ children, className }: { children: ReactNode; className?: 
 
 function HeroMockup() {
   return (
-    <div className="flex rounded-lg border border-zinc-700 bg-zinc-900 overflow-x-auto shadow-2xl text-left">
-      <div className="flex-1 min-w-0">
+    <div className="flex flex-col md:flex-row rounded-lg border border-zinc-700 bg-zinc-900 shadow-2xl text-left">
+      <div className="flex-1 min-w-0 overflow-x-auto">
         <div className="grid grid-cols-[1fr_1fr_48px_96px] gap-x-3 px-4 py-2 border-b border-zinc-800">
           <span className="text-xs text-zinc-500 uppercase tracking-wide">Company</span>
           <span className="text-xs text-zinc-500 uppercase tracking-wide">Role</span>
@@ -396,7 +396,7 @@ function HeroMockup() {
         <MockupRow company="Meta" role="Staff Engineer" score={38} recommendation="skip" />
       </div>
 
-      <div className="w-60 shrink-0 border-l border-zinc-800">
+      <div className="w-full md:w-60 shrink-0 border-t md:border-t-0 md:border-l border-zinc-800">
         <div className="px-4 py-3 border-b border-zinc-800">
           <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Stripe</p>
           <p className="text-sm font-semibold text-zinc-100 leading-snug">Senior Software Engineer</p>
