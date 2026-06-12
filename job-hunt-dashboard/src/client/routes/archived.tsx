@@ -35,6 +35,7 @@ export function ArchivedRoute() {
           selectedJobId={selectedJobId}
           fixedColumns={['company', 'jobTitle', 'location', 'locationType', 'fitScore', 'recommendation', 'date_analyzed', 'date_applied', 'date_archived']}
           initialSort={[{ id: 'date_archived', desc: true }]}
+          sizingStorageKey="hitlobster-column-sizing-archive"
         />
       </div>
       <JobDrawer

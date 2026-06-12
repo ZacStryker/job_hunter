@@ -40,6 +40,7 @@ export function MatchesRoute() {
           onBulkArchive={bulkArchiveMutation.mutate}
           isBulkArchiving={bulkArchiveMutation.isPending}
           fixedColumns={['company', 'jobTitle', 'location', 'locationType', 'fitScore', 'recommendation', 'date_analyzed']}
+          sizingStorageKey="hitlobster-column-sizing-matches"
         />
       </div>
       <JobDrawer

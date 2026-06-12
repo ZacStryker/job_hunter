@@ -7,7 +7,7 @@ import {
   getPaginationRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type { SortingState } from '@tanstack/react-table'
+import type { SortingState, ColumnSizingState } from '@tanstack/react-table'
 import {
   TableBody,
   TableCell,
@@ -21,6 +21,31 @@ import { ScoreBadge } from '../pipeline/ScoreBadge'
 import { parseLocation } from '../../utils/parseLocation'
 
 const PAGE_SIZE = 20
+const SIZING_KEY = 'hitlobster-column-sizing-tracker'
+
+function loadSizing(): ColumnSizingState {
+  try {
+    const stored = localStorage.getItem(SIZING_KEY)
+    if (!stored) return {}
+    const parsed: unknown = JSON.parse(stored)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
+    const result: ColumnSizingState = {}
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof v === 'number' && isFinite(v)) result[k] = v
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
+
+function saveSizing(state: ColumnSizingState) {
+  try {
+    localStorage.setItem(SIZING_KEY, JSON.stringify(state))
+  } catch {
+    // ignore storage errors
+  }
+}
 
 const columnHelper = createColumnHelper<Job>()
 
@@ -35,17 +60,26 @@ function formatDate(dateApplied: string): string {
 const columns = [
   columnHelper.accessor('company', {
     header: 'Company',
-    cell: (info) => info.getValue(),
+    size: 160,
+    cell: (info) => (
+      <span className="whitespace-nowrap overflow-hidden text-ellipsis block">{info.getValue()}</span>
+    ),
   }),
   columnHelper.accessor('jobTitle', {
     header: 'Job Title',
-    cell: (info) => info.getValue(),
+    size: 220,
+    cell: (info) => (
+      <span className="whitespace-nowrap overflow-hidden text-ellipsis block">{info.getValue()}</span>
+    ),
   }),
   columnHelper.accessor('location', {
     header: 'Location',
+    size: 140,
     cell: (info) => {
       const { place } = parseLocation(info.getValue())
-      return place ?? '—'
+      return place
+        ? <span className="whitespace-nowrap overflow-hidden text-ellipsis block">{place}</span>
+        : '—'
     },
     sortingFn: (rowA, rowB) => {
       const a = parseLocation(rowA.original.location).place ?? ''
@@ -56,9 +90,12 @@ const columns = [
   columnHelper.accessor('location', {
     id: 'locationType',
     header: 'Type',
+    size: 90,
     cell: (info) => {
       const { type } = parseLocation(info.getValue())
-      return type ?? '—'
+      return type
+        ? <span className="whitespace-nowrap overflow-hidden text-ellipsis block">{type}</span>
+        : '—'
     },
     sortingFn: (rowA, rowB) => {
       const a = parseLocation(rowA.original.location).type ?? ''
@@ -68,18 +105,28 @@ const columns = [
   }),
   columnHelper.accessor('fitScore', {
     header: 'Score',
+    size: 70,
     cell: (info) => <ScoreBadge score={info.getValue()} />,
   }),
   columnHelper.accessor('latestStatus', {
     header: 'Status',
-    cell: (info) => info.getValue() ?? '—',
+    size: 140,
+    cell: (info) => {
+      const v = info.getValue()
+      return v
+        ? <span className="whitespace-nowrap overflow-hidden text-ellipsis block">{v}</span>
+        : '—'
+    },
     sortUndefined: 1,
   }),
   columnHelper.accessor('dateApplied', {
     header: 'Date Applied',
+    size: 120,
     cell: (info) => {
       const v = info.getValue()
-      return v ? formatDate(v) : '—'
+      return v
+        ? <span className="whitespace-nowrap overflow-hidden text-ellipsis block">{formatDate(v)}</span>
+        : '—'
     },
     sortUndefined: 1,
   }),
@@ -94,6 +141,7 @@ interface TrackerTableProps {
 export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTableProps) {
   const appliedJobs = useMemo(() => jobs.filter((j) => j.applied), [jobs])
   const [sorting, setSorting] = useState<SortingState>([{ id: 'dateApplied', desc: true }])
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing())
 
   const table = useReactTable({
     data: appliedJobs,
@@ -101,12 +149,22 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    defaultColumn: { minSize: 40 },
     enableMultiSort: false,
+    enableColumnResizing: true,
+    columnResizeMode: 'onChange',
     initialState: { pagination: { pageSize: PAGE_SIZE, pageIndex: 0 } },
-    state: { sorting },
+    state: { sorting, columnSizing },
     onSortingChange: (updater) => {
       table.setPageIndex(0)
       setSorting(updater)
+    },
+    onColumnSizingChange: (updater) => {
+      setColumnSizing((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        saveSizing(next)
+        return next
+      })
     },
   })
 
@@ -130,7 +188,7 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col max-h-[calc(100vh-88px)]">
       <div className="overflow-auto flex-1">
-        <table className="w-full caption-bottom text-sm">
+        <table className="caption-bottom text-sm" style={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <TableHeader className="sticky top-0 backdrop-blur-sm bg-zinc-900/80 border-b border-zinc-800">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="border-0 hover:bg-transparent">
@@ -139,11 +197,24 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
                   return (
                     <TableHead
                       key={header.id}
-                      className="px-3 h-9 text-xs font-medium uppercase text-zinc-400 cursor-pointer select-none"
+                      className="px-3 h-9 text-xs font-medium uppercase text-zinc-400 cursor-pointer select-none relative overflow-hidden"
+                      style={{ width: header.getSize() }}
                       onClick={header.column.getToggleSortingHandler()}
                     >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                      <span className="whitespace-nowrap overflow-hidden text-ellipsis block">
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                      </span>
+                      <div
+                        onMouseDown={(e) => { e.stopPropagation(); header.getResizeHandler()(e) }}
+                        onTouchStart={header.getResizeHandler()}
+                        onClick={(e) => e.stopPropagation()}
+                        className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none ${
+                          header.column.getIsResizing()
+                            ? 'bg-zinc-400 opacity-100'
+                            : 'bg-zinc-700 opacity-0 hover:opacity-100'
+                        }`}
+                      />
                     </TableHead>
                   )
                 })}
@@ -160,7 +231,11 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
                 }`}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="py-1.5 px-3 text-sm text-zinc-200">
+                  <TableCell
+                    key={cell.id}
+                    className="py-1.5 px-3 text-sm text-zinc-200 overflow-hidden"
+                    style={{ width: cell.column.getSize() }}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}

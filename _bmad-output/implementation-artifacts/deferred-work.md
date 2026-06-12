@@ -1,5 +1,22 @@
 # Deferred Work
 
+## Deferred from: resizable-columns (2026-06-12)
+
+- **Stale column sizing keys in localStorage**: Saved `ColumnSizingState` objects are never pruned when column IDs are renamed or removed. Old keys silently coexist in localStorage and are ignored. Low impact — orphaned keys just take up negligible storage. Address if column IDs change in a future refactor.
+- **`isResizing` stuck on pointer-leave**: If the user starts a column drag and moves the pointer outside the browser window, `pointerup` may not fire inside the document, leaving `getIsResizing()` true until the next interaction. Pre-existing TanStack Table behavior with `onChange` mode. Mitigation: add a `document.addEventListener('pointerup', ...)` cleanup in a `useEffect`.
+- **MessagesTable interactive column widths don't respond to resize**: The Type and Job Title `<Select>` triggers and Company `<CompanyTypeahead>` input have hardcoded Tailwind widths (`w-[130px]`, `w-[180px]`, `w-[150px]`) that don't stretch to fill the resized column. Deferred per spec. Fix would require making these controls 100% width.
+
+## Deferred from: add-date-archived-field (2026-06-12)
+
+- `analysis-service.ts` auto-archive: if a user manually unarchives a job and it is re-analyzed with `recommended_action === 'skip'`, it will be silently re-archived with a fresh `dateArchived`, ignoring the user's action. Guard requires checking `existing.archived` before the DB update.
+
+## Deferred from: split-location-type-column (2026-06-12)
+
+- `parseLocation`: "Work from Home" / "WFH" are common LinkedIn/Indeed formats that would classify as `type: null` (not Remote). Add as Remote alias if WFH jobs surface with wrong type column.
+- `parseLocation`: "In-Office" / "In Office" not matched by on-site branch. Add if scrapers produce this format.
+- `parseLocation`: Multi-keyword strings like "Remote / Hybrid" silently pick first match (Remote). No clear winner by spec; defer until a clear preference emerges.
+- `parseLocation` strip charset: brackets `[]`, pipes `|`, bullets `·` not included. Extend if stray characters appear in the place column.
+
 ## Deferred from: code review of profile-skills-field (2026-06-11)
 
 - Whitespace-only `skills` value (`"   "`) bypasses the `skills || null` null-coercion in `buildPersonal()` and is stored + sent to LLM as `Skills:    ` — pre-existing pattern for all other personal fields (`phone`, `location`, `summary`); add `.trim()` before `|| null` in a future hardening pass. [`profile-resume.tsx`]

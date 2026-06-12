@@ -7,7 +7,7 @@ import {
   getPaginationRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type { SortingState, VisibilityState, Updater, RowSelectionState } from '@tanstack/react-table'
+import type { SortingState, VisibilityState, Updater, RowSelectionState, ColumnSizingState } from '@tanstack/react-table'
 import { Button } from '../ui/button'
 import {
   TableBody,
@@ -51,27 +51,54 @@ function loadVisibility(): VisibilityState {
   }
 }
 
+function loadSizing(key: string): ColumnSizingState {
+  try {
+    const stored = localStorage.getItem(key)
+    if (!stored) return {}
+    const parsed: unknown = JSON.parse(stored)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
+    const result: ColumnSizingState = {}
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof v === 'number' && isFinite(v)) result[k] = v
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
+
+function saveSizing(key: string, state: ColumnSizingState) {
+  try {
+    localStorage.setItem(key, JSON.stringify(state))
+  } catch {
+    // ignore storage errors
+  }
+}
+
 const columnHelper = createColumnHelper<Job>()
 
 const staticColumns = [
   columnHelper.accessor('company', {
     header: 'Company',
+    size: 180,
     cell: (info) => (
-      <span className="max-w-[200px] truncate block text-zinc-300" title={info.getValue()}>{info.getValue()}</span>
+      <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300" title={info.getValue()}>{info.getValue()}</span>
     ),
   }),
   columnHelper.accessor('jobTitle', {
     header: 'Job Title',
+    size: 240,
     cell: (info) => (
-      <span className="max-w-[280px] truncate block text-zinc-300" title={info.getValue()}>{info.getValue()}</span>
+      <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300" title={info.getValue()}>{info.getValue()}</span>
     ),
   }),
   columnHelper.accessor('location', {
     header: 'Location',
+    size: 160,
     cell: (info) => {
       const { place } = parseLocation(info.getValue())
       return place ? (
-        <span className="max-w-[180px] truncate block text-zinc-300" title={place}>{place}</span>
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300" title={place}>{place}</span>
       ) : (
         <span className="text-zinc-500">—</span>
       )
@@ -85,10 +112,11 @@ const staticColumns = [
   columnHelper.accessor('location', {
     id: 'locationType',
     header: 'Type',
+    size: 90,
     cell: (info) => {
       const { type } = parseLocation(info.getValue())
       return type ? (
-        <span className="text-zinc-300">{type}</span>
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{type}</span>
       ) : (
         <span className="text-zinc-500">—</span>
       )
@@ -101,19 +129,22 @@ const staticColumns = [
   }),
   columnHelper.accessor('fitScore', {
     header: 'Score',
+    size: 70,
     cell: (info) => <ScoreBadge score={info.getValue()} />,
   }),
   columnHelper.accessor('recommendation', {
     header: 'Recommendation',
+    size: 130,
     cell: (info) => <ActionChip recommendation={info.getValue()} />,
   }),
   columnHelper.accessor('dateAnalyzed', {
     id: 'date_analyzed',
     header: 'Date Analyzed',
+    size: 120,
     cell: (info) => {
       const v = info.getValue()
       return v ? (
-        <span className="text-zinc-300">{v.slice(0, 10)}</span>
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{v.slice(0, 10)}</span>
       ) : (
         <span className="text-zinc-500">—</span>
       )
@@ -122,10 +153,11 @@ const staticColumns = [
   columnHelper.accessor('roleFit', {
     id: 'notes',
     header: 'Notes',
+    size: 180,
     cell: (info) => {
       const v = info.getValue()
       return v ? (
-        <span className="max-w-[200px] truncate block text-zinc-300">{v}</span>
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{v}</span>
       ) : (
         <span className="text-zinc-500">—</span>
       )
@@ -133,10 +165,11 @@ const staticColumns = [
   }),
   columnHelper.accessor('source', {
     header: 'Source',
+    size: 100,
     cell: (info) => {
       const v = info.getValue()
       return v ? (
-        <span className="text-zinc-300">{v}</span>
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{v}</span>
       ) : (
         <span className="text-zinc-500">—</span>
       )
@@ -144,10 +177,11 @@ const staticColumns = [
   }),
   columnHelper.accessor('relevanceScore', {
     header: 'Relevance',
+    size: 90,
     cell: (info) => {
       const v = info.getValue()
       return v != null
-        ? <span className="text-zinc-300">{v.toFixed(2)}</span>
+        ? <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{v.toFixed(2)}</span>
         : <span className="text-zinc-500">—</span>
     },
     sortingFn: (rowA, rowB) => {
@@ -160,10 +194,11 @@ const staticColumns = [
   columnHelper.accessor('dateScraped', {
     id: 'date_scraped',
     header: 'Date Scraped',
+    size: 120,
     cell: (info) => {
       const v = info.getValue()
       return v ? (
-        <span className="text-zinc-300">{v.slice(0, 10)}</span>
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{v.slice(0, 10)}</span>
       ) : (
         <span className="text-zinc-500">—</span>
       )
@@ -172,10 +207,11 @@ const staticColumns = [
   columnHelper.accessor('dateApplied', {
     id: 'date_applied',
     header: 'Date Applied',
+    size: 120,
     cell: (info) => {
       const v = info.getValue()
       return v ? (
-        <span className="text-zinc-300">{v.slice(0, 10)}</span>
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{v.slice(0, 10)}</span>
       ) : (
         <span className="text-zinc-500">—</span>
       )
@@ -186,21 +222,23 @@ const staticColumns = [
     {
       id: 'status',
       header: 'Status',
+      size: 120,
       cell: ({ getValue }) => {
         const value = getValue()
         if (value === NO_STATUS) return <span className="text-zinc-500">—</span>
         const label = STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value
-        return <span className="text-zinc-300">{label}</span>
+        return <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{label}</span>
       },
     }
   ),
   columnHelper.accessor('dateArchived', {
     id: 'date_archived',
     header: 'Date Archived',
+    size: 120,
     cell: (info) => {
       const v = info.getValue()
       return v ? (
-        <span className="text-zinc-300">{v.slice(0, 10)}</span>
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{v.slice(0, 10)}</span>
       ) : (
         <span className="text-zinc-500">—</span>
       )
@@ -224,9 +262,10 @@ interface PipelineTableProps {
   isBulkArchiving?: boolean
   fixedColumns?: string[]
   initialSort?: SortingState
+  sizingStorageKey: string
 }
 
-export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, isBulkArchiving = false, fixedColumns, initialSort }: PipelineTableProps) {
+export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, isBulkArchiving = false, fixedColumns, initialSort, sizingStorageKey }: PipelineTableProps) {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
     if (fixedColumns) {
       const state: VisibilityState = {}
@@ -240,6 +279,7 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
   })
   const [sorting, setSorting] = useState<SortingState>(initialSort ?? [{ id: 'fitScore', desc: true }])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing(sizingStorageKey))
   const lastSelectedIndexRef = useRef<number | null>(null)
 
   function handleVisibilityChange(updater: Updater<VisibilityState>) {
@@ -258,6 +298,8 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
 
   const selectionColumn = columnHelper.display({
     id: 'select',
+    size: 36,
+    minSize: 36,
     header: ({ table }) => (
       <div onClick={(e) => e.stopPropagation()}>
         <input
@@ -325,10 +367,13 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    defaultColumn: { minSize: 40 },
     enableMultiSort: false,
     enableRowSelection: true,
+    enableColumnResizing: true,
+    columnResizeMode: 'onChange',
     initialState: { pagination: { pageSize: PAGE_SIZE, pageIndex: 0 } },
-    state: { columnVisibility, sorting, rowSelection },
+    state: { columnVisibility, sorting, rowSelection, columnSizing },
     onColumnVisibilityChange: handleVisibilityChange,
     onSortingChange: (updater) => {
       table.setPageIndex(0)
@@ -336,6 +381,13 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
       lastSelectedIndexRef.current = null
     },
     onRowSelectionChange: setRowSelection,
+    onColumnSizingChange: (updater) => {
+      setColumnSizing((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        saveSizing(sizingStorageKey, next)
+        return next
+      })
+    },
   })
 
   const { pageIndex, pageSize } = table.getState().pagination
@@ -364,7 +416,7 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
         {!fixedColumns && <ColumnVisibilityToggle table={table} />}
       </div>
       <div className="overflow-auto flex-1">
-        <table className="w-full caption-bottom text-sm">
+        <table className="caption-bottom text-sm" style={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <TableHeader className="sticky top-0 backdrop-blur-sm bg-zinc-900/80 border-b border-zinc-800">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="border-0 hover:bg-transparent">
@@ -373,11 +425,24 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
                   return (
                     <TableHead
                       key={header.id}
-                      className="px-3 h-9 text-xs font-medium uppercase text-zinc-400 cursor-pointer select-none"
+                      className="px-3 h-9 text-xs font-medium uppercase text-zinc-400 cursor-pointer select-none relative overflow-hidden"
+                      style={{ width: header.getSize() }}
                       onClick={header.column.getToggleSortingHandler()}
                     >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                      <span className="whitespace-nowrap overflow-hidden text-ellipsis block">
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                      </span>
+                      <div
+                        onMouseDown={(e) => { e.stopPropagation(); header.getResizeHandler()(e) }}
+                        onTouchStart={header.getResizeHandler()}
+                        onClick={(e) => e.stopPropagation()}
+                        className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none ${
+                          header.column.getIsResizing()
+                            ? 'bg-zinc-400 opacity-100'
+                            : 'bg-zinc-700 opacity-0 hover:opacity-100'
+                        }`}
+                      />
                     </TableHead>
                   )
                 })}
@@ -396,7 +461,11 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
                 }`}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="py-1.5 px-3 text-sm text-zinc-200">
+                  <TableCell
+                    key={cell.id}
+                    className="py-1.5 px-3 text-sm text-zinc-200 overflow-hidden"
+                    style={{ width: cell.column.getSize() }}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}

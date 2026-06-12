@@ -6,7 +6,7 @@ import {
   getPaginationRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type { SortingState } from '@tanstack/react-table'
+import type { SortingState, ColumnSizingState } from '@tanstack/react-table'
 import { useState, useMemo, useRef } from 'react'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
@@ -20,6 +20,31 @@ import { useMessageMutation } from '../../hooks/useMessageMutation'
 
 const NONE_SENTINEL = '__none__'
 const PAGE_SIZE = 20
+const SIZING_KEY = 'hitlobster-column-sizing-messages'
+
+function loadSizing(): ColumnSizingState {
+  try {
+    const stored = localStorage.getItem(SIZING_KEY)
+    if (!stored) return {}
+    const parsed: unknown = JSON.parse(stored)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
+    const result: ColumnSizingState = {}
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof v === 'number' && isFinite(v)) result[k] = v
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
+
+function saveSizing(state: ColumnSizingState) {
+  try {
+    localStorage.setItem(SIZING_KEY, JSON.stringify(state))
+  } catch {
+    // ignore storage errors
+  }
+}
 
 function formatDateScraped(dateStr: string | null, includeYear: boolean): string {
   if (!dateStr) return '—'
@@ -148,6 +173,7 @@ interface MessagesTableProps {
 
 export function MessagesTable({ messages, jobs }: MessagesTableProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'receivedAt', desc: true }])
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing())
   const { mutate } = useMessageMutation()
 
   const distinctCompanies = useMemo(
@@ -172,24 +198,28 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
   const columns = useMemo(() => [
     columnHelper.accessor('receivedAt', {
       header: 'Received',
+      size: 160,
       cell: (info) => (
-        <span className="text-zinc-300 whitespace-nowrap">{formatReceived(info.getValue())}</span>
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{formatReceived(info.getValue())}</span>
       ),
     }),
     columnHelper.accessor('fromAddress', {
       header: 'From',
+      size: 200,
       cell: (info) => (
-        <span className="max-w-[220px] truncate block text-zinc-300">{info.getValue()}</span>
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{info.getValue()}</span>
       ),
     }),
     columnHelper.accessor('subject', {
       header: 'Subject',
+      size: 260,
       cell: (info) => (
-        <span className="max-w-[280px] truncate block text-zinc-300">{info.getValue()}</span>
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{info.getValue()}</span>
       ),
     }),
     columnHelper.accessor('type', {
       header: 'Type',
+      size: 140,
       cell: (info) => {
         const row = info.row.original
         const value = row.type ?? NONE_SENTINEL
@@ -219,6 +249,7 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
     }),
     columnHelper.accessor('company', {
       header: 'Company',
+      size: 160,
       cell: (info) => {
         const row = info.row.original
         return (
@@ -236,6 +267,7 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
     }),
     columnHelper.accessor('jobTitle', {
       header: 'Job Title',
+      size: 200,
       cell: (info) => {
         const row = info.row.original
         const hasCompany = Boolean(row.company)
@@ -301,12 +333,22 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    defaultColumn: { minSize: 40 },
     enableMultiSort: false,
+    enableColumnResizing: true,
+    columnResizeMode: 'onChange',
     initialState: { pagination: { pageSize: PAGE_SIZE, pageIndex: 0 } },
-    state: { sorting },
+    state: { sorting, columnSizing },
     onSortingChange: (updater) => {
       table.setPageIndex(0)
       setSorting(updater)
+    },
+    onColumnSizingChange: (updater) => {
+      setColumnSizing((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        saveSizing(next)
+        return next
+      })
     },
   })
 
@@ -318,7 +360,7 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col">
       <div className="overflow-auto">
-        <table className="w-full caption-bottom text-sm">
+        <table className="caption-bottom text-sm" style={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <TableHeader className="border-b border-zinc-800">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="border-0 hover:bg-transparent">
@@ -327,11 +369,24 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
                   return (
                     <TableHead
                       key={header.id}
-                      className="px-3 h-9 text-xs font-medium uppercase text-zinc-400 cursor-pointer select-none"
+                      className="px-3 h-9 text-xs font-medium uppercase text-zinc-400 cursor-pointer select-none relative overflow-hidden"
+                      style={{ width: header.getSize() }}
                       onClick={header.column.getToggleSortingHandler()}
                     >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                      <span className="whitespace-nowrap overflow-hidden text-ellipsis block">
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                      </span>
+                      <div
+                        onMouseDown={(e) => { e.stopPropagation(); header.getResizeHandler()(e) }}
+                        onTouchStart={header.getResizeHandler()}
+                        onClick={(e) => e.stopPropagation()}
+                        className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none ${
+                          header.column.getIsResizing()
+                            ? 'bg-zinc-400 opacity-100'
+                            : 'bg-zinc-700 opacity-0 hover:opacity-100'
+                        }`}
+                      />
                     </TableHead>
                   )
                 })}
@@ -342,7 +397,11 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
             {table.getRowModel().rows.map((row) => (
               <TableRow key={row.id} className="border-zinc-800 hover:bg-zinc-800/50">
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="py-1.5 px-3 text-sm text-zinc-200">
+                  <TableCell
+                    key={cell.id}
+                    className="py-1.5 px-3 text-sm text-zinc-200 overflow-hidden"
+                    style={{ width: cell.column.getSize() }}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}

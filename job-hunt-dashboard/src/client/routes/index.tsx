@@ -252,6 +252,7 @@ export function PipelineRoute() {
             onBulkArchive={bulkArchiveMutation.mutate}
             isBulkArchiving={bulkArchiveMutation.isPending}
             fixedColumns={['company', 'jobTitle', 'location', 'locationType', 'source', 'relevanceScore', 'date_scraped']}
+            sizingStorageKey="hitlobster-column-sizing-jobs"
           />
         </div>
         <JobDrawer
