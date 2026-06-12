@@ -95,6 +95,12 @@ export function TourRoute() {
       </header>
 
       <section className="px-6 pt-20 pb-16 text-center">
+        <div className="flex flex-col items-center mb-8">
+          <img src="/hl-logo.png" alt="Hit Lobster" width="112" height="112" fetchPriority="high" className="w-28 h-28 object-contain mb-3" />
+          <p className="text-xs text-zinc-500 leading-relaxed text-center">
+            Human in the Loop Organized Business<br />Search, Track, &amp; Evaluation Resource
+          </p>
+        </div>
         <h1 className="text-4xl sm:text-5xl font-bold leading-tight mb-4 max-w-2xl mx-auto">
           Discover smarter. Apply faster. Track everything.
         </h1>
