@@ -17,6 +17,7 @@ const JOBS_NULLABLE_COLUMNS: Array<[string, string]> = [
   ['analysis_status', 'TEXT'],
   ['resume_generated_at', 'TEXT'],
   ['date_analyzed', 'TEXT'],
+  ['date_archived', 'TEXT'],
 ]
 
 // Columns added via ALTER TABLE after initial webhook_runs creation (migrations 0016–0018, 0025).

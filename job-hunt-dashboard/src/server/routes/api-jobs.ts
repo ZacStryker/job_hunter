@@ -254,7 +254,7 @@ app.post('/bulk-archive', async (c) => {
   const archived = db.transaction((tx) => {
     const matching = tx.select({ id: jobs.id }).from(jobs)
       .where(and(inArray(jobs.id, ids), eq(jobs.userId, userId))).all()
-    tx.update(jobs).set({ archived: true })
+    tx.update(jobs).set({ archived: true, dateArchived: new Date().toISOString() })
       .where(and(inArray(jobs.id, ids), eq(jobs.userId, userId))).run()
     return matching.length
   })
@@ -305,7 +305,14 @@ app.patch('/:id', async (c) => {
     }
   }
   if (patch.statusOverride !== undefined) updateFields.statusOverride = patch.statusOverride
-  if (patch.archived !== undefined) updateFields.archived = patch.archived
+  if (patch.archived !== undefined) {
+    updateFields.archived = patch.archived
+    if (patch.archived && !existing.archived) {
+      updateFields.dateArchived = new Date().toISOString()
+    } else if (!patch.archived) {
+      updateFields.dateArchived = null
+    }
+  }
   if (patch.jobDescription !== undefined) updateFields.jobDescription = patch.jobDescription
 
   db.update(jobs).set(updateFields).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
@@ -348,7 +355,7 @@ app.post('/:id/generate-cover-letter', async (c) => {
   const startMs = Date.now()
   let coverLetterResult: { content: string; pdf: Buffer; inputTokens: number; outputTokens: number }
   try {
-    coverLetterResult = await generateCoverLetter(job as Job, userId)
+    coverLetterResult = await generateCoverLetter(job as unknown as Job, userId)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (message === 'ANTHROPIC_API_KEY not configured') {
@@ -425,7 +432,7 @@ app.post('/:id/generate-resume', async (c) => {
   const resumeStartMs = Date.now()
   let resumeResult: { pdf: Buffer; inputTokens: number; outputTokens: number }
   try {
-    resumeResult = await generateResume(job as Job, userId)
+    resumeResult = await generateResume(job as unknown as Job, userId)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (message === 'ANTHROPIC_API_KEY not configured') {

@@ -194,6 +194,26 @@ const staticColumns = [
       },
     }
   ),
+  columnHelper.accessor('dateArchived', {
+    id: 'date_archived',
+    header: 'Date Archived',
+    cell: (info) => {
+      const v = info.getValue()
+      return v ? (
+        <span className="text-zinc-300">{v.slice(0, 10)}</span>
+      ) : (
+        <span className="text-zinc-500">—</span>
+      )
+    },
+    sortingFn: (rowA, rowB) => {
+      const a = rowA.original.dateArchived
+      const b = rowB.original.dateArchived
+      if (!a && !b) return 0
+      if (!a) return 1   // nulls sink to bottom regardless of sort direction
+      if (!b) return -1
+      return a < b ? -1 : a > b ? 1 : 0
+    },
+  }),
 ]
 
 interface PipelineTableProps {
@@ -203,9 +223,10 @@ interface PipelineTableProps {
   onBulkArchive?: (ids: number[]) => void
   isBulkArchiving?: boolean
   fixedColumns?: string[]
+  initialSort?: SortingState
 }
 
-export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, isBulkArchiving = false, fixedColumns }: PipelineTableProps) {
+export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, isBulkArchiving = false, fixedColumns, initialSort }: PipelineTableProps) {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
     if (fixedColumns) {
       const state: VisibilityState = {}
@@ -217,7 +238,7 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
     }
     return loadVisibility()
   })
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'fitScore', desc: true }])
+  const [sorting, setSorting] = useState<SortingState>(initialSort ?? [{ id: 'fitScore', desc: true }])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const lastSelectedIndexRef = useRef<number | null>(null)
 

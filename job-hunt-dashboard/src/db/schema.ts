@@ -33,6 +33,7 @@ export const jobs = sqliteTable('jobs', {
   statusOverride: text('status_override'),
   coverLetterSentAt: text('cover_letter_sent_at'),
   dateApplied: text('date_applied'),
+  dateArchived: text('date_archived'),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
   userId: integer('user_id').notNull().references(() => users.id),
   resumeGeneratedAt: text('resume_generated_at'),

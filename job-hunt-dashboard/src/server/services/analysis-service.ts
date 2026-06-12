@@ -211,7 +211,7 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
           contactPhone: result.contact_phone ?? null,
           analysisStatus: 'done',
           dateAnalyzed: new Date().toLocaleDateString('en-CA'),
-          ...(result.recommended_action === 'skip' ? { archived: true } : {}),
+          ...(result.recommended_action === 'skip' ? { archived: true, dateArchived: new Date().toISOString() } : {}),
         })
         .where(and(eq(jobs.id, job.id), userId !== undefined ? eq(jobs.userId, userId) : sql`1=1`))
         .run()
