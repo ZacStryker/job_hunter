@@ -95,8 +95,8 @@ export function TourRoute() {
       </header>
 
       <section className="px-6 pt-20 pb-16 text-center">
-        <div className="flex flex-col items-center mb-8">
-          <img src="/hl-logo.png" alt="Hit Lobster" width="112" height="112" fetchPriority="high" className="w-28 h-28 object-contain mb-3" />
+        <div className="inline-flex flex-col items-center mb-8 rounded-2xl px-10 py-8" style={{ backgroundColor: '#18181B' }}>
+          <img src="/hl-logo.png" alt="Hit Lobster" width="400" height="400" fetchPriority="high" className="w-[400px] h-[400px] object-contain" />
           <p className="text-xs text-zinc-500 leading-relaxed text-center">
             Human in the Loop Organized Business<br />Search, Track, &amp; Evaluation Resource
           </p>
