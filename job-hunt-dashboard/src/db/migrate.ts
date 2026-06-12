@@ -54,10 +54,25 @@ function repairWebhookRunsSchema(): void {
   }
 }
 
+function backfillDateArchived(): void {
+  const result = sqlite
+    .prepare(
+      `UPDATE jobs
+       SET date_archived = COALESCE(date_applied, date_analyzed, date_scraped)
+       WHERE archived = 1 AND date_archived IS NULL
+         AND COALESCE(date_applied, date_analyzed, date_scraped) IS NOT NULL`
+    )
+    .run()
+  if (result.changes > 0) {
+    console.log(`[db] Backfill: set date_archived on ${result.changes} archived job(s)`)
+  }
+}
+
 export function runMigrations(): void {
   migrate(db, { migrationsFolder: join(import.meta.dir, 'migrations') })
   repairSchema()
   repairWebhookRunsSchema()
+  backfillDateArchived()
   console.log('[db] Migrations complete')
 }
 
