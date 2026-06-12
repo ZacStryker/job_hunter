@@ -141,7 +141,7 @@ function FeatureSection2() {
       <div className="flex-1 space-y-4">
         <h2 className="text-3xl font-bold text-zinc-100">Find the right jobs before the AI even runs</h2>
         <p className="text-zinc-400 leading-relaxed">
-          Configure job title and location search pairs once. HITLOBSTER scrapes matching listings across LinkedIn, Indeed, and ARC — then scores each one for semantic similarity to your resume profile before the full AI pipeline runs. Only the most relevant results make it through, so you spend your attention budget on real opportunities.
+          Configure job title and location search pairs once. HITLOBSTER scrapes matching listings from LinkedIn — then scores each one for semantic similarity to your resume profile before the full AI pipeline runs. Only the most relevant results make it through, so you spend your attention budget on real opportunities. More job boards are on the way.
         </p>
       </div>
       <FadeInView className="flex-1">
@@ -158,7 +158,7 @@ function FeatureSection2() {
             <span className="text-zinc-500">Remote, US</span>
           </div>
           <div className="px-4 py-3 border-b border-zinc-800 text-xs text-zinc-500 uppercase tracking-wide mt-2">
-            Latest Results
+            Title Relevance
           </div>
           {[
             { company: 'Stripe', role: 'Senior SWE', rel: 94 },
@@ -248,7 +248,7 @@ function FeatureSection4() {
       <div className="flex-1 space-y-4">
         <h2 className="text-3xl font-bold text-zinc-100">One click. Two documents. Zero boilerplate.</h2>
         <p className="text-zinc-400 leading-relaxed">
-          From the Job Drawer, click once to generate a tailored resume and cover letter — each rewritten to match the specific job description. Both documents are stored against the job record so you can preview and download at any time. The resume uses a dynamic 1/2-page layout that expands or trims to the most relevant experience automatically.
+          From the Job Drawer, click once to generate a tailored resume and cover letter — each rewritten to match the specific job description. Your profile is the source of truth: all documents are generated from it on demand and stored against the job record so you can preview and download at any time. The resume uses a dynamic layout that expands or trims to the most relevant experience automatically.
         </p>
       </div>
       <FadeInView className="flex-1">
@@ -289,7 +289,7 @@ function FeatureSection5() {
       <div className="flex-1 space-y-4">
         <h2 className="text-3xl font-bold text-zinc-100">Every application, accounted for</h2>
         <p className="text-zinc-400 leading-relaxed">
-          Mark a job as applied directly from the Job Drawer to move it into the Applications view. Connect your IMAP inbox, move relevant emails into dedicated subfolders, and manually map messages to jobs to keep a complete status history. As you update statuses — Applied, Screening, Interview, Offer — each change is recorded in the drawer's status history.
+          Mark a job as applied directly from the Job Drawer to move it into the Applications view. As you update statuses — Applied, Screening, Interview, Offer — each change is recorded in the drawer's status history. Gmail integration is on the roadmap, with plans to surface and map recruiter emails directly to jobs.
         </p>
       </div>
       <FadeInView className="flex-1">
@@ -633,7 +633,7 @@ function FaqSection() {
               How is my data secured?
             </AccordionTrigger>
             <AccordionContent className="text-zinc-400 text-sm pb-4 leading-relaxed">
-              HITLOBSTER runs entirely on your own server. Your job data, resume profile, and API keys live in a SQLite database on your machine — nothing is sent to HITLOBSTER's servers because there are no HITLOBSTER servers. In production, API keys are encrypted at rest using AES-256-GCM before being written to the database. HTTPS is handled by Nginx with Let's Encrypt certificates.
+              Your job data, resume profile, and API keys are stored in a database on HITLOBSTER's servers — your data is never shared or sold. API keys are encrypted at rest using AES-256-GCM before being written to the database. All traffic is served over HTTPS with Let's Encrypt certificates.
             </AccordionContent>
           </AccordionItem>
           <AccordionItem value="api-key" className="border border-zinc-800 rounded-lg px-4">
@@ -641,7 +641,7 @@ function FaqSection() {
               Do I need my own Claude API key?
             </AccordionTrigger>
             <AccordionContent className="text-zinc-400 text-sm pb-4 leading-relaxed">
-              Yes. HITLOBSTER uses your Anthropic API key to run the AI analysis pipeline — Fit Score, role fit summary, requirements breakdown, and cover letter generation all call the Claude API on your behalf. Your key is stored encrypted on your server and is never transmitted anywhere except directly to Anthropic. The cost of a typical job search run is a few cents per job analysed.
+              Yes. HITLOBSTER uses your Anthropic API key to run the AI analysis pipeline — Fit Score, role fit summary, requirements breakdown, resume tailoring, and cover letter generation all call the Claude API on your behalf. Your key is stored encrypted on HITLOBSTER's servers and is never transmitted anywhere except directly to Anthropic. The cost of a typical job search run is a few cents per job analysed.
             </AccordionContent>
           </AccordionItem>
           <AccordionItem value="job-boards" className="border border-zinc-800 rounded-lg px-4">
@@ -649,7 +649,7 @@ function FaqSection() {
               What job boards does it search?
             </AccordionTrigger>
             <AccordionContent className="text-zinc-400 text-sm pb-4 leading-relaxed">
-              HITLOBSTER currently supports LinkedIn, Indeed, and ARC (Work at a Startup). You configure search pairs — a job title and a location — and the discovery pipeline scrapes matching listings from each source on demand. Results are scored for semantic relevance to your resume profile before the full AI analysis runs.
+              HITLOBSTER currently searches LinkedIn. You configure search pairs — a job title and a location — and the discovery pipeline scrapes matching listings on demand. Results are scored for semantic relevance to your resume profile before the full AI analysis runs. More job boards are planned.
             </AccordionContent>
           </AccordionItem>
           <AccordionItem value="email-sync" className="border border-zinc-800 rounded-lg px-4">
@@ -657,7 +657,7 @@ function FaqSection() {
               How does email sync work?
             </AccordionTrigger>
             <AccordionContent className="text-zinc-400 text-sm pb-4 leading-relaxed">
-              Connect your IMAP inbox (Gmail, Outlook, or any IMAP-compatible provider) in the Config → Connections settings. HITLOBSTER does not scan your entire inbox — instead, you move relevant emails (recruiter outreach, application confirmations, interview invites) into a designated subfolder, then manually map them to jobs inside the app. Status transitions are logged in the job's status history.
+              Gmail integration is on the roadmap. Once available, you'll be able to connect your Gmail account to surface recruiter outreach, application confirmations, and interview invites — and map them directly to jobs in the app. For now, you can manually update statuses and add notes from the Job Drawer, with each change recorded in the status history.
             </AccordionContent>
           </AccordionItem>
         </Accordion>
