@@ -459,7 +459,7 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-6">
       {/* Personal section */}
-      <div className="border border-zinc-800 rounded-lg p-4">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm font-medium text-zinc-200">Personal</span>
           {personalEditing ? (
@@ -592,7 +592,7 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
       </div>
 
       {/* Summary section */}
-      <div className="border border-zinc-800 rounded-lg p-4">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm font-medium text-zinc-200">Summary</span>
           {summaryEditing ? (
@@ -620,7 +620,7 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
       </div>
 
       {/* Skills section */}
-      <div className="border border-zinc-800 rounded-lg p-4">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm font-medium text-zinc-200">Skills</span>
           {skillsEditing ? (
@@ -654,7 +654,7 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
         const count = liveExp[key as keyof typeof liveExp].length
 
         return (
-          <div key={key} className="border border-zinc-800 rounded-lg">
+          <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-lg">
             <div className="flex items-center justify-between px-4 py-3">
               <button
                 type="button"
