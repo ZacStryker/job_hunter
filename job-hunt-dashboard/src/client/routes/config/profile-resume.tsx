@@ -32,7 +32,7 @@ const EXPERIENCE_SECTIONS = [
   { key: 'education', label: 'Education', addLabel: 'Add Education' },
   { key: 'projects', label: 'Projects', addLabel: 'Add Project' },
   { key: 'certifications', label: 'Certifications', addLabel: 'Add Certification' },
-  { key: 'licences', label: 'Licences', addLabel: 'Add Licence' },
+  { key: 'licences', label: 'Licenses', addLabel: 'Add License' },
   { key: 'awards', label: 'Awards', addLabel: 'Add Award' },
 ] as const
 
@@ -79,18 +79,23 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
   const [jobEditingIdx, setJobEditingIdx] = useState<number | null>(null)
 
   const [showAddEdu, setShowAddEdu] = useState(false)
+  const [expandedEduIdx, setExpandedEduIdx] = useState<number | null>(null)
   const [editingEduIdx, setEditingEduIdx] = useState<number | null>(null)
 
   const [showAddProject, setShowAddProject] = useState(false)
+  const [expandedProjectIdx, setExpandedProjectIdx] = useState<number | null>(null)
   const [editingProjectIdx, setEditingProjectIdx] = useState<number | null>(null)
 
   const [showAddCert, setShowAddCert] = useState(false)
+  const [expandedCertIdx, setExpandedCertIdx] = useState<number | null>(null)
   const [editingCertIdx, setEditingCertIdx] = useState<number | null>(null)
 
   const [showAddLicence, setShowAddLicence] = useState(false)
+  const [expandedLicenceIdx, setExpandedLicenceIdx] = useState<number | null>(null)
   const [editingLicenceIdx, setEditingLicenceIdx] = useState<number | null>(null)
 
   const [showAddAward, setShowAddAward] = useState(false)
+  const [expandedAwardIdx, setExpandedAwardIdx] = useState<number | null>(null)
   const [editingAwardIdx, setEditingAwardIdx] = useState<number | null>(null)
 
   const { data: liveProfile } = useProfileQuery()
@@ -261,7 +266,10 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
 
   function handleDeleteEducation(idx: number) {
     const exp = getExperience()
-    if (editingEduIdx !== null && editingEduIdx >= idx) setEditingEduIdx(null)
+    if (expandedEduIdx === idx) setExpandedEduIdx(null)
+    else if (expandedEduIdx !== null && expandedEduIdx > idx) setExpandedEduIdx(expandedEduIdx - 1)
+    if (editingEduIdx === idx) setEditingEduIdx(null)
+    else if (editingEduIdx !== null && editingEduIdx > idx) setEditingEduIdx(editingEduIdx - 1)
     const updated = { ...exp, education: exp.education.filter((_, i) => i !== idx) }
     mutation.mutate(
       { personal: buildPersonal(), experience: updated },
@@ -298,7 +306,10 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
 
   function handleDeleteProject(idx: number) {
     const exp = getExperience()
-    if (editingProjectIdx !== null && editingProjectIdx >= idx) setEditingProjectIdx(null)
+    if (expandedProjectIdx === idx) setExpandedProjectIdx(null)
+    else if (expandedProjectIdx !== null && expandedProjectIdx > idx) setExpandedProjectIdx(expandedProjectIdx - 1)
+    if (editingProjectIdx === idx) setEditingProjectIdx(null)
+    else if (editingProjectIdx !== null && editingProjectIdx > idx) setEditingProjectIdx(editingProjectIdx - 1)
     const updated = { ...exp, projects: exp.projects.filter((_, i) => i !== idx) }
     mutation.mutate(
       { personal: buildPersonal(), experience: updated },
@@ -335,7 +346,10 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
 
   function handleDeleteCert(idx: number) {
     const exp = getExperience()
-    if (editingCertIdx !== null && editingCertIdx >= idx) setEditingCertIdx(null)
+    if (expandedCertIdx === idx) setExpandedCertIdx(null)
+    else if (expandedCertIdx !== null && expandedCertIdx > idx) setExpandedCertIdx(expandedCertIdx - 1)
+    if (editingCertIdx === idx) setEditingCertIdx(null)
+    else if (editingCertIdx !== null && editingCertIdx > idx) setEditingCertIdx(editingCertIdx - 1)
     const updated = { ...exp, certifications: exp.certifications.filter((_, i) => i !== idx) }
     mutation.mutate(
       { personal: buildPersonal(), experience: updated },
@@ -352,7 +366,7 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
     mutation.mutate(
       { personal: buildPersonal(), experience: updated },
       {
-        onSuccess: () => { toast.success('Licence added'); setShowAddLicence(false) },
+        onSuccess: () => { toast.success('License added'); setShowAddLicence(false) },
         onError: (err) => toast.error(err.message),
       }
     )
@@ -364,7 +378,7 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
     mutation.mutate(
       { personal: buildPersonal(), experience: updated },
       {
-        onSuccess: () => { toast.success('Licence updated'); setEditingLicenceIdx(null) },
+        onSuccess: () => { toast.success('License updated'); setEditingLicenceIdx(null) },
         onError: (err) => toast.error(err.message),
       }
     )
@@ -372,12 +386,15 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
 
   function handleDeleteLicence(idx: number) {
     const exp = getExperience()
-    if (editingLicenceIdx !== null && editingLicenceIdx >= idx) setEditingLicenceIdx(null)
+    if (expandedLicenceIdx === idx) setExpandedLicenceIdx(null)
+    else if (expandedLicenceIdx !== null && expandedLicenceIdx > idx) setExpandedLicenceIdx(expandedLicenceIdx - 1)
+    if (editingLicenceIdx === idx) setEditingLicenceIdx(null)
+    else if (editingLicenceIdx !== null && editingLicenceIdx > idx) setEditingLicenceIdx(editingLicenceIdx - 1)
     const updated = { ...exp, licences: exp.licences.filter((_, i) => i !== idx) }
     mutation.mutate(
       { personal: buildPersonal(), experience: updated },
       {
-        onSuccess: () => toast.success('Licence removed'),
+        onSuccess: () => toast.success('License removed'),
         onError: (err) => toast.error(err.message),
       }
     )
@@ -409,7 +426,10 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
 
   function handleDeleteAward(idx: number) {
     const exp = getExperience()
-    if (editingAwardIdx !== null && editingAwardIdx >= idx) setEditingAwardIdx(null)
+    if (expandedAwardIdx === idx) setExpandedAwardIdx(null)
+    else if (expandedAwardIdx !== null && expandedAwardIdx > idx) setExpandedAwardIdx(expandedAwardIdx - 1)
+    if (editingAwardIdx === idx) setEditingAwardIdx(null)
+    else if (editingAwardIdx !== null && editingAwardIdx > idx) setEditingAwardIdx(editingAwardIdx - 1)
     const updated = { ...exp, awards: exp.awards.filter((_, i) => i !== idx) }
     mutation.mutate(
       { personal: buildPersonal(), experience: updated },
@@ -681,7 +701,7 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
                   <Button size="sm" variant="outline" onClick={() => setShowAddLicence(true)} disabled={mutation.isPending}>
                     {addLabel}
                   </Button>
-                  <AddCertSheet open={showAddLicence} onClose={() => setShowAddLicence(false)} onSave={handleAddLicence} sectionTitle="Add Licence" />
+                  <AddCertSheet open={showAddLicence} onClose={() => setShowAddLicence(false)} onSave={handleAddLicence} sectionTitle="Add License" />
                 </>
               ) : (
                 <>
@@ -692,128 +712,180 @@ function ProfileResumeForm({ profileData }: { profileData: ProfileData }) {
                 </>
               )}
             </div>
-            {isOpen && (
-              <div className="px-4 pb-4 border-t border-zinc-800">
-                {key === 'jobs' ? (
-                  <>
-                    {liveExp.jobs.length === 0 && (
-                      <p className="text-sm text-zinc-400 my-3">No entries yet.</p>
-                    )}
-                    {sortedJobs.length > 0 && (
-                      <div className="grid grid-cols-[2fr_2fr_auto] gap-4 pt-3 pb-1 mb-1 border-b border-zinc-700">
-                        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Title</span>
-                        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Company</span>
-                        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Dates</span>
-                      </div>
-                    )}
-                    {sortedJobs.map(({ job, originalIdx }) => (
-                      <JobEntryRow
-                        key={`job-${originalIdx}-${jobEditingIdx === originalIdx ? 'editing' : 'view'}`}
-                        job={job}
-                        isExpanded={expandedJobIdx === originalIdx}
-                        isEditing={jobEditingIdx === originalIdx}
-                        onToggleExpand={() => {
-                          if (expandedJobIdx === originalIdx) {
-                            if (jobEditingIdx === originalIdx) return
-                            setExpandedJobIdx(null)
-                          } else {
-                            setExpandedJobIdx(originalIdx)
-                            setJobEditingIdx(null)
-                          }
-                        }}
-                        onStartEdit={() => setJobEditingIdx(originalIdx)}
-                        onSave={(updated) => handleSaveJobEntry(originalIdx, updated)}
-                        onCancel={() => setJobEditingIdx(null)}
-                        onDelete={() => handleDeleteJob(originalIdx)}
-                        disabled={mutation.isPending}
-                      />
-                    ))}
-                  </>
-                ) : key === 'education' ? (
-                  <>
-                    {liveExp.education.length === 0 && (
-                      <p className="text-sm text-zinc-400 my-3">No entries yet.</p>
-                    )}
-                    {liveExp.education.map((edu, idx) => (
-                      <EduEntryRow
-                        key={editingEduIdx === idx ? `edit-${idx}` : `view-${idx}`}
-                        edu={edu}
-                        isEditing={editingEduIdx === idx}
-                        onToggleEdit={() => setEditingEduIdx(editingEduIdx === idx ? null : idx)}
-                        onSave={(updated) => handleSaveEduEntry(idx, updated)}
-                        onCancel={() => setEditingEduIdx(null)}
-                        onDelete={() => handleDeleteEducation(idx)}
-                        disabled={mutation.isPending}
-                      />
-                    ))}
-                  </>
-                ) : key === 'projects' ? (
-                  <>
-                    {liveExp.projects.length === 0 && <p className="text-sm text-zinc-400 my-3">No entries yet.</p>}
-                    {liveExp.projects.map((project, idx) => (
-                      <ProjectEntryRow
-                        key={editingProjectIdx === idx ? `edit-${idx}` : `view-${idx}`}
-                        project={project}
-                        isEditing={editingProjectIdx === idx}
-                        onToggleEdit={() => setEditingProjectIdx(editingProjectIdx === idx ? null : idx)}
-                        onSave={(updated) => handleSaveProjectEntry(idx, updated)}
-                        onCancel={() => setEditingProjectIdx(null)}
-                        onDelete={() => handleDeleteProject(idx)}
-                        disabled={mutation.isPending}
-                      />
-                    ))}
-                  </>
-                ) : key === 'certifications' ? (
-                  <>
-                    {liveExp.certifications.length === 0 && <p className="text-sm text-zinc-400 my-3">No entries yet.</p>}
-                    {liveExp.certifications.map((cert, idx) => (
-                      <CertEntryRow
-                        key={editingCertIdx === idx ? `edit-${idx}` : `view-${idx}`}
-                        entry={cert}
-                        isEditing={editingCertIdx === idx}
-                        onToggleEdit={() => setEditingCertIdx(editingCertIdx === idx ? null : idx)}
-                        onSave={(updated) => handleSaveCertEntry(idx, updated)}
-                        onCancel={() => setEditingCertIdx(null)}
-                        onDelete={() => handleDeleteCert(idx)}
-                        disabled={mutation.isPending}
-                      />
-                    ))}
-                  </>
-                ) : key === 'licences' ? (
-                  <>
-                    {liveExp.licences.length === 0 && <p className="text-sm text-zinc-400 my-3">No entries yet.</p>}
-                    {liveExp.licences.map((licence, idx) => (
-                      <CertEntryRow
-                        key={editingLicenceIdx === idx ? `edit-${idx}` : `view-${idx}`}
-                        entry={licence}
-                        isEditing={editingLicenceIdx === idx}
-                        onToggleEdit={() => setEditingLicenceIdx(editingLicenceIdx === idx ? null : idx)}
-                        onSave={(updated) => handleSaveLicenceEntry(idx, updated)}
-                        onCancel={() => setEditingLicenceIdx(null)}
-                        onDelete={() => handleDeleteLicence(idx)}
-                        disabled={mutation.isPending}
-                      />
-                    ))}
-                  </>
-                ) : (
-                  <>
-                    {liveExp.awards.length === 0 && <p className="text-sm text-zinc-400 my-3">No entries yet.</p>}
-                    {liveExp.awards.map((award, idx) => (
-                      <CertEntryRow
-                        key={editingAwardIdx === idx ? `edit-${idx}` : `view-${idx}`}
-                        entry={award}
-                        isEditing={editingAwardIdx === idx}
-                        onToggleEdit={() => setEditingAwardIdx(editingAwardIdx === idx ? null : idx)}
-                        onSave={(updated) => handleSaveAwardEntry(idx, updated)}
-                        onCancel={() => setEditingAwardIdx(null)}
-                        onDelete={() => handleDeleteAward(idx)}
-                        disabled={mutation.isPending}
-                      />
-                    ))}
-                  </>
-                )}
+            <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+              <div className="overflow-hidden">
+                <div className="px-4 pb-4 border-t border-zinc-800">
+                  {key === 'jobs' ? (
+                    <>
+                      {liveExp.jobs.length === 0 && (
+                        <p className="text-sm text-zinc-400 my-3">No entries yet.</p>
+                      )}
+                      {sortedJobs.length > 0 && (
+                        <div className="grid grid-cols-[2fr_2fr_auto] gap-4 pt-3 pb-1 mb-1 border-b border-zinc-700">
+                          <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Title</span>
+                          <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Company</span>
+                          <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Dates</span>
+                        </div>
+                      )}
+                      {sortedJobs.map(({ job, originalIdx }) => (
+                        <JobEntryRow
+                          key={`job-${originalIdx}-${jobEditingIdx === originalIdx ? 'editing' : 'view'}`}
+                          job={job}
+                          isExpanded={expandedJobIdx === originalIdx}
+                          isEditing={jobEditingIdx === originalIdx}
+                          onToggleExpand={() => {
+                            if (expandedJobIdx === originalIdx) {
+                              if (jobEditingIdx === originalIdx) return
+                              setExpandedJobIdx(null)
+                            } else {
+                              setExpandedJobIdx(originalIdx)
+                              setJobEditingIdx(null)
+                            }
+                          }}
+                          onStartEdit={() => setJobEditingIdx(originalIdx)}
+                          onSave={(updated) => handleSaveJobEntry(originalIdx, updated)}
+                          onCancel={() => setJobEditingIdx(null)}
+                          onDelete={() => handleDeleteJob(originalIdx)}
+                          disabled={mutation.isPending}
+                        />
+                      ))}
+                    </>
+                  ) : key === 'education' ? (
+                    <>
+                      {liveExp.education.length === 0 && (
+                        <p className="text-sm text-zinc-400 my-3">No entries yet.</p>
+                      )}
+                      {liveExp.education.map((edu, idx) => (
+                        <EduEntryRow
+                          key={editingEduIdx === idx ? `edit-${idx}` : `view-${idx}`}
+                          edu={edu}
+                          isExpanded={expandedEduIdx === idx}
+                          isEditing={editingEduIdx === idx}
+                          onToggleExpand={() => {
+                            if (expandedEduIdx === idx) {
+                              if (editingEduIdx === idx) return
+                              setExpandedEduIdx(null)
+                            } else {
+                              setExpandedEduIdx(idx)
+                              setEditingEduIdx(null)
+                            }
+                          }}
+                          onStartEdit={() => setEditingEduIdx(idx)}
+                          onSave={(updated) => handleSaveEduEntry(idx, updated)}
+                          onCancel={() => setEditingEduIdx(null)}
+                          onDelete={() => handleDeleteEducation(idx)}
+                          disabled={mutation.isPending}
+                        />
+                      ))}
+                    </>
+                  ) : key === 'projects' ? (
+                    <>
+                      {liveExp.projects.length === 0 && <p className="text-sm text-zinc-400 my-3">No entries yet.</p>}
+                      {liveExp.projects.map((project, idx) => (
+                        <ProjectEntryRow
+                          key={editingProjectIdx === idx ? `edit-${idx}` : `view-${idx}`}
+                          project={project}
+                          isExpanded={expandedProjectIdx === idx}
+                          isEditing={editingProjectIdx === idx}
+                          onToggleExpand={() => {
+                            if (expandedProjectIdx === idx) {
+                              if (editingProjectIdx === idx) return
+                              setExpandedProjectIdx(null)
+                            } else {
+                              setExpandedProjectIdx(idx)
+                              setEditingProjectIdx(null)
+                            }
+                          }}
+                          onStartEdit={() => setEditingProjectIdx(idx)}
+                          onSave={(updated) => handleSaveProjectEntry(idx, updated)}
+                          onCancel={() => setEditingProjectIdx(null)}
+                          onDelete={() => handleDeleteProject(idx)}
+                          disabled={mutation.isPending}
+                        />
+                      ))}
+                    </>
+                  ) : key === 'certifications' ? (
+                    <>
+                      {liveExp.certifications.length === 0 && <p className="text-sm text-zinc-400 my-3">No entries yet.</p>}
+                      {liveExp.certifications.map((cert, idx) => (
+                        <CertEntryRow
+                          key={editingCertIdx === idx ? `edit-${idx}` : `view-${idx}`}
+                          entry={cert}
+                          isExpanded={expandedCertIdx === idx}
+                          isEditing={editingCertIdx === idx}
+                          onToggleExpand={() => {
+                            if (expandedCertIdx === idx) {
+                              if (editingCertIdx === idx) return
+                              setExpandedCertIdx(null)
+                            } else {
+                              setExpandedCertIdx(idx)
+                              setEditingCertIdx(null)
+                            }
+                          }}
+                          onStartEdit={() => setEditingCertIdx(idx)}
+                          onSave={(updated) => handleSaveCertEntry(idx, updated)}
+                          onCancel={() => setEditingCertIdx(null)}
+                          onDelete={() => handleDeleteCert(idx)}
+                          disabled={mutation.isPending}
+                        />
+                      ))}
+                    </>
+                  ) : key === 'licences' ? (
+                    <>
+                      {liveExp.licences.length === 0 && <p className="text-sm text-zinc-400 my-3">No entries yet.</p>}
+                      {liveExp.licences.map((licence, idx) => (
+                        <CertEntryRow
+                          key={editingLicenceIdx === idx ? `edit-${idx}` : `view-${idx}`}
+                          entry={licence}
+                          isExpanded={expandedLicenceIdx === idx}
+                          isEditing={editingLicenceIdx === idx}
+                          onToggleExpand={() => {
+                            if (expandedLicenceIdx === idx) {
+                              if (editingLicenceIdx === idx) return
+                              setExpandedLicenceIdx(null)
+                            } else {
+                              setExpandedLicenceIdx(idx)
+                              setEditingLicenceIdx(null)
+                            }
+                          }}
+                          onStartEdit={() => setEditingLicenceIdx(idx)}
+                          onSave={(updated) => handleSaveLicenceEntry(idx, updated)}
+                          onCancel={() => setEditingLicenceIdx(null)}
+                          onDelete={() => handleDeleteLicence(idx)}
+                          disabled={mutation.isPending}
+                        />
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      {liveExp.awards.length === 0 && <p className="text-sm text-zinc-400 my-3">No entries yet.</p>}
+                      {liveExp.awards.map((award, idx) => (
+                        <CertEntryRow
+                          key={editingAwardIdx === idx ? `edit-${idx}` : `view-${idx}`}
+                          entry={award}
+                          isExpanded={expandedAwardIdx === idx}
+                          isEditing={editingAwardIdx === idx}
+                          onToggleExpand={() => {
+                            if (expandedAwardIdx === idx) {
+                              if (editingAwardIdx === idx) return
+                              setExpandedAwardIdx(null)
+                            } else {
+                              setExpandedAwardIdx(idx)
+                              setEditingAwardIdx(null)
+                            }
+                          }}
+                          onStartEdit={() => setEditingAwardIdx(idx)}
+                          onSave={(updated) => handleSaveAwardEntry(idx, updated)}
+                          onCancel={() => setEditingAwardIdx(null)}
+                          onDelete={() => handleDeleteAward(idx)}
+                          disabled={mutation.isPending}
+                        />
+                      ))}
+                    </>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
           </div>
         )
       })}
@@ -1008,120 +1080,122 @@ function JobEntryRow({ job, isExpanded, isEditing, onToggleExpand, onStartEdit, 
         <span className="text-sm text-zinc-500 whitespace-nowrap">{dateRange}</span>
       </button>
 
-      {isExpanded && !isEditing && (
-        <div className="pb-3 pt-1 space-y-3">
-          <div className="flex items-center justify-end gap-2">
-            <Button size="sm" variant="outline" onClick={onStartEdit} disabled={disabled}>Edit</Button>
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={disabled}
-              className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">Title</label>
-              <Input value={job.title} readOnly className="bg-transparent border-zinc-800 cursor-default" />
-            </div>
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">Company</label>
-              <Input value={job.company} readOnly className="bg-transparent border-zinc-800 cursor-default" />
-            </div>
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">Start Date</label>
-              <Input value={startFormatted} readOnly className="bg-transparent border-zinc-800 cursor-default" />
-            </div>
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">End Date</label>
-              <Input value={endFormatted} readOnly className="bg-transparent border-zinc-800 cursor-default" />
-            </div>
-          </div>
-          {job.employmentType && (
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">Employment Type</label>
-              <Input value={job.employmentType} readOnly className="bg-transparent border-zinc-800 cursor-default" />
-            </div>
-          )}
-          {job.bullets.length > 0 && (
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">Bullets</label>
-              <ul className="space-y-1 mt-1">
-                {job.bullets.map((b, i) => (
-                  <li key={i} className="text-sm text-zinc-300">• {b}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-
-      {isExpanded && isEditing && (
-        <div className="pb-3 pt-1 space-y-3">
-          {errors.length > 0 && (
-            <div className="text-xs text-red-400 space-y-1">
-              {errors.map((e, i) => <p key={i}>{e}</p>)}
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">Title *</label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-zinc-900 border-zinc-700" />
-            </div>
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">Company *</label>
-              <Input value={company} onChange={(e) => setCompany(e.target.value)} className="bg-zinc-900 border-zinc-700" />
-            </div>
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">Start Date * (YYYY-MM)</label>
-              <Input value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="YYYY-MM" />
-            </div>
-            <div>
-              <label className="block text-xs text-zinc-400 mb-1">End Date (YYYY-MM)</label>
-              <Input value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="YYYY-MM" disabled={current} />
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch checked={current} onCheckedChange={(checked) => { setCurrent(checked); if (checked) setEndDate('') }} />
-            <label className="text-xs text-zinc-400">Currently employed here</label>
-          </div>
-          <div>
-            <label className="block text-xs text-zinc-400 mb-1">Employment Type</label>
-            <Input value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="e.g. Full-time" />
-          </div>
-          <div>
-            <label className="block text-xs text-zinc-400 mb-1">Bullets</label>
-            <div className="space-y-2">
-              {bullets.map((bullet, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Input
-                    value={bullet}
-                    onChange={(e) => setBullets(bullets.map((b, j) => j === i ? e.target.value : b))}
-                    className="bg-zinc-900 border-zinc-700 flex-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setBullets(bullets.filter((_, j) => j !== i))}
-                    disabled={bullets.length <= 1}
-                    className="text-zinc-500 hover:text-red-400 disabled:opacity-30 shrink-0"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+      <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+        <div className="overflow-hidden">
+          {!isEditing ? (
+            <div className="pb-3 pt-1 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">Title</label>
+                  <Input value={job.title} readOnly className="bg-transparent border-zinc-800 cursor-default" />
                 </div>
-              ))}
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">Company</label>
+                  <Input value={job.company} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">Start Date</label>
+                  <Input value={startFormatted} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">End Date</label>
+                  <Input value={endFormatted} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+                </div>
+              </div>
+              {job.employmentType && (
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">Employment Type</label>
+                  <Input value={job.employmentType} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+                </div>
+              )}
+              {job.bullets.length > 0 && (
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">Bullets</label>
+                  <ul className="space-y-1 mt-1">
+                    {job.bullets.map((b, i) => (
+                      <li key={i} className="text-sm text-zinc-300">• {b}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-zinc-800">
+                <Button size="sm" variant="outline" onClick={onStartEdit} disabled={disabled}>Edit</Button>
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={disabled}
+                  className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            <Button size="sm" variant="outline" className="mt-2" onClick={() => setBullets([...bullets, ''])}>
-              Add Bullet
-            </Button>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={handleSave} disabled={disabled}>Save</Button>
-            <Button size="sm" variant="ghost" onClick={handleCancel}>Cancel</Button>
-          </div>
+          ) : (
+            <div className="pb-3 pt-1 space-y-3">
+              {errors.length > 0 && (
+                <div className="text-xs text-red-400 space-y-1">
+                  {errors.map((e, i) => <p key={i}>{e}</p>)}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">Title *</label>
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-zinc-900 border-zinc-700" />
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">Company *</label>
+                  <Input value={company} onChange={(e) => setCompany(e.target.value)} className="bg-zinc-900 border-zinc-700" />
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">Start Date * (YYYY-MM)</label>
+                  <Input value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="YYYY-MM" />
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">End Date (YYYY-MM)</label>
+                  <Input value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="YYYY-MM" disabled={current} />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={current} onCheckedChange={(checked) => { setCurrent(checked); if (checked) setEndDate('') }} />
+                <label className="text-xs text-zinc-400">Currently employed here</label>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Employment Type</label>
+                <Input value={employmentType} onChange={(e) => setEmploymentType(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="e.g. Full-time" />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Bullets</label>
+                <div className="space-y-2">
+                  {bullets.map((bullet, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Input
+                        value={bullet}
+                        onChange={(e) => setBullets(bullets.map((b, j) => j === i ? e.target.value : b))}
+                        className="bg-zinc-900 border-zinc-700 flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setBullets(bullets.filter((_, j) => j !== i))}
+                        disabled={bullets.length <= 1}
+                        className="text-zinc-500 hover:text-red-400 disabled:opacity-30 shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <Button size="sm" variant="outline" className="mt-2" onClick={() => setBullets([...bullets, ''])}>
+                  Add Bullet
+                </Button>
+              </div>
+              <div className="flex gap-2 pt-1 border-t border-zinc-800">
+                <Button size="sm" onClick={handleSave} disabled={disabled}>Save</Button>
+                <Button size="sm" variant="ghost" onClick={handleCancel}>Cancel</Button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -1257,10 +1331,12 @@ function AddEducationSheet({ open, onClose, onSave }: {
   )
 }
 
-function EduEntryRow({ edu, isEditing, onToggleEdit, onSave, onCancel, onDelete, disabled }: {
+function EduEntryRow({ edu, isExpanded, isEditing, onToggleExpand, onStartEdit, onSave, onCancel, onDelete, disabled }: {
   edu: EducationEntry
+  isExpanded: boolean
   isEditing: boolean
-  onToggleEdit: () => void
+  onToggleExpand: () => void
+  onStartEdit: () => void
   onSave: (entry: EducationEntry) => void
   onCancel: () => void
   onDelete: () => void
@@ -1274,6 +1350,15 @@ function EduEntryRow({ edu, isEditing, onToggleEdit, onSave, onCancel, onDelete,
 
   const degCount = edu.degrees.length
   const summary = `${edu.school} — ${edu.name} (${degCount} degree${degCount !== 1 ? 's' : ''})`
+
+  function handleCancel() {
+    setName(edu.name)
+    setSchool(edu.school)
+    setCurrent(edu.current)
+    setDegrees([...edu.degrees])
+    setErrors([])
+    onCancel()
+  }
 
   function handleSave() {
     const errs: string[] = []
@@ -1296,115 +1381,131 @@ function EduEntryRow({ edu, isEditing, onToggleEdit, onSave, onCancel, onDelete,
     setDegrees(degrees.map((d, i) => i === idx ? { ...d, ...patch } : d))
   }
 
-  if (!isEditing) {
-    return (
-      <div className="flex items-center gap-2 py-2 border-b border-zinc-800 last:border-0">
-        <button
-          type="button"
-          className="flex-1 text-left text-sm text-zinc-300 hover:text-zinc-100 truncate"
-          onClick={onToggleEdit}
-          disabled={disabled}
-        >
-          {summary}
-        </button>
-        <button
-          type="button"
-          onClick={onToggleEdit}
-          disabled={disabled}
-          className="text-zinc-500 hover:text-zinc-300 disabled:opacity-50 shrink-0"
-        >
-          <ChevronDown className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={disabled}
-          className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50 shrink-0"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
-    )
-  }
-
   return (
-    <div className="py-3 border-b border-zinc-800 last:border-0 space-y-3">
-      {errors.length > 0 && (
-        <div className="text-xs text-red-400 space-y-1">
-          {errors.map((e, i) => <p key={i}>{e}</p>)}
-        </div>
-      )}
-      <div>
-        <label className="block text-xs text-zinc-400 mb-1">Program Name *</label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} className="bg-zinc-900 border-zinc-700" />
-      </div>
-      <div>
-        <label className="block text-xs text-zinc-400 mb-1">School *</label>
-        <Input value={school} onChange={(e) => setSchool(e.target.value)} className="bg-zinc-900 border-zinc-700" />
-      </div>
-      <div className="flex items-center gap-2">
-        <Switch checked={current} onCheckedChange={(checked) => setCurrent(checked)} />
-        <label className="text-xs text-zinc-400">Currently enrolled</label>
-      </div>
-      <div>
-        <label className="block text-xs text-zinc-400 mb-2">Degrees</label>
-        <div className="space-y-3">
-          {degrees.map((degree, i) => (
-            <div key={i} className="flex flex-col gap-2 p-3 border border-zinc-800 rounded">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs text-zinc-400 mb-1">Degree Type</label>
-                  <Input
-                    value={degree.degreeType}
-                    onChange={(e) => updateDegree(i, { degreeType: e.target.value })}
-                    className="bg-zinc-900 border-zinc-700"
-                    placeholder="e.g. Bachelor of Science"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-zinc-400 mb-1">Degree Subject</label>
-                  <Input
-                    value={degree.degreeSubject}
-                    onChange={(e) => updateDegree(i, { degreeSubject: e.target.value })}
-                    className="bg-zinc-900 border-zinc-700"
-                    placeholder="e.g. Computer Science"
-                  />
-                </div>
+    <div className="border-b border-zinc-800 last:border-0">
+      <button
+        type="button"
+        className="w-full flex items-center gap-2 py-2 text-left hover:bg-zinc-800/30 rounded transition-colors disabled:opacity-50"
+        onClick={onToggleExpand}
+        disabled={disabled}
+      >
+        <span className="flex-1 text-sm text-zinc-200 truncate">{summary}</span>
+        <ChevronDown className={`h-4 w-4 text-zinc-400 shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+        <div className="overflow-hidden">
+          {!isEditing ? (
+            <div className="pb-3 pt-1 space-y-3">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Program Name</label>
+                <Input value={edu.name} readOnly className="bg-transparent border-zinc-800 cursor-default" />
               </div>
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
-                  <label className="block text-xs text-zinc-400 mb-1">Graduation Date (YYYY-MM)</label>
-                  <Input
-                    value={degree.graduationDate ?? ''}
-                    onChange={(e) => updateDegree(i, { graduationDate: e.target.value || null })}
-                    className="bg-zinc-900 border-zinc-700"
-                    placeholder="YYYY-MM"
-                    disabled={current}
-                  />
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">School</label>
+                <Input value={edu.school} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+              </div>
+              {edu.degrees.length > 0 && (
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">Degrees</label>
+                  <ul className="space-y-1 mt-1">
+                    {edu.degrees.map((d, i) => (
+                      <li key={i} className="text-sm text-zinc-300">
+                        • {d.degreeType} in {d.degreeSubject}{d.graduationDate ? ` — ${d.graduationDate}` : edu.current ? ' — Present' : ''}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setDegrees(degrees.filter((_, j) => j !== i))}
-                  className="text-zinc-500 hover:text-red-400 shrink-0 pb-1"
-                >
+              )}
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-zinc-800">
+                <Button size="sm" variant="outline" onClick={onStartEdit} disabled={disabled}>Edit</Button>
+                <button type="button" onClick={onDelete} disabled={disabled} className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             </div>
-          ))}
+          ) : (
+            <div className="pb-3 pt-1 space-y-3">
+              {errors.length > 0 && (
+                <div className="text-xs text-red-400 space-y-1">
+                  {errors.map((e, i) => <p key={i}>{e}</p>)}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Program Name *</label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} className="bg-zinc-900 border-zinc-700" />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">School *</label>
+                <Input value={school} onChange={(e) => setSchool(e.target.value)} className="bg-zinc-900 border-zinc-700" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={current} onCheckedChange={(checked) => setCurrent(checked)} />
+                <label className="text-xs text-zinc-400">Currently enrolled</label>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-2">Degrees</label>
+                <div className="space-y-3">
+                  {degrees.map((degree, i) => (
+                    <div key={i} className="flex flex-col gap-2 p-3 border border-zinc-800 rounded">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1">Degree Type</label>
+                          <Input
+                            value={degree.degreeType}
+                            onChange={(e) => updateDegree(i, { degreeType: e.target.value })}
+                            className="bg-zinc-900 border-zinc-700"
+                            placeholder="e.g. Bachelor of Science"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1">Degree Subject</label>
+                          <Input
+                            value={degree.degreeSubject}
+                            onChange={(e) => updateDegree(i, { degreeSubject: e.target.value })}
+                            className="bg-zinc-900 border-zinc-700"
+                            placeholder="e.g. Computer Science"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1">
+                          <label className="block text-xs text-zinc-400 mb-1">Graduation Date (YYYY-MM)</label>
+                          <Input
+                            value={degree.graduationDate ?? ''}
+                            onChange={(e) => updateDegree(i, { graduationDate: e.target.value || null })}
+                            className="bg-zinc-900 border-zinc-700"
+                            placeholder="YYYY-MM"
+                            disabled={current}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setDegrees(degrees.filter((_, j) => j !== i))}
+                          className="text-zinc-500 hover:text-red-400 shrink-0 pb-1"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => setDegrees([...degrees, { degreeType: '', degreeSubject: '', graduationDate: null }])}
+                >
+                  Add Degree
+                </Button>
+              </div>
+              <div className="flex gap-2 pt-1 border-t border-zinc-800">
+                <Button size="sm" onClick={handleSave} disabled={disabled}>Save</Button>
+                <Button size="sm" variant="ghost" onClick={handleCancel}>Cancel</Button>
+              </div>
+            </div>
+          )}
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="mt-2"
-          onClick={() => setDegrees([...degrees, { degreeType: '', degreeSubject: '', graduationDate: null }])}
-        >
-          Add Degree
-        </Button>
-      </div>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={handleSave} disabled={disabled}>Save</Button>
-        <Button size="sm" variant="ghost" onClick={() => { setErrors([]); onCancel() }}>Cancel</Button>
       </div>
     </div>
   )
@@ -1530,10 +1631,12 @@ function AddCertSheet({ open, onClose, onSave, sectionTitle }: {
   )
 }
 
-function ProjectEntryRow({ project, isEditing, onToggleEdit, onSave, onCancel, onDelete, disabled }: {
+function ProjectEntryRow({ project, isExpanded, isEditing, onToggleExpand, onStartEdit, onSave, onCancel, onDelete, disabled }: {
   project: ProjectEntry
+  isExpanded: boolean
   isEditing: boolean
-  onToggleEdit: () => void
+  onToggleExpand: () => void
+  onStartEdit: () => void
   onSave: (entry: ProjectEntry) => void
   onCancel: () => void
   onDelete: () => void
@@ -1543,6 +1646,13 @@ function ProjectEntryRow({ project, isEditing, onToggleEdit, onSave, onCancel, o
   const [description, setDescription] = useState(project.description)
   const [errors, setErrors] = useState<string[]>([])
 
+  function handleCancel() {
+    setName(project.name)
+    setDescription(project.description)
+    setErrors([])
+    onCancel()
+  }
+
   function handleSave() {
     const errs: string[] = []
     if (!name.trim()) errs.push('Name is required')
@@ -1551,49 +1661,70 @@ function ProjectEntryRow({ project, isEditing, onToggleEdit, onSave, onCancel, o
     onSave({ name: name.trim(), description: description.trim() })
   }
 
-  if (!isEditing) {
-    return (
-      <div className="flex items-center gap-2 py-2 border-b border-zinc-800 last:border-0">
-        <button type="button" className="flex-1 text-left text-sm text-zinc-300 hover:text-zinc-100 truncate" onClick={onToggleEdit} disabled={disabled}>
-          {project.name}
-        </button>
-        <button type="button" onClick={onToggleEdit} disabled={disabled} className="text-zinc-500 hover:text-zinc-300 disabled:opacity-50 shrink-0">
-          <ChevronDown className="h-4 w-4" />
-        </button>
-        <button type="button" onClick={onDelete} disabled={disabled} className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50 shrink-0">
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
-    )
-  }
-
   return (
-    <div className="py-3 border-b border-zinc-800 last:border-0 space-y-3">
-      {errors.length > 0 && (
-        <div className="text-xs text-red-400 space-y-1">
-          {errors.map((e, i) => <p key={i}>{e}</p>)}
+    <div className="border-b border-zinc-800 last:border-0">
+      <button
+        type="button"
+        className="w-full flex items-center gap-2 py-2 text-left hover:bg-zinc-800/30 rounded transition-colors disabled:opacity-50"
+        onClick={onToggleExpand}
+        disabled={disabled}
+      >
+        <span className="flex-1 text-sm text-zinc-200 truncate">{project.name}</span>
+        <ChevronDown className={`h-4 w-4 text-zinc-400 shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+        <div className="overflow-hidden">
+          {!isEditing ? (
+            <div className="pb-3 pt-1 space-y-3">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Name</label>
+                <Input value={project.name} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Description</label>
+                <Textarea value={project.description} readOnly rows={3} className="bg-transparent border-zinc-800 cursor-default resize-none" />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-zinc-800">
+                <Button size="sm" variant="outline" onClick={onStartEdit} disabled={disabled}>Edit</Button>
+                <button type="button" onClick={onDelete} disabled={disabled} className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="pb-3 pt-1 space-y-3">
+              {errors.length > 0 && (
+                <div className="text-xs text-red-400 space-y-1">
+                  {errors.map((e, i) => <p key={i}>{e}</p>)}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Name *</label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} className="bg-zinc-900 border-zinc-700" />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Description *</label>
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="bg-zinc-900 border-zinc-700" />
+              </div>
+              <div className="flex gap-2 pt-1 border-t border-zinc-800">
+                <Button size="sm" onClick={handleSave} disabled={disabled}>Save</Button>
+                <Button size="sm" variant="ghost" onClick={handleCancel}>Cancel</Button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-      <div>
-        <label className="block text-xs text-zinc-400 mb-1">Name *</label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} className="bg-zinc-900 border-zinc-700" />
-      </div>
-      <div>
-        <label className="block text-xs text-zinc-400 mb-1">Description *</label>
-        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="bg-zinc-900 border-zinc-700" />
-      </div>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={handleSave} disabled={disabled}>Save</Button>
-        <Button size="sm" variant="ghost" onClick={() => { setErrors([]); onCancel() }}>Cancel</Button>
       </div>
     </div>
   )
 }
 
-function CertEntryRow({ entry, isEditing, onToggleEdit, onSave, onCancel, onDelete, disabled }: {
+function CertEntryRow({ entry, isExpanded, isEditing, onToggleExpand, onStartEdit, onSave, onCancel, onDelete, disabled }: {
   entry: CertEntry
+  isExpanded: boolean
   isEditing: boolean
-  onToggleEdit: () => void
+  onToggleExpand: () => void
+  onStartEdit: () => void
   onSave: (entry: CertEntry) => void
   onCancel: () => void
   onDelete: () => void
@@ -1606,6 +1737,14 @@ function CertEntryRow({ entry, isEditing, onToggleEdit, onSave, onCancel, onDele
 
   const summary = `${entry.name} — ${entry.issuer} (${entry.year})`
 
+  function handleCancel() {
+    setName(entry.name)
+    setIssuer(entry.issuer)
+    setYear(entry.year)
+    setErrors([])
+    onCancel()
+  }
+
   function handleSave() {
     const errs: string[] = []
     if (!name.trim()) errs.push('Name is required')
@@ -1616,44 +1755,67 @@ function CertEntryRow({ entry, isEditing, onToggleEdit, onSave, onCancel, onDele
     onSave({ name: name.trim(), issuer: issuer.trim(), year: year.trim() })
   }
 
-  if (!isEditing) {
-    return (
-      <div className="flex items-center gap-2 py-2 border-b border-zinc-800 last:border-0">
-        <button type="button" className="flex-1 text-left text-sm text-zinc-300 hover:text-zinc-100 truncate" onClick={onToggleEdit} disabled={disabled}>
-          {summary}
-        </button>
-        <button type="button" onClick={onToggleEdit} disabled={disabled} className="text-zinc-500 hover:text-zinc-300 disabled:opacity-50 shrink-0">
-          <ChevronDown className="h-4 w-4" />
-        </button>
-        <button type="button" onClick={onDelete} disabled={disabled} className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50 shrink-0">
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
-    )
-  }
-
   return (
-    <div className="py-3 border-b border-zinc-800 last:border-0 space-y-3">
-      {errors.length > 0 && (
-        <div className="text-xs text-red-400 space-y-1">
-          {errors.map((e, i) => <p key={i}>{e}</p>)}
+    <div className="border-b border-zinc-800 last:border-0">
+      <button
+        type="button"
+        className="w-full flex items-center gap-2 py-2 text-left hover:bg-zinc-800/30 rounded transition-colors disabled:opacity-50"
+        onClick={onToggleExpand}
+        disabled={disabled}
+      >
+        <span className="flex-1 text-sm text-zinc-200 truncate">{summary}</span>
+        <ChevronDown className={`h-4 w-4 text-zinc-400 shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+        <div className="overflow-hidden">
+          {!isEditing ? (
+            <div className="pb-3 pt-1 space-y-3">
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Name</label>
+                <Input value={entry.name} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Issuer</label>
+                <Input value={entry.issuer} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Year</label>
+                <Input value={entry.year} readOnly className="bg-transparent border-zinc-800 cursor-default" />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-zinc-800">
+                <Button size="sm" variant="outline" onClick={onStartEdit} disabled={disabled}>Edit</Button>
+                <button type="button" onClick={onDelete} disabled={disabled} className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="pb-3 pt-1 space-y-3">
+              {errors.length > 0 && (
+                <div className="text-xs text-red-400 space-y-1">
+                  {errors.map((e, i) => <p key={i}>{e}</p>)}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Name *</label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} className="bg-zinc-900 border-zinc-700" />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Issuer *</label>
+                <Input value={issuer} onChange={(e) => setIssuer(e.target.value)} className="bg-zinc-900 border-zinc-700" />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Year * (YYYY)</label>
+                <Input value={year} onChange={(e) => setYear(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="YYYY" maxLength={4} />
+              </div>
+              <div className="flex gap-2 pt-1 border-t border-zinc-800">
+                <Button size="sm" onClick={handleSave} disabled={disabled}>Save</Button>
+                <Button size="sm" variant="ghost" onClick={handleCancel}>Cancel</Button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-      <div>
-        <label className="block text-xs text-zinc-400 mb-1">Name *</label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} className="bg-zinc-900 border-zinc-700" />
-      </div>
-      <div>
-        <label className="block text-xs text-zinc-400 mb-1">Issuer *</label>
-        <Input value={issuer} onChange={(e) => setIssuer(e.target.value)} className="bg-zinc-900 border-zinc-700" />
-      </div>
-      <div>
-        <label className="block text-xs text-zinc-400 mb-1">Year * (YYYY)</label>
-        <Input value={year} onChange={(e) => setYear(e.target.value)} className="bg-zinc-900 border-zinc-700" placeholder="YYYY" maxLength={4} />
-      </div>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={handleSave} disabled={disabled}>Save</Button>
-        <Button size="sm" variant="ghost" onClick={() => { setErrors([]); onCancel() }}>Cancel</Button>
       </div>
     </div>
   )
