@@ -20,6 +20,8 @@ import type { Job } from '@shared/schemas'
 import { ScoreBadge } from './ScoreBadge'
 import { ActionChip } from './ActionChip'
 import { ColumnVisibilityToggle } from './ColumnVisibilityToggle'
+import { parseLocation } from '../../utils/parseLocation'
+
 const NO_STATUS = '__none__'
 const APPLIED = 'Applied'
 const STATUS_OPTIONS = [
@@ -67,9 +69,21 @@ const staticColumns = [
   columnHelper.accessor('location', {
     header: 'Location',
     cell: (info) => {
-      const v = info.getValue()
-      return v ? (
-        <span className="max-w-[180px] truncate block text-zinc-300" title={v}>{v}</span>
+      const { place } = parseLocation(info.getValue())
+      return place ? (
+        <span className="max-w-[180px] truncate block text-zinc-300" title={place}>{place}</span>
+      ) : (
+        <span className="text-zinc-500">—</span>
+      )
+    },
+  }),
+  columnHelper.accessor('location', {
+    id: 'locationType',
+    header: 'Type',
+    cell: (info) => {
+      const { type } = parseLocation(info.getValue())
+      return type ? (
+        <span className="text-zinc-300">{type}</span>
       ) : (
         <span className="text-zinc-500">—</span>
       )

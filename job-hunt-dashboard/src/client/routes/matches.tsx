@@ -39,7 +39,7 @@ export function MatchesRoute() {
           selectedJobId={selectedJobId}
           onBulkArchive={bulkArchiveMutation.mutate}
           isBulkArchiving={bulkArchiveMutation.isPending}
-          fixedColumns={['company', 'jobTitle', 'location', 'fitScore', 'recommendation', 'date_analyzed']}
+          fixedColumns={['company', 'jobTitle', 'location', 'locationType', 'fitScore', 'recommendation', 'date_analyzed']}
         />
       </div>
       <JobDrawer

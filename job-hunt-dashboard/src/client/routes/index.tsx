@@ -251,7 +251,7 @@ export function PipelineRoute() {
             selectedJobId={selectedJobId}
             onBulkArchive={bulkArchiveMutation.mutate}
             isBulkArchiving={bulkArchiveMutation.isPending}
-            fixedColumns={['company', 'jobTitle', 'location', 'source', 'relevanceScore', 'date_scraped']}
+            fixedColumns={['company', 'jobTitle', 'location', 'locationType', 'source', 'relevanceScore', 'date_scraped']}
           />
         </div>
         <JobDrawer

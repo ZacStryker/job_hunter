@@ -18,6 +18,7 @@ import {
 import { Button } from '../ui/button'
 import type { Job } from '@shared/schemas'
 import { ScoreBadge } from '../pipeline/ScoreBadge'
+import { parseLocation } from '../../utils/parseLocation'
 
 const PAGE_SIZE = 20
 
@@ -42,7 +43,18 @@ const columns = [
   }),
   columnHelper.accessor('location', {
     header: 'Location',
-    cell: (info) => info.getValue() ?? '—',
+    cell: (info) => {
+      const { place } = parseLocation(info.getValue())
+      return place ?? '—'
+    },
+  }),
+  columnHelper.accessor('location', {
+    id: 'locationType',
+    header: 'Type',
+    cell: (info) => {
+      const { type } = parseLocation(info.getValue())
+      return type ?? '—'
+    },
   }),
   columnHelper.accessor('fitScore', {
     header: 'Score',
