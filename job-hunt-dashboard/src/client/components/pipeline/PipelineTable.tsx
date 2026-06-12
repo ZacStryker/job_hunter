@@ -76,6 +76,11 @@ const staticColumns = [
         <span className="text-zinc-500">—</span>
       )
     },
+    sortingFn: (rowA, rowB) => {
+      const a = parseLocation(rowA.original.location).place ?? ''
+      const b = parseLocation(rowB.original.location).place ?? ''
+      return a.localeCompare(b)
+    },
   }),
   columnHelper.accessor('location', {
     id: 'locationType',
@@ -87,6 +92,11 @@ const staticColumns = [
       ) : (
         <span className="text-zinc-500">—</span>
       )
+    },
+    sortingFn: (rowA, rowB) => {
+      const a = parseLocation(rowA.original.location).type ?? ''
+      const b = parseLocation(rowB.original.location).type ?? ''
+      return a.localeCompare(b)
     },
   }),
   columnHelper.accessor('fitScore', {

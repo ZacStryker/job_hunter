@@ -47,6 +47,11 @@ const columns = [
       const { place } = parseLocation(info.getValue())
       return place ?? '—'
     },
+    sortingFn: (rowA, rowB) => {
+      const a = parseLocation(rowA.original.location).place ?? ''
+      const b = parseLocation(rowB.original.location).place ?? ''
+      return a.localeCompare(b)
+    },
   }),
   columnHelper.accessor('location', {
     id: 'locationType',
@@ -54,6 +59,11 @@ const columns = [
     cell: (info) => {
       const { type } = parseLocation(info.getValue())
       return type ?? '—'
+    },
+    sortingFn: (rowA, rowB) => {
+      const a = parseLocation(rowA.original.location).type ?? ''
+      const b = parseLocation(rowB.original.location).type ?? ''
+      return a.localeCompare(b)
     },
   }),
   columnHelper.accessor('fitScore', {
