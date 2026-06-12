@@ -33,7 +33,7 @@ export function ArchivedRoute() {
           jobs={archivedJobs}
           onRowClick={(job) => setSelectedJobId(job.id === selectedJobId ? null : job.id)}
           selectedJobId={selectedJobId}
-          fixedColumns={['company', 'jobTitle', 'location', 'locationType', 'fitScore', 'recommendation', 'date_analyzed', 'date_applied']}
+          fixedColumns={['company', 'jobTitle', 'location', 'locationType', 'fitScore', 'recommendation', 'date_analyzed', 'date_applied', 'date_archived']}
           initialSort={[{ id: 'date_archived', desc: true }]}
         />
       </div>
