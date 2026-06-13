@@ -285,7 +285,7 @@ function ResumeCarousel() {
   return (
     <div>
       <div
-        className="border border-zinc-700 rounded overflow-hidden"
+        className="border border-zinc-700 rounded overflow-hidden md:h-[500px]"
         onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX }}
         onTouchEnd={(e) => {
           if (touchStartX.current === null) return
@@ -298,7 +298,7 @@ function ResumeCarousel() {
         <img
           src={RESUME_PAGES[index]}
           alt={`Resume page ${index + 1} of ${RESUME_PAGES.length}`}
-          className="w-full"
+          className="w-full md:h-full md:w-auto md:mx-auto object-contain"
           loading="lazy"
         />
       </div>
