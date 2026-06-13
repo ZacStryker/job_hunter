@@ -276,6 +276,46 @@ function FeatureSection3() {
   )
 }
 
+const RESUME_PAGES = ['/resume-preview.png', '/resume-preview-2.png']
+
+function ResumeCarousel() {
+  const [index, setIndex] = useState(0)
+  const touchStartX = useRef<number | null>(null)
+
+  return (
+    <div className="md:hidden">
+      <div
+        className="border border-zinc-700 rounded overflow-hidden"
+        onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX }}
+        onTouchEnd={(e) => {
+          if (touchStartX.current === null) return
+          const dx = e.changedTouches[0].clientX - touchStartX.current
+          if (dx > 40 && index > 0) setIndex(index - 1)
+          else if (dx < -40 && index < RESUME_PAGES.length - 1) setIndex(index + 1)
+          touchStartX.current = null
+        }}
+      >
+        <img
+          src={RESUME_PAGES[index]}
+          alt={`Resume page ${index + 1} of ${RESUME_PAGES.length}`}
+          className="w-full"
+          loading="lazy"
+        />
+      </div>
+      <div className="flex justify-center gap-2 mt-3">
+        {RESUME_PAGES.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setIndex(i)}
+            aria-label={`Go to page ${i + 1}`}
+            className={`w-2 h-2 rounded-full transition-colors ${i === index ? 'bg-zinc-300' : 'bg-zinc-600'}`}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function FeatureSection4() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-20 flex flex-col md:flex-row-reverse gap-12 items-center border-t border-zinc-800/40">
@@ -289,9 +329,10 @@ function FeatureSection4() {
         <img
           src="/resume-preview.png"
           alt="Example tailored resume"
-          className="w-full border border-zinc-700 rounded"
+          className="hidden md:block w-full border border-zinc-700 rounded"
           loading="lazy"
         />
+        <ResumeCarousel />
       </FadeInView>
     </div>
   )
