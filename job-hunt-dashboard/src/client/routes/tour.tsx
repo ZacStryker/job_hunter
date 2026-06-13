@@ -277,38 +277,22 @@ function FeatureSection3() {
 
 function FeatureSection4() {
   return (
-    <div className="max-w-6xl mx-auto px-6 py-20 flex flex-col gap-10 border-t border-zinc-800/40">
-      <div className="max-w-2xl space-y-4">
+    <div className="max-w-6xl mx-auto px-6 py-20 flex flex-col md:flex-row-reverse gap-12 items-center border-t border-zinc-800/40">
+      <div className="flex-1 space-y-4">
         <h2 className="text-3xl font-bold text-zinc-100">One click. Two documents. Zero boilerplate.</h2>
         <p className="text-zinc-400 leading-relaxed">
           From the Job Drawer, click once to generate a tailored resume and cover letter — each rewritten to match the specific job description. Your profile is the source of truth: all documents are generated from it on demand and stored against the job record so you can preview and download at any time. The resume uses a dynamic layout that expands or trims to the most relevant experience automatically.
         </p>
       </div>
-      <FadeInView className="w-full">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide">Cover Letter</p>
-            <iframe
-              src="/cover-letter-preview.pdf#toolbar=0"
-              className="w-full h-96 border border-zinc-700 rounded pointer-events-none"
-              title="Cover letter preview"
-              loading="lazy"
-            >
-              <a href="/cover-letter-preview.pdf" className="text-xs text-zinc-400 underline">View cover letter PDF</a>
-            </iframe>
-          </div>
-          <div className="space-y-1.5">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide">Resume</p>
-            <iframe
-              src="/resume-preview.pdf#toolbar=0"
-              className="w-full h-96 border border-zinc-700 rounded pointer-events-none"
-              title="Resume preview"
-              loading="lazy"
-            >
-              <a href="/resume-preview.pdf" className="text-xs text-zinc-400 underline">View resume PDF</a>
-            </iframe>
-          </div>
-        </div>
+      <FadeInView className="flex-1">
+        <iframe
+          src="/resume-preview.pdf#toolbar=0"
+          className="w-full h-96 border border-zinc-700 rounded pointer-events-none"
+          title="Resume preview"
+          loading="lazy"
+        >
+          <a href="/resume-preview.pdf" className="text-xs text-zinc-400 underline">View resume PDF</a>
+        </iframe>
       </FadeInView>
     </div>
   )
