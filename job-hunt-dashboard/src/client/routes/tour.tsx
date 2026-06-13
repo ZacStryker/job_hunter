@@ -279,7 +279,7 @@ function FeatureSection4() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-20 flex flex-col md:flex-row-reverse gap-12 items-center border-t border-zinc-800/40">
       <div className="flex-1 space-y-4">
-        <h2 className="text-3xl font-bold text-zinc-100">One click. Two documents. Zero boilerplate.</h2>
+        <h2 className="text-3xl font-bold text-zinc-100">Tailor application documents with one click</h2>
         <p className="text-zinc-400 leading-relaxed">
           From the Job Drawer, click once to generate a tailored resume and cover letter — each rewritten to match the specific job description. Your profile is the source of truth: all documents are generated from it on demand and stored against the job record so you can preview and download at any time. The resume uses a dynamic layout that expands or trims to the most relevant experience automatically.
         </p>
