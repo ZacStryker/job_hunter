@@ -285,26 +285,23 @@ function FeatureSection4() {
         </p>
       </div>
       <FadeInView className="flex-1">
-        <div className="rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden text-left">
-          <div className="px-4 py-3 border-b border-zinc-800">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Stripe — Senior SWE</p>
-            <p className="text-xs text-zinc-500 mb-2">Documents generated 2 min ago</p>
-            <div className="flex flex-col gap-2">
-              <div className="px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-200 flex items-center justify-between" aria-hidden="true">
-                <span>Resume (tailored)</span>
-                <span className="text-zinc-500">↓ PDF</span>
-              </div>
-              <div className="px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-xs text-zinc-200 flex items-center justify-between" aria-hidden="true">
-                <span>Cover Letter</span>
-                <span className="text-zinc-500">↓ PDF</span>
-              </div>
-            </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Cover Letter</p>
+            <iframe
+              src="/cover-letter-preview.pdf"
+              className="w-full h-72 border border-zinc-700 rounded pointer-events-none"
+              title="Cover letter preview"
+              loading="lazy"
+            >
+              <a href="/cover-letter-preview.pdf" className="text-xs text-zinc-400 underline">View cover letter PDF</a>
+            </iframe>
           </div>
-          <div className="px-4 py-3 space-y-1.5">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Resume Preview</p>
+          <div className="space-y-1.5">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Resume</p>
             <iframe
               src="/resume-preview.pdf"
-              className="w-2/3 h-48 border border-zinc-800 rounded pointer-events-none"
+              className="w-full h-72 border border-zinc-700 rounded pointer-events-none"
               title="Resume preview"
               loading="lazy"
             >
