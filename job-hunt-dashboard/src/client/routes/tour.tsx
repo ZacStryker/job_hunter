@@ -304,7 +304,7 @@ function FeatureSection4() {
             <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Resume Preview</p>
             <iframe
               src="/resume-preview.pdf"
-              className="w-full aspect-[210/297] border border-zinc-800 rounded pointer-events-none"
+              className="w-full h-48 border border-zinc-800 rounded pointer-events-none"
               title="Resume preview"
               loading="lazy"
             >
