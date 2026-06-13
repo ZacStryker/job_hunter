@@ -284,9 +284,9 @@ function ResumeCarousel() {
 
   return (
     <div>
-      <div className="relative">
+      <div>
         <div
-          className="border border-zinc-700 rounded overflow-hidden md:h-[500px] md:py-[10px]"
+          className="relative border border-zinc-700 rounded overflow-hidden md:h-[500px] md:py-[10px]"
           onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX }}
           onTouchEnd={(e) => {
             if (touchStartX.current === null) return
@@ -307,14 +307,14 @@ function ResumeCarousel() {
           <button
             onClick={() => setIndex(index - 1)}
             aria-label="Previous page"
-            className="hidden md:flex items-center justify-center absolute left-[-52px] top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 transition-colors"
+            className="hidden md:flex items-center justify-center absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-zinc-800/80 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 transition-colors"
           >‹</button>
         )}
         {index < RESUME_PAGES.length - 1 && (
           <button
             onClick={() => setIndex(index + 1)}
             aria-label="Next page"
-            className="hidden md:flex items-center justify-center absolute right-[-52px] top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 transition-colors"
+            className="hidden md:flex items-center justify-center absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-zinc-800/80 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 transition-colors"
           >›</button>
         )}
       </div>
