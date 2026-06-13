@@ -151,7 +151,7 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
         Websites: profileData.personal.websites,
         Jobs: profileData.experience.jobs,
         Education: profileData.experience.education,
-        Projects: profileData.experience.projects,
+        Projects: profileData.experience.projects.map(p => ({ name: p.name, description: p.description })),
         Certifications: profileData.experience.certifications,
         Licences: profileData.experience.licences,
         Awards: profileData.experience.awards,

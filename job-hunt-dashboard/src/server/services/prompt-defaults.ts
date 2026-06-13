@@ -53,7 +53,7 @@ export const DEFAULT_PROMPTS: Record<PromptFlow, PromptConfig> = {
       '  "summary": "string",\n' +
       '  "skill_groups": [{ "label": "string", "skills": ["string"] }],\n' +
       '  "education": [{ "school": "string", "degree": "string", "year": "string" }],\n' +
-      '  "projects": [{ "name": "string", "desc": "string", "stack": "string" }],\n' +
+      '  "projects": [{ "name": "string", "desc": "string", "stack": "string", "url": "string" }],\n' +
       '  "experience": [{ "company": "string", "location": "string", "dates": "string", "role": "string", "bullets": ["string"] }]\n' +
       '}\n\n' +
       'HARD RULES \u2014 never violate:\n' +
@@ -79,7 +79,8 @@ export const DEFAULT_PROMPTS: Record<PromptFlow, PromptConfig> = {
       '- skill_groups: infer relevant group labels from the job description; populate each with skills from the profile.\n' +
       '- summary: 2\u20134 sentences, high-impact professional tone, reference relevant achievements.\n' +
       '- bullets: maximize relevance to the role; never trim metrics, named technologies, or most-recent-job entries; never remove an entire experience entry to create space.\n' +
-      '- projects: choose those most relevant to the job; filter out the rest. stack is a "\u00b7"-separated string (e.g. "TypeScript \u00b7 Bun \u00b7 SQLite").',
+      '- projects: choose those most relevant to the job; filter out the rest. stack is a "\u00b7"-separated string (e.g. "TypeScript \u00b7 Bun \u00b7 SQLite").\n' +
+      '- url: copy the chosen project\'s URL verbatim into its "url" field (it appears as "[URL: ...]" in the profile); use an empty string "" when the project has no URL.',
     userMessage:
       'Tailor a resume for this role. Return ONLY the JSON object as specified.\n\n' +
       '{{JOB_DETAILS}}',

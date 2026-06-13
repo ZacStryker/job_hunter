@@ -202,6 +202,7 @@ export const educationEntrySchema = z.object({
 export const projectEntrySchema = z.object({
   name: z.string(),
   description: z.string(),
+  url: z.string().nullable().default(null),
 })
 
 export const certEntrySchema = z.object({
@@ -355,7 +356,7 @@ export const resumeDataSchema = z.object({
   summary:      z.string(),
   skill_groups: z.array(z.object({ label: z.string(), skills: z.array(z.string()) })),
   education:    z.array(z.object({ school: z.string(), degree: z.string(), year: z.string() })),
-  projects:     z.array(z.object({ name: z.string(), desc: z.string(), stack: z.string() })),
+  projects:     z.array(z.object({ name: z.string(), desc: z.string(), stack: z.string(), url: z.string().default('') })),
   experience:   z.array(z.object({
     company:  z.string(),
     location: z.string(),

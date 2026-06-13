@@ -27,7 +27,7 @@ function buildProfileText(pd: ProfileData): string {
   const jobLines = pd.experience.jobs.map(j =>
     `${j.company} — ${j.title} (${j.startDate}${j.endDate ? ` – ${j.endDate}` : j.current ? ' – Present' : ''})\n${j.bullets.map(b => `  • ${b}`).join('\n')}`
   ).join('\n\n')
-  const projectLines = pd.experience.projects.map(p => `${p.name}: ${p.description}`).join('\n')
+  const projectLines = pd.experience.projects.map(p => `${p.name}: ${p.description}${p.url ? ` [URL: ${p.url}]` : ''}`).join('\n')
   const eduLines = pd.experience.education.map(e =>
     `${e.school} — ${e.name}${e.degrees.length ? ` (${e.degrees.map(d => `${d.degreeType} ${d.degreeSubject}`).join(', ')})` : ''}`
   ).join('\n')

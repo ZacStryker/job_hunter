@@ -1518,10 +1518,11 @@ function AddProjectSheet({ open, onClose, onSave }: {
 }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [url, setUrl] = useState('')
   const [errors, setErrors] = useState<string[]>([])
 
   function reset() {
-    setName(''); setDescription(''); setErrors([])
+    setName(''); setDescription(''); setUrl(''); setErrors([])
   }
 
   function handleClose() {
@@ -1534,7 +1535,7 @@ function AddProjectSheet({ open, onClose, onSave }: {
     if (!name.trim()) errs.push('Name is required')
     if (!description.trim()) errs.push('Description is required')
     if (errs.length) { setErrors(errs); return }
-    onSave({ name: name.trim(), description: description.trim() })
+    onSave({ name: name.trim(), description: description.trim(), url: url.trim() || null })
   }
 
   return (
@@ -1556,6 +1557,10 @@ function AddProjectSheet({ open, onClose, onSave }: {
           <div>
             <label className="block text-xs text-zinc-400 mb-1">Description *</label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="bg-zinc-900 border-zinc-700" />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1">Project URL</label>
+            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://… (optional)" className="bg-zinc-900 border-zinc-700" />
           </div>
           <div className="flex gap-2 mt-2">
             <Button onClick={handleSave}>Save Project</Button>
@@ -1644,11 +1649,13 @@ function ProjectEntryRow({ project, isExpanded, isEditing, onToggleExpand, onSta
 }) {
   const [name, setName] = useState(project.name)
   const [description, setDescription] = useState(project.description)
+  const [url, setUrl] = useState(project.url ?? '')
   const [errors, setErrors] = useState<string[]>([])
 
   function handleCancel() {
     setName(project.name)
     setDescription(project.description)
+    setUrl(project.url ?? '')
     setErrors([])
     onCancel()
   }
@@ -1658,7 +1665,7 @@ function ProjectEntryRow({ project, isExpanded, isEditing, onToggleExpand, onSta
     if (!name.trim()) errs.push('Name is required')
     if (!description.trim()) errs.push('Description is required')
     if (errs.length) { setErrors(errs); return }
-    onSave({ name: name.trim(), description: description.trim() })
+    onSave({ name: name.trim(), description: description.trim(), url: url.trim() || null })
   }
 
   return (
@@ -1685,6 +1692,10 @@ function ProjectEntryRow({ project, isExpanded, isEditing, onToggleExpand, onSta
                 <label className="block text-xs text-zinc-400 mb-1">Description</label>
                 <Textarea value={project.description} readOnly rows={3} className="bg-transparent border-zinc-800 cursor-default resize-none" />
               </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Project URL</label>
+                <Input value={project.url ?? ''} readOnly placeholder="—" className="bg-transparent border-zinc-800 cursor-default" />
+              </div>
               <div className="flex items-center justify-end gap-3 pt-2 border-t border-zinc-800">
                 <Button size="sm" variant="outline" onClick={onStartEdit} disabled={disabled}>Edit</Button>
                 <button type="button" onClick={onDelete} disabled={disabled} className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50">
@@ -1706,6 +1717,10 @@ function ProjectEntryRow({ project, isExpanded, isEditing, onToggleExpand, onSta
               <div>
                 <label className="block text-xs text-zinc-400 mb-1">Description *</label>
                 <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="bg-zinc-900 border-zinc-700" />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-400 mb-1">Project URL</label>
+                <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://… (optional)" className="bg-zinc-900 border-zinc-700" />
               </div>
               <div className="flex gap-2 pt-1 border-t border-zinc-800">
                 <Button size="sm" onClick={handleSave} disabled={disabled}>Save</Button>
