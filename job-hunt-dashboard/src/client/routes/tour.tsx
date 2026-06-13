@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Mail } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
@@ -323,17 +324,22 @@ function FeatureSection5() {
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>{status}</span>
             </div>
           ))}
-          <div className="px-4 py-3 border-t border-zinc-800 space-y-2">
+          <div className="px-4 py-3 border-t border-zinc-800 space-y-2.5">
             <p className="text-xs text-zinc-500 uppercase tracking-wide">Status History — Stripe</p>
             {[
-              { label: 'Interview scheduled', date: 'Jun 10' },
-              { label: 'Moved to screening', date: 'Jun 7' },
-              { label: 'Applied', date: 'Jun 5' },
-            ].map(({ label, date }) => (
-              <div key={date} className="flex items-center gap-2 text-xs">
-                <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0"></span>
-                <span className="text-zinc-300 flex-1">{label}</span>
-                <span className="text-zinc-600">{date}</span>
+              { timestamp: 'Jun 10, 2026, 2:07 PM', status: 'Interview', source: 'email', sender: 'Alex Rivera', subject: 'Re: Senior Software Engineer role at Stripe' },
+              { timestamp: 'Jun 7, 2026, 9:14 AM', status: 'Screening', source: 'email', sender: 'Alex Rivera', subject: 'Re: Senior Software Engineer role at Stripe' },
+              { timestamp: 'Jun 5, 2026, 11:06 AM', status: 'Applied', source: 'email', sender: 'Stripe Careers', subject: 'Thanks for your job application' },
+            ].map(({ timestamp, status, source, sender, subject }) => (
+              <div key={timestamp} className="flex gap-2 text-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0 mt-1"></span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 overflow-hidden">
+                    <span className="text-zinc-300 truncate">{timestamp} — {status}</span>
+                    {source === 'email' && <Mail size={11} className="text-zinc-500 shrink-0" aria-hidden="true" />}
+                  </div>
+                  <p className="text-zinc-500 truncate">{sender} — {subject}</p>
+                </div>
               </div>
             ))}
           </div>
