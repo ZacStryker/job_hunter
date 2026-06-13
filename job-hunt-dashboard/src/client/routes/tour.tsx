@@ -286,14 +286,12 @@ function FeatureSection4() {
         </p>
       </div>
       <FadeInView className="flex-1">
-        <iframe
-          src="/resume-preview.pdf#toolbar=0"
-          className="w-full h-96 border border-zinc-700 rounded pointer-events-none"
-          title="Resume preview"
+        <img
+          src="/resume-preview.png"
+          alt="Example tailored resume"
+          className="w-full border border-zinc-700 rounded"
           loading="lazy"
-        >
-          <a href="/resume-preview.pdf" className="text-xs text-zinc-400 underline">View resume PDF</a>
-        </iframe>
+        />
       </FadeInView>
     </div>
   )
