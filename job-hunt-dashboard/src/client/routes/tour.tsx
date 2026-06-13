@@ -289,7 +289,7 @@ function FeatureSection4() {
           <div className="space-y-1.5">
             <p className="text-xs text-zinc-500 uppercase tracking-wide">Cover Letter</p>
             <iframe
-              src="/cover-letter-preview.pdf"
+              src="/cover-letter-preview.pdf#toolbar=0"
               className="w-full h-72 border border-zinc-700 rounded pointer-events-none"
               title="Cover letter preview"
               loading="lazy"
@@ -300,7 +300,7 @@ function FeatureSection4() {
           <div className="space-y-1.5">
             <p className="text-xs text-zinc-500 uppercase tracking-wide">Resume</p>
             <iframe
-              src="/resume-preview.pdf"
+              src="/resume-preview.pdf#toolbar=0"
               className="w-full h-72 border border-zinc-700 rounded pointer-events-none"
               title="Resume preview"
               loading="lazy"
