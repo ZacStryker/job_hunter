@@ -283,7 +283,7 @@ function ResumeCarousel() {
   const touchStartX = useRef<number | null>(null)
 
   return (
-    <div className="md:hidden">
+    <div>
       <div
         className="border border-zinc-700 rounded overflow-hidden"
         onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX }}
@@ -326,12 +326,6 @@ function FeatureSection4() {
         </p>
       </div>
       <FadeInView className="flex-1">
-        <img
-          src="/resume-preview.png"
-          alt="Example tailored resume"
-          className="hidden md:block w-full border border-zinc-700 rounded"
-          loading="lazy"
-        />
         <ResumeCarousel />
       </FadeInView>
     </div>
