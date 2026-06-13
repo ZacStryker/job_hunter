@@ -78,6 +78,12 @@ const DEMO_JOBS: DemoJob[] = [
 ]
 
 export function TourRoute() {
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const selectedJob = DEMO_JOBS.find(j => j.id === selectedId) ?? null
+  const lastJobRef = useRef<DemoJob | null>(null)
+  if (selectedJob) lastJobRef.current = selectedJob
+  const visibleJob = selectedJob ?? lastJobRef.current
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="border-b border-zinc-800">
@@ -107,7 +113,7 @@ export function TourRoute() {
         <p className="text-lg text-zinc-400 mb-10">
           AI-powered job search command center — from discovery to offer.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-16">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-10">
           <Button asChild size="lg">
             <Link to="/register">Get started</Link>
           </Button>
@@ -123,8 +129,30 @@ export function TourRoute() {
             See how it works ↓
           </a>
         </div>
-        <div className="max-w-3xl mx-auto">
-          <HeroMockup />
+
+        <div className="max-w-6xl mx-auto text-left">
+          <div className="mb-4 text-center">
+            <span className="inline-block mb-2 px-3 py-1 rounded-full border border-zinc-700 text-xs text-zinc-400 uppercase tracking-wider">
+              Interactive Demo
+            </span>
+            <p className="text-sm text-zinc-500">Click any row to open the AI analysis drawer.</p>
+          </div>
+          <div className="rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl overflow-hidden">
+            <div className="flex flex-col md:flex-row">
+              <DemoTable
+                jobs={DEMO_JOBS}
+                selectedId={selectedId}
+                onSelect={(id) => setSelectedId(prev => prev === id ? null : id)}
+              />
+              <div className={`transition-all duration-300 ease-in-out overflow-hidden shrink-0 border-zinc-800 md:border-l ${selectedId !== null ? 'max-h-[500px] md:max-h-none md:w-80 border-t md:border-t-0' : 'max-h-0 md:max-h-none md:w-0'}`}>
+                <div className="w-full md:w-80 flex flex-col" style={{ minHeight: '100%' }}>
+                  {visibleJob && (
+                    <DemoDrawer job={visibleJob} onClose={() => setSelectedId(null)} />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -134,7 +162,6 @@ export function TourRoute() {
         <FeatureSection4 />
         <FeatureSection5 />
       </section>
-      <InteractiveDemo />
       <FaqSection />
       <ClosingCta />
     </div>
@@ -145,7 +172,7 @@ function FeatureSection2() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-20 flex flex-col md:flex-row-reverse gap-12 items-center">
       <div className="flex-1 space-y-4">
-        <h2 className="text-3xl font-bold text-zinc-100">Find the right jobs before the AI even runs</h2>
+        <h2 className="text-3xl font-bold text-zinc-100">Separate the signal from the noise</h2>
         <p className="text-zinc-400 leading-relaxed">
           Configure job title and location search pairs once. HITLOBSTER scrapes matching listings from LinkedIn — then scores each one for semantic similarity to your resume profile before the full AI pipeline runs. Only the most relevant results make it through, so you spend your attention budget on real opportunities. More job boards are on the way.
         </p>
@@ -275,13 +302,14 @@ function FeatureSection4() {
           </div>
           <div className="px-4 py-3 space-y-1.5">
             <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Resume Preview</p>
-            <div className="space-y-1">
-              <div className="h-2 bg-zinc-700 rounded w-3/4"></div>
-              <div className="h-1.5 bg-zinc-800 rounded w-full"></div>
-              <div className="h-1.5 bg-zinc-800 rounded w-5/6"></div>
-              <div className="h-1.5 bg-zinc-800 rounded w-4/5 mt-2"></div>
-              <div className="h-1.5 bg-zinc-800 rounded w-full"></div>
-            </div>
+            <iframe
+              src="/resume-preview.pdf"
+              className="w-full aspect-[210/297] border border-zinc-800 rounded pointer-events-none"
+              title="Resume preview"
+              loading="lazy"
+            >
+              <a href="/resume-preview.pdf" className="text-xs text-zinc-400 underline">View resume PDF</a>
+            </iframe>
           </div>
         </div>
       </FadeInView>
@@ -377,103 +405,6 @@ function FadeInView({ children, className }: { children: ReactNode; className?: 
     >
       {children}
     </div>
-  )
-}
-
-function HeroMockup() {
-  return (
-    <div className="flex flex-col md:flex-row rounded-lg border border-zinc-700 bg-zinc-900 shadow-2xl text-left">
-      <div className="flex-1 min-w-0 overflow-x-auto">
-        <div className="grid grid-cols-[1fr_1fr_48px_96px] gap-x-3 px-4 py-2 border-b border-zinc-800">
-          <span className="text-xs text-zinc-500 uppercase tracking-wide">Company</span>
-          <span className="text-xs text-zinc-500 uppercase tracking-wide">Role</span>
-          <span className="text-xs text-zinc-500 uppercase tracking-wide text-center">Score</span>
-          <span className="text-xs text-zinc-500 uppercase tracking-wide">Match</span>
-        </div>
-        <MockupRow company="Stripe" role="Senior SWE" score={84} recommendation="apply" selected />
-        <MockupRow company="Vercel" role="Platform Eng." score={71} recommendation="investigate" />
-        <MockupRow company="Datadog" role="Backend Eng." score={52} recommendation="investigate" />
-        <MockupRow company="Meta" role="Staff Engineer" score={38} recommendation="skip" />
-      </div>
-
-      <div className="w-full md:w-60 shrink-0 border-t md:border-t-0 md:border-l border-zinc-800">
-        <div className="px-4 py-3 border-b border-zinc-800">
-          <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Stripe</p>
-          <p className="text-sm font-semibold text-zinc-100 leading-snug">Senior Software Engineer</p>
-          <div className="flex items-center gap-2 mt-2">
-            <ScoreBadge score={84} />
-            <ActionChip recommendation="apply" />
-          </div>
-        </div>
-        <div className="px-4 py-3 space-y-3">
-          <div>
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1.5">Requirements Met</p>
-            <ul className="space-y-1">
-              <li className="flex gap-1.5 items-start text-xs text-zinc-300">
-                <span className="text-emerald-500 shrink-0 leading-4">✓</span>
-                5+ years TypeScript
-              </li>
-              <li className="flex gap-1.5 items-start text-xs text-zinc-300">
-                <span className="text-emerald-500 shrink-0 leading-4">✓</span>
-                Distributed systems exp.
-              </li>
-              <li className="flex gap-1.5 items-start text-xs text-zinc-300">
-                <span className="text-emerald-500 shrink-0 leading-4">✓</span>
-                Payment platform background
-              </li>
-            </ul>
-          </div>
-          <div>
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1.5">Requirements Missed</p>
-            <ul className="space-y-1">
-              <li className="flex gap-1.5 items-start text-xs text-zinc-400">
-                <span className="text-amber-500 shrink-0 leading-4">○</span>
-                Go language proficiency
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function InteractiveDemo() {
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const selectedJob = DEMO_JOBS.find(j => j.id === selectedId) ?? null
-  const lastJobRef = useRef<DemoJob | null>(null)
-  if (selectedJob) lastJobRef.current = selectedJob
-  const visibleJob = selectedJob ?? lastJobRef.current
-
-  return (
-    <section className="py-24 border-t border-zinc-800/50">
-      <div className="max-w-6xl mx-auto px-6">
-        <div className="mb-10 text-center">
-          <span className="inline-block mb-3 px-3 py-1 rounded-full border border-zinc-700 text-xs text-zinc-400 uppercase tracking-wider">
-            Interactive Demo
-          </span>
-          <h2 className="text-3xl font-bold text-zinc-100">See it in action</h2>
-          <p className="mt-3 text-zinc-400">Click any row to open the AI analysis drawer.</p>
-        </div>
-
-        <div className="rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl overflow-hidden">
-          <div className="flex flex-col md:flex-row">
-            <DemoTable
-              jobs={DEMO_JOBS}
-              selectedId={selectedId}
-              onSelect={(id) => setSelectedId(prev => prev === id ? null : id)}
-            />
-            <div className={`transition-all duration-300 ease-in-out overflow-hidden shrink-0 border-zinc-800 md:border-l ${selectedId !== null ? 'max-h-[500px] md:max-h-none md:w-80 border-t md:border-t-0' : 'max-h-0 md:max-h-none md:w-0'}`}>
-              <div className="w-full md:w-80 flex flex-col" style={{ minHeight: '100%' }}>
-                {visibleJob && (
-                  <DemoDrawer job={visibleJob} onClose={() => setSelectedId(null)} />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
   )
 }
 
@@ -598,31 +529,6 @@ function DemoDrawer({ job, onClose }: DemoDrawerProps) {
         </Link>
       </div>
     </>
-  )
-}
-
-interface MockupRowProps {
-  company: string
-  role: string
-  score: number
-  recommendation: 'apply' | 'investigate' | 'skip'
-  selected?: boolean
-}
-
-function MockupRow({ company, role, score, recommendation, selected = false }: MockupRowProps) {
-  return (
-    <div
-      className={`grid grid-cols-[1fr_1fr_48px_96px] gap-x-3 items-center px-4 py-2.5 border-b border-zinc-800/50 last:border-b-0 ${
-        selected ? 'bg-zinc-800 ring-1 ring-inset ring-blue-500/30' : ''
-      }`}
-    >
-      <span className={`text-sm truncate ${selected ? 'text-zinc-100 font-medium' : 'text-zinc-300'}`}>{company}</span>
-      <span className={`text-sm truncate ${selected ? 'text-zinc-200' : 'text-zinc-400'}`}>{role}</span>
-      <span className="flex justify-center">
-        <ScoreBadge score={score} />
-      </span>
-      <ActionChip recommendation={recommendation} />
-    </div>
   )
 }
 

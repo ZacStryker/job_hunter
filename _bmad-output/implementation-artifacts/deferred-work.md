@@ -911,3 +911,6 @@ If none of `.job_seen_beacon`, `td.resultContent` match, card=null → company=n
 - **`DemoTable` row buttons lack ARIA state** — `aria-pressed` or `aria-expanded` would announce to screen readers when the drawer opens/closes. Low accessibility gap; tour page is informational so impact is limited.
 - **`FadeInView` SSR/MQL lifecycle issues** — pre-existing from story 44.1/44.2: `mqlRef` created during render (multiple objects in concurrent mode), SSR flash when server renders elements as `opacity-0`. Not actionable without SSR strategy change.
 - **Mobile overflow — `w-80` drawer has no responsive fallback** — on viewports narrower than ~640px the flex row (table + 320px drawer) overflows. No mobile breakpoints exist anywhere on the tour page yet; address in a future responsive polish pass.
+
+## Tour page interactive demo — mobile drawer clipping
+On narrow viewports (≤375 px), the demo drawer is capped at `max-h-[500px]`. Jobs with many fields (e.g. Datadog with red flags + 5 list items) may push the CTA button below the visible area, requiring scroll to reach it. The inner div is `overflow-y-auto` so content is reachable, but the CTA is effectively hidden. Consider raising the cap or using `max-h-screen` on mobile.
