@@ -7,7 +7,8 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { SortingState, ColumnSizingState } from '@tanstack/react-table'
-import { useState, useMemo, useRef, useLayoutEffect } from 'react'
+import { useState, useMemo, useRef, useLayoutEffect, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import * as SelectPrimitive from '@radix-ui/react-select'
@@ -87,6 +88,7 @@ function CompanyTypeahead({
 }) {
   const [inputValue, setInputValue] = useState('')
   const [open, setOpen] = useState(false)
+  const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const filtered = useMemo(
@@ -94,8 +96,27 @@ function CompanyTypeahead({
     [options, inputValue]
   )
 
+  function updateRect() {
+    const el = inputRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setMenuRect({ top: r.bottom + 4, left: r.left, width: 200 })
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const onReflow = () => updateRect()
+    window.addEventListener('scroll', onReflow, true)
+    window.addEventListener('resize', onReflow)
+    return () => {
+      window.removeEventListener('scroll', onReflow, true)
+      window.removeEventListener('resize', onReflow)
+    }
+  }, [open])
+
   function handleFocus() {
     setInputValue('')
+    updateRect()
     setOpen(true)
   }
 
@@ -135,8 +156,11 @@ function CompanyTypeahead({
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyDown}
       />
-      {open && (
-        <div className="absolute z-50 top-full left-0 mt-1 w-[200px] bg-zinc-800 border border-zinc-700 rounded shadow-lg max-h-60 overflow-y-auto">
+      {open && menuRect && createPortal(
+        <div
+          className="fixed z-50 bg-zinc-800 border border-zinc-700 rounded shadow-lg max-h-60 overflow-y-auto"
+          style={{ top: menuRect.top, left: menuRect.left, width: menuRect.width }}
+        >
           <div
             className="px-2 py-1.5 text-xs text-zinc-400 hover:bg-zinc-700 cursor-pointer"
             onMouseDown={(e) => {
@@ -158,7 +182,8 @@ function CompanyTypeahead({
               {c}
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
