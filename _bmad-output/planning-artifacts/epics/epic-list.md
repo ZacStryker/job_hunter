@@ -10,6 +10,7 @@ User can clone the repo, run `bun start`, and see a live (empty) dashboard with 
 User can sync job records from Google Sheets into the dashboard — jobs land in SQLite, user-owned fields are protected, and feedback is clear on success or failure.
 **FRs covered:** FR1, FR2, FR3, FR4, FR5, FR6
 **NFRs addressed:** NFR3, NFR7, NFR8, NFR10, NFR11, NFR12
+> ⚠️ **Superseded:** The Google Sheets sync was replaced by the self-contained Discovery/Analysis pipeline (scraper sources + Anthropic API). The current FR1–FR6 in `requirements-inventory.md` describe that pipeline, not Sheets.
 
 ## Epic 3: Pipeline View — Job Triage at a Glance
 User can scan all jobs in a dense, color-coded pipeline table with fit score badges and action chips — including column visibility toggling and view switching to Tracker tab.
@@ -35,6 +36,7 @@ System polls IMAP inbox, matches emails to job records, and auto-updates applica
 ## Epic 7 (Post-MVP): Cover Letter Generation Pipeline
 User can trigger cover letter generation for any job — delivered via email, tracked in the drawer, with status indicator visible in the table row.
 **FRs covered:** FR28, FR29, FR30, FR31, FR33
+> ⚠️ **Superseded:** The n8n webhook callback (Story 7.2) was replaced by direct in-app generation via the Anthropic API; cover letters are now managed on the Messages page (spec-fix-messages-company-typeahead).
 
 ## Epic 8 (Post-MVP): Field Visibility & Archive
 User can see additional job data fields (date scraped, status) in the pipeline table and archive irrelevant jobs to keep active views focused.
@@ -135,5 +137,32 @@ Users can pre-screen newly discovered jobs against their resume before running e
 **FRs covered:** FR1–FR13 (epic-40 scope)
 **NFRs addressed:** NFR1–NFR5 (epic-40 scope)
 **Architecture:** New DB migration (relevance_score column + user_embeddings table); new embedding-service + resume-embedding-cache modules; hook in discovery-service after transaction; two parallel implementation paths gated by spike 40.1
+
+---
+
+## Epic 41: Company Blacklist
+Users can blacklist companies to prevent future discovery runs from surfacing jobs at those companies, and manage their blacklist from the Config section or directly from the job drawer.
+**Source:** User request 2026-06-04
+**Priority:** Medium — discovery quality-of-life improvement; no breaking changes to existing schema or API
+**Architecture:** New `company_blacklist` table (`user_id`, `company_name` lowercased, `UNIQUE(user_id, company_name)`); CRUD `/api/blacklist`; discovery-service filters blacklisted companies; shared hooks reused by the drawer toggle and the `/config/job-sources/blacklist` page
+
+---
+
+## Epic 42: Resume Pipeline — Schema + Prompt + Template Alignment
+Replaces the app's HTML-generation resume pipeline with a three-component canonical contract — a flat JSON schema, a rewritten LLM prompt that emits it, and the Sage HTML template that consumes it — all provably aligned. Resume service flow becomes LLM → JSON → schema validation → template injection → Playwright PDF.
+**Source:** Epic input — Resume Generation Pipeline (provided inline)
+**Priority:** Medium — correctness/maintainability of the resume feature
+**FRs covered:** FR1–FR5 (epic-42 scope)
+**Architecture:** Canonical flat `resumeDataSchema` (machine-checkable JSON Schema + prose rules); rewritten `prompt-defaults.ts` resume prompt; `resume-service.ts` migrated from HTML-direct to JSON pipeline; contract-drift guard test; migration risk limited to custom prompt overrides in the `prompts` table
+
+---
+
+## Epic 44: Public-Facing Tour Page
+Unauthenticated visitors can navigate to `/tour` and experience a polished, scroll-driven marketing page communicating the workflow (discover → score → match → apply → track), interact with a live demo of the Matches view, and follow a CTA to register — all without an account.
+**Source:** User request
+**Priority:** Medium — acquisition surface; no changes to the authenticated app
+**FRs covered:** FR1–FR10 (epic-44 scope) · **NFRs:** NFR1–NFR8 · **UX-DRs:** UX-DR1–UX-DR5
+**Out of scope:** Pricing page, blog/SEO strategy, A/B testing, analytics instrumentation
+**Architecture:** `/tour` registered as a direct child of `rootRoute` (no `beforeLoad`, no session fetch); static JSX feature sections with scroll animations; interactive Matches demo; FAQ + closing CTA
 
 ---
