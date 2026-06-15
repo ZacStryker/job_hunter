@@ -530,7 +530,7 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
                 key={row.id}
                 onClick={() => onRowClick(row.original)}
                 className={cn(
-                  'border-zinc-800 cursor-pointer transition-colors',
+                  'border-zinc-800 cursor-pointer select-none transition-colors',
                   row.getIsSelected()
                     ? 'bg-zinc-700/60 hover:bg-zinc-700/80'
                     : row.original.id === selectedJobId
