@@ -33,7 +33,14 @@ const columnHelper = createColumnHelper<WebhookRun>()
 const columns = [
   columnHelper.accessor('runAt', {
     header: 'Run Date',
-    cell: (info) => new Date(info.getValue()).toLocaleString(),
+    cell: (info) =>
+      new Date(info.getValue()).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
   }),
   columnHelper.accessor((row) => parseName(row.name).workflow, {
     id: 'workflow',
