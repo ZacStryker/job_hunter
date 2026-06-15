@@ -70,6 +70,7 @@ const CREATE_JOBS_TABLE = `
     status_override TEXT,
     cover_letter_sent_at TEXT,
     date_applied TEXT,
+    date_archived TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
     resume_generated_at TEXT,
     date_analyzed TEXT,
@@ -477,15 +478,15 @@ describe('runDiscovery()', () => {
     expect(errors).toHaveLength(0)
   })
 
-  test('LinkedIn with valid auth passes storageStatePath in request body', async () => {
+  test('LinkedIn with valid auth passes storageStateContent in request body', async () => {
     prodSqlite.run(
       `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
     )
 
-    let capturedStorageStatePath: string | undefined
+    let capturedStorageStateContent: string | undefined
     globalThis.fetch = mock((url: unknown, options: unknown) => {
       const body = JSON.parse((options as RequestInit).body as string) as Record<string, unknown>
-      if (body.source === 'linkedin') capturedStorageStatePath = body.storageStatePath as string
+      if (body.source === 'linkedin') capturedStorageStateContent = body.storageStateContent as string
       return Promise.resolve(new Response(
         JSON.stringify({ results: [] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
@@ -493,19 +494,18 @@ describe('runDiscovery()', () => {
     })
 
     await runDiscovery(undefined, 1)
-    expect(capturedStorageStatePath).toBeDefined()
-    expect(capturedStorageStatePath).toMatch(/linkedin-1-\d+\.json$/)
+    expect(capturedStorageStateContent).toBe('{"cookies":[],"origins":[]}')
   })
 
-  test('temp file is deleted after scrape (finally block)', async () => {
+  test('session is sent inline as content, never as a temp-file path', async () => {
     prodSqlite.run(
       `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
     )
 
-    let capturedPath: string | undefined
+    let sawStorageStatePath = false
     globalThis.fetch = mock((_url: unknown, options: unknown) => {
       const body = JSON.parse((options as RequestInit).body as string) as Record<string, unknown>
-      if (body.storageStatePath) capturedPath = body.storageStatePath as string
+      if ('storageStatePath' in body) sawStorageStatePath = true
       return Promise.resolve(new Response(
         JSON.stringify({ results: [] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
@@ -513,11 +513,7 @@ describe('runDiscovery()', () => {
     })
 
     await runDiscovery(undefined, 1)
-    expect(capturedPath).toBeDefined()
-    if (capturedPath) {
-      const { existsSync } = await import('node:fs')
-      expect(existsSync(capturedPath)).toBe(false)
-    }
+    expect(sawStorageStatePath).toBe(false)
   })
 
   test('invalid ciphertext: decrypt error caught, LinkedIn skipped, no throw', async () => {
