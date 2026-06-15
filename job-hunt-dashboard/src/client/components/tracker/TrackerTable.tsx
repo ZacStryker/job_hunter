@@ -24,6 +24,28 @@ import { TablePagination } from '../shared/TablePagination'
 
 const PAGE_SIZE = 20
 const SIZING_KEY = 'hitlobster-column-sizing-tracker'
+const SORTING_KEY = 'hitlobster-column-sorting-tracker'
+
+function loadSorting(): SortingState | null {
+  try {
+    const stored = localStorage.getItem(SORTING_KEY)
+    if (!stored) return null
+    const parsed: unknown = JSON.parse(stored)
+    if (!Array.isArray(parsed)) return null
+    if (!parsed.every((e) => typeof e === 'object' && e !== null && typeof (e as { id?: unknown }).id === 'string' && typeof (e as { desc?: unknown }).desc === 'boolean')) return null
+    return parsed as SortingState
+  } catch {
+    return null
+  }
+}
+
+function saveSorting(state: SortingState) {
+  try {
+    localStorage.setItem(SORTING_KEY, JSON.stringify(state))
+  } catch {
+    // ignore storage errors
+  }
+}
 
 function loadSizing(): ColumnSizingState {
   try {
@@ -147,7 +169,7 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
     () => appliedJobs.filter((job) => jobMatchesKeyword(job, keyword)),
     [appliedJobs, keyword]
   )
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'dateApplied', desc: true }])
+  const [sorting, setSorting] = useState<SortingState>(() => loadSorting() ?? [{ id: 'dateApplied', desc: true }])
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing())
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -165,7 +187,11 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
     state: { sorting, columnSizing },
     onSortingChange: (updater) => {
       table.setPageIndex(0)
-      setSorting(updater)
+      setSorting((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        saveSorting(next)
+        return next
+      })
     },
     onColumnSizingChange: (updater) => {
       setColumnSizing((prev) => {

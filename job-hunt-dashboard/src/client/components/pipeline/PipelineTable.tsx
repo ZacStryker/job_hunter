@@ -119,6 +119,27 @@ function saveSizing(key: string, state: ColumnSizingState) {
   }
 }
 
+function loadSorting(key: string): SortingState | null {
+  try {
+    const stored = localStorage.getItem(key)
+    if (!stored) return null
+    const parsed: unknown = JSON.parse(stored)
+    if (!Array.isArray(parsed)) return null
+    if (!parsed.every((e) => typeof e === 'object' && e !== null && typeof (e as { id?: unknown }).id === 'string' && typeof (e as { desc?: unknown }).desc === 'boolean')) return null
+    return parsed as SortingState
+  } catch {
+    return null
+  }
+}
+
+function saveSorting(key: string, state: SortingState) {
+  try {
+    localStorage.setItem(key, JSON.stringify(state))
+  } catch {
+    // ignore storage errors
+  }
+}
+
 const columnHelper = createColumnHelper<Job>()
 
 const staticColumns = [
@@ -307,9 +328,10 @@ interface PipelineTableProps {
   fixedColumns?: string[]
   initialSort?: SortingState
   sizingStorageKey: string
+  sortingStorageKey: string
 }
 
-export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, isBulkArchiving = false, fixedColumns, initialSort, sizingStorageKey }: PipelineTableProps) {
+export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, isBulkArchiving = false, fixedColumns, initialSort, sizingStorageKey, sortingStorageKey }: PipelineTableProps) {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
     if (fixedColumns) {
       const state: VisibilityState = {}
@@ -321,7 +343,7 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
     }
     return loadVisibility()
   })
-  const [sorting, setSorting] = useState<SortingState>(initialSort ?? [{ id: 'fitScore', desc: true }])
+  const [sorting, setSorting] = useState<SortingState>(() => loadSorting(sortingStorageKey) ?? initialSort ?? [{ id: 'fitScore', desc: true }])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing(sizingStorageKey))
   const [keyword, setKeyword] = useState('')
@@ -424,7 +446,11 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
     onColumnVisibilityChange: handleVisibilityChange,
     onSortingChange: (updater) => {
       table.setPageIndex(0)
-      setSorting(updater)
+      setSorting((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        saveSorting(sortingStorageKey, next)
+        return next
+      })
       lastSelectedIndexRef.current = null
     },
     onRowSelectionChange: setRowSelection,

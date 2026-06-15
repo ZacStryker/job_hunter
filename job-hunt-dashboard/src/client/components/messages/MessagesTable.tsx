@@ -23,6 +23,28 @@ import { KeywordFilterInput } from '../shared/KeywordFilterInput'
 const NONE_SENTINEL = '__none__'
 const PAGE_SIZE = 20
 const SIZING_KEY = 'hitlobster-column-sizing-messages'
+const SORTING_KEY = 'hitlobster-column-sorting-messages'
+
+function loadSorting(): SortingState | null {
+  try {
+    const stored = localStorage.getItem(SORTING_KEY)
+    if (!stored) return null
+    const parsed: unknown = JSON.parse(stored)
+    if (!Array.isArray(parsed)) return null
+    if (!parsed.every((e) => typeof e === 'object' && e !== null && typeof (e as { id?: unknown }).id === 'string' && typeof (e as { desc?: unknown }).desc === 'boolean')) return null
+    return parsed as SortingState
+  } catch {
+    return null
+  }
+}
+
+function saveSorting(state: SortingState) {
+  try {
+    localStorage.setItem(SORTING_KEY, JSON.stringify(state))
+  } catch {
+    // ignore storage errors
+  }
+}
 
 function loadSizing(): ColumnSizingState {
   try {
@@ -198,7 +220,7 @@ interface MessagesTableProps {
 }
 
 export function MessagesTable({ messages, jobs }: MessagesTableProps) {
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'receivedAt', desc: true }])
+  const [sorting, setSorting] = useState<SortingState>(() => loadSorting() ?? [{ id: 'receivedAt', desc: true }])
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing())
   const [keyword, setKeyword] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -382,7 +404,11 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
     state: { sorting, columnSizing },
     onSortingChange: (updater) => {
       table.setPageIndex(0)
-      setSorting(updater)
+      setSorting((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        saveSorting(next)
+        return next
+      })
     },
     onColumnSizingChange: (updater) => {
       setColumnSizing((prev) => {
