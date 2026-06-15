@@ -14,8 +14,8 @@ export function ScoreBadge({ score }: ScoreBadgeProps) {
 
   return (
     <span
-      className="inline-flex items-center justify-center w-10 h-6 text-xs font-semibold border rounded bg-transparent"
-      style={{ borderColor: color, color }}
+      className="inline-flex items-center justify-center w-10 h-6 text-xs font-semibold border border-zinc-700 rounded bg-transparent"
+      style={{ color }}
     >
       {score}
     </span>
