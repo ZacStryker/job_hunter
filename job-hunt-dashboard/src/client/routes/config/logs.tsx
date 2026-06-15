@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useLayoutEffect } from 'react'
 import {
   createColumnHelper,
   flexRender,
@@ -7,7 +7,7 @@ import {
   getPaginationRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type { SortingState } from '@tanstack/react-table'
+import type { SortingState, ColumnSizingState } from '@tanstack/react-table'
 import { TablePagination } from '@/components/shared/TablePagination'
 import {
   TableBody,
@@ -21,6 +21,31 @@ import { useWebhookRunsQuery } from '@/hooks/useWebhookRunsQuery'
 import { KeywordFilterInput } from '@/components/shared/KeywordFilterInput'
 
 const PAGE_SIZE = 20
+const SIZING_KEY = 'hitlobster-column-sizing-logs'
+
+function loadSizing(): ColumnSizingState {
+  try {
+    const stored = localStorage.getItem(SIZING_KEY)
+    if (!stored) return {}
+    const parsed: unknown = JSON.parse(stored)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
+    const result: ColumnSizingState = {}
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof v === 'number' && isFinite(v)) result[k] = v
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
+
+function saveSizing(state: ColumnSizingState) {
+  try {
+    localStorage.setItem(SIZING_KEY, JSON.stringify(state))
+  } catch {
+    // ignore storage errors
+  }
+}
 
 function parseName(name: string): { workflow: string; job: string } {
   if (name.startsWith('Cover Letter - ')) return { workflow: 'Cover Letter', job: name.slice('Cover Letter - '.length) }
@@ -30,33 +55,39 @@ function parseName(name: string): { workflow: string; job: string } {
 
 const columnHelper = createColumnHelper<WebhookRun>()
 
+const ELLIPSIS = 'whitespace-nowrap overflow-hidden text-ellipsis block'
+
 const columns = [
   columnHelper.accessor('runAt', {
     header: 'Run Date',
-    cell: (info) =>
-      new Date(info.getValue()).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      }),
+    size: 150,
+    cell: (info) => (
+      <span className={ELLIPSIS}>
+        {new Date(info.getValue()).toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })}
+      </span>
+    ),
   }),
   columnHelper.accessor((row) => parseName(row.name).workflow, {
     id: 'workflow',
     header: 'Workflow',
-    cell: (info) => info.getValue(),
+    size: 130,
+    cell: (info) => <span className={ELLIPSIS}>{info.getValue()}</span>,
   }),
   columnHelper.accessor((row) => row, {
     id: 'detail',
     header: 'Detail',
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    meta: { minWidth: 220 } as any,
+    size: 280,
     cell: (info) => {
       const row = info.getValue()
       if (row.name === 'Analysis' && row.itemCount !== null) {
         return (
-          <span className="text-zinc-300">
+          <span className={`text-zinc-300 ${ELLIPSIS}`}>
             {row.itemCount} analyzed, {row.matchedCount ?? 0} matched, {row.archivedCount ?? 0} archived
           </span>
         )
@@ -67,55 +98,70 @@ const columns = [
           ? Object.entries(breakdown).filter(([, count]) => count >= 1).map(([src, count]) => `${src}: ${count}`)
           : []
         return (
-          <span className="text-zinc-300">
+          <span className={`text-zinc-300 ${ELLIPSIS}`}>
             {row.itemCount} added{parts.length > 0 ? ` (${parts.join(', ')})` : ''}
           </span>
         )
       }
       const job = parseName(row.name).job
-      return job || <span className="text-zinc-600">—</span>
+      return job
+        ? <span className={ELLIPSIS}>{job}</span>
+        : <span className="text-zinc-600">—</span>
     },
   }),
   columnHelper.accessor('success', {
     header: 'Success',
+    size: 110,
     cell: (info) => {
       const ok = info.getValue()
       const errorMessage = info.row.original.errorMessage
       return ok ? (
         <span className="text-green-400">✓</span>
       ) : (
-        <span className="text-red-400 flex items-center gap-1.5" title={errorMessage ?? undefined}>
-          ✗{errorMessage ? <span className="text-xs text-zinc-500 max-w-[160px] truncate">{errorMessage}</span> : null}
+        <span className="text-red-400 flex items-center gap-1.5 overflow-hidden" title={errorMessage ?? undefined}>
+          ✗{errorMessage ? <span className="text-xs text-zinc-500 truncate min-w-0">{errorMessage}</span> : null}
         </span>
       )
     },
   }),
   columnHelper.accessor('durationMs', {
     header: 'Duration',
+    size: 90,
     cell: (info) => {
       const val = info.getValue()
-      return val !== null ? (val / 1000).toFixed(1) + 's' : <span className="text-zinc-600">—</span>
+      return val !== null
+        ? <span className={ELLIPSIS}>{(val / 1000).toFixed(1) + 's'}</span>
+        : <span className="text-zinc-600">—</span>
     },
   }),
   columnHelper.accessor('inputTokens', {
     header: 'Input Tokens',
+    size: 110,
     cell: (info) => {
       const val = info.getValue()
-      return val !== null ? String(val) : <span className="text-zinc-600">—</span>
+      return val !== null
+        ? <span className={ELLIPSIS}>{String(val)}</span>
+        : <span className="text-zinc-600">—</span>
     },
   }),
   columnHelper.accessor('outputTokens', {
     header: 'Output Tokens',
+    size: 120,
     cell: (info) => {
       const val = info.getValue()
-      return val !== null ? String(val) : <span className="text-zinc-600">—</span>
+      return val !== null
+        ? <span className={ELLIPSIS}>{String(val)}</span>
+        : <span className="text-zinc-600">—</span>
     },
   }),
   columnHelper.accessor('costUsd', {
     header: 'Cost',
+    size: 90,
     cell: (info) => {
       const val = info.getValue()
-      return val !== null ? '$' + Number(val).toFixed(4) : <span className="text-zinc-600">—</span>
+      return val !== null
+        ? <span className={ELLIPSIS}>{'$' + Number(val).toFixed(4)}</span>
+        : <span className="text-zinc-600">—</span>
     },
   }),
 ]
@@ -124,6 +170,8 @@ export function ConfigLogsRoute() {
   const { data: runs = [], isPending, isError, error } = useWebhookRunsQuery()
   const [sorting, setSorting] = useState<SortingState>([{ id: 'runAt', desc: true }])
   const [keyword, setKeyword] = useState('')
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing())
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const filteredRuns = useMemo(() => {
     const q = keyword.trim().toLowerCase()
@@ -144,14 +192,46 @@ export function ConfigLogsRoute() {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    defaultColumn: { minSize: 40 },
     enableMultiSort: false,
+    enableColumnResizing: true,
+    columnResizeMode: 'onChange',
     initialState: { pagination: { pageSize: PAGE_SIZE, pageIndex: 0 } },
-    state: { sorting },
+    state: { sorting, columnSizing },
     onSortingChange: (updater) => {
       table.setPageIndex(0)
       setSorting(updater)
     },
+    onColumnSizingChange: (updater) => {
+      setColumnSizing((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        saveSizing(next)
+        return next
+      })
+    },
   })
+
+  useLayoutEffect(() => {
+    if (Object.keys(columnSizing).length > 0 || !containerRef.current) return
+    const containerWidth = containerRef.current.clientWidth
+    if (containerWidth === 0) return
+    const visibleCols = table.getVisibleLeafColumns()
+    const totalSize = visibleCols.reduce((sum, col) => sum + col.getSize(), 0)
+    if (totalSize === 0 || totalSize >= containerWidth) return
+    const newSizing: ColumnSizingState = {}
+    let allocated = 0
+    visibleCols.forEach((col, i) => {
+      if (i === visibleCols.length - 1) {
+        newSizing[col.id] = Math.max(col.columnDef.minSize ?? 40, containerWidth - allocated)
+      } else {
+        const w = Math.max(col.columnDef.minSize ?? 40, Math.floor(col.getSize() / totalSize * containerWidth))
+        newSizing[col.id] = w
+        allocated += w
+      }
+    })
+    setColumnSizing(newSizing)
+    saveSizing(newSizing)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { pageIndex, pageSize } = table.getState().pagination
   const totalRows = table.getFilteredRowModel().rows.length
@@ -194,23 +274,34 @@ export function ConfigLogsRoute() {
               noun="runs"
             />
           </div>
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
+          <div ref={containerRef} className="overflow-auto">
+            <table className="text-sm" style={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
               <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id} className="border-zinc-800">
                     {headerGroup.headers.map((header) => {
                       const sorted = header.column.getIsSorted()
-                      const colMeta = header.column.columnDef.meta as { minWidth?: number } | undefined
                       return (
                         <TableHead
                           key={header.id}
-                          className="text-zinc-400 bg-zinc-900 px-3 h-9 cursor-pointer select-none"
-                          style={colMeta?.minWidth ? { minWidth: colMeta.minWidth } : undefined}
+                          className="text-zinc-400 bg-zinc-900 px-3 h-9 cursor-pointer select-none relative overflow-hidden"
+                          style={{ width: header.getSize() }}
                           onClick={header.column.getToggleSortingHandler()}
                         >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                          {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                          <span className="whitespace-nowrap overflow-hidden text-ellipsis block">
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ''}
+                          </span>
+                          <div
+                            onMouseDown={(e) => { e.stopPropagation(); header.getResizeHandler()(e) }}
+                            onTouchStart={header.getResizeHandler()}
+                            onClick={(e) => e.stopPropagation()}
+                            className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none ${
+                              header.column.getIsResizing()
+                                ? 'bg-zinc-400 opacity-100'
+                                : 'bg-zinc-700 opacity-0 hover:opacity-100'
+                            }`}
+                          />
                         </TableHead>
                       )
                     })}
@@ -220,16 +311,15 @@ export function ConfigLogsRoute() {
               <TableBody>
                 {table.getRowModel().rows.map((row) => (
                   <TableRow key={row.id} className="border-zinc-800 hover:bg-zinc-900/50">
-                    {row.getVisibleCells().map((cell) => {
-                      const cellMeta = cell.column.columnDef.meta as { minWidth?: number } | undefined
-                      return (
-                        <TableCell key={cell.id} className="h-[40.8px] px-3 py-1.5 text-zinc-300"
-                          style={cellMeta?.minWidth ? { minWidth: cellMeta.minWidth } : undefined}
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      )
-                    })}
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        className="h-[40.8px] px-3 py-1.5 text-zinc-300 overflow-hidden"
+                        style={{ width: cell.column.getSize() }}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 ))}
               </TableBody>
