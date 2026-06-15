@@ -17,12 +17,53 @@ import {
   TableRow,
 } from '../ui/table'
 import type { Job } from '@shared/schemas'
+import { Check, Minus } from 'lucide-react'
 import { ScoreBadge } from './ScoreBadge'
 import { ActionChip } from './ActionChip'
 import { ColumnVisibilityToggle } from './ColumnVisibilityToggle'
 import { parseLocation } from '../../utils/parseLocation'
+import { cn } from '../../lib/utils'
 
 const NO_STATUS = '__none__'
+
+function SelectionCheckbox({
+  checked,
+  indeterminate = false,
+  onChange,
+  onClick,
+  label,
+}: {
+  checked: boolean
+  indeterminate?: boolean
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onClick?: (e: React.MouseEvent<HTMLInputElement>) => void
+  label: string
+}) {
+  return (
+    <span className="relative inline-flex h-4 w-4 items-center justify-center">
+      <input
+        type="checkbox"
+        checked={checked}
+        ref={(el) => {
+          if (el) el.indeterminate = indeterminate
+        }}
+        onChange={onChange}
+        onClick={onClick}
+        aria-label={label}
+        className="peer h-4 w-4 cursor-pointer appearance-none rounded-[3px] border border-zinc-600 bg-zinc-800 transition-colors hover:border-zinc-500 checked:border-zinc-100 checked:bg-zinc-100 indeterminate:border-zinc-100 indeterminate:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/40"
+      />
+      <Check
+        className="pointer-events-none absolute h-3 w-3 text-zinc-900 opacity-0 peer-checked:opacity-100"
+        strokeWidth={3}
+      />
+      <Minus
+        className="pointer-events-none absolute h-3 w-3 text-zinc-900 opacity-0 peer-indeterminate:opacity-100 peer-checked:opacity-0"
+        strokeWidth={3}
+      />
+    </span>
+  )
+}
+
 const APPLIED = 'Applied'
 const STATUS_OPTIONS = [
   { value: NO_STATUS, label: 'No Status' },
@@ -302,21 +343,20 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
     size: 36,
     minSize: 36,
     header: ({ table }) => (
-      <div onClick={(e) => e.stopPropagation()}>
-        <input
-          type="checkbox"
+      <label
+        className="absolute inset-0 flex cursor-pointer items-center justify-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <SelectionCheckbox
           checked={table.getIsAllRowsSelected()}
-          ref={(el) => {
-            if (el) el.indeterminate = table.getIsSomeRowsSelected()
-          }}
+          indeterminate={table.getIsSomeRowsSelected()}
           onChange={(e) => {
             table.getToggleAllRowsSelectedHandler()(e)
             lastSelectedIndexRef.current = null
           }}
-          className="cursor-pointer accent-zinc-400"
-          aria-label="Select all"
+          label="Select all"
         />
-      </div>
+      </label>
     ),
     cell: ({ row, table }) => {
       const rows = table.getRowModel().rows
@@ -345,16 +385,17 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
       }
 
       return (
-        <div onClick={(e) => e.stopPropagation()}>
-          <input
-            type="checkbox"
+        <label
+          className="absolute inset-0 flex cursor-pointer items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <SelectionCheckbox
             checked={row.getIsSelected()}
             onChange={handleChange}
             onClick={handleClick}
-            className="cursor-pointer accent-zinc-400"
-            aria-label="Select row"
+            label="Select row"
           />
-        </div>
+        </label>
       )
     },
   })
@@ -445,6 +486,17 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
               <TableRow key={headerGroup.id} className="border-0 hover:bg-transparent">
                 {headerGroup.headers.map((header) => {
                   const sorted = header.column.getIsSorted()
+                  if (header.column.id === 'select') {
+                    return (
+                      <TableHead
+                        key={header.id}
+                        className="relative h-9 p-0 select-none"
+                        style={{ width: header.getSize() }}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                      </TableHead>
+                    )
+                  }
                   return (
                     <TableHead
                       key={header.id}
@@ -477,16 +529,22 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
               <TableRow
                 key={row.id}
                 onClick={() => onRowClick(row.original)}
-                className={`border-zinc-800 cursor-pointer ${
-                  row.original.id === selectedJobId
-                    ? 'bg-zinc-800'
-                    : 'hover:bg-zinc-800/50'
-                }`}
+                className={cn(
+                  'border-zinc-800 cursor-pointer transition-colors',
+                  row.getIsSelected()
+                    ? 'bg-zinc-700/60 hover:bg-zinc-700/80'
+                    : row.original.id === selectedJobId
+                      ? 'bg-zinc-800'
+                      : 'hover:bg-zinc-800/50'
+                )}
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
                     key={cell.id}
-                    className="h-[40.8px] py-1.5 px-3 text-sm text-zinc-200 overflow-hidden"
+                    className={cn(
+                      'h-[40.8px] py-1.5 px-3 text-sm text-zinc-200 overflow-hidden',
+                      cell.column.id === 'select' && 'relative p-0'
+                    )}
                     style={{ width: cell.column.getSize() }}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
