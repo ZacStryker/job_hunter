@@ -23,14 +23,14 @@ context: []
 - `columnResizeMode: 'onChange'` for immediate drag feedback.
 - `table-layout: fixed` on every `<table>` element; table width set to `table.getTotalSize()px` so horizontal scroll works when columns expand beyond the container.
 - Default column widths set in the column `size:` field (not via Tailwind `max-w-*`). Remove existing `max-w-[...]` constraints from cell spans now that truncation is handled by `overflow-hidden` on the `<td>`.
-- localStorage keys follow the frozen naming scheme: `hitlobster-column-sizing-jobs`, `hitlobster-column-sizing-matches`, `hitlobster-column-sizing-archive`, `hitlobster-column-sizing-tracker`, `hitlobster-column-sizing-messages`.
+- localStorage keys follow the frozen naming scheme: `hitlobster-column-sizing-jobs`, `hitlobster-column-sizing-matches`, `hitlobster-column-sizing-archive`, `hitlobster-column-sizing-tracker`, `hitlobster-column-sizing-messages`, `hitlobster-column-sizing-logs`.
 
 **Ask First:** None.
 
 **Never:**
 - Do not wrap cell text or add vertical height to rows.
 - Do not persist sizes in TanStack Query or React state that doesn't survive a page reload.
-- Do not add column resizing to non-data tables (logs, config views, skeleton).
+- Do not add column resizing to non-data tables (config views, skeleton). (Logs table excluded from this list on 2026-06-15 — see Renegotiation note below.)
 - Do not change existing column sets, sort logic, visibility toggle, or pagination.
 
 ## I/O & Edge-Case Matrix
@@ -43,6 +43,10 @@ context: []
 | Interactive cell (MessagesTable type/company/jobTitle) | Cell contains a dropdown or typeahead | Outer column resizes; inner control retains its own fixed width | N/A |
 
 </frozen-after-approval>
+
+## Renegotiation — 2026-06-15
+
+The original "Never" list excluded the **logs** table (webhook runs, `src/client/routes/config/logs.tsx`). The human renegotiated this: the logs table now uses the same resizable-column pattern as the data tables, with localStorage key `hitlobster-column-sizing-logs`. Implemented in commit `8630001`. The exclusion now covers only config views and skeleton tables.
 
 ## Code Map
 
