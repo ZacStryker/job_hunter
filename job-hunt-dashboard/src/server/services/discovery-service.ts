@@ -291,11 +291,13 @@ export async function runDiscovery(
 
     const profileData = parseProfileData(profileRow?.profileData)
     const resumeText = [
+      profileData.personal.summary,
+      profileData.personal.skills,
       ...profileData.experience.jobs.map(j =>
         [j.title, j.company, ...j.bullets].join(' ')
       ),
       ...profileData.experience.projects.map(p => `${p.name} ${p.description}`),
-    ].join('\n').trim()
+    ].filter(Boolean).join('\n').trim()
 
     if (resumeText) {
       try {
