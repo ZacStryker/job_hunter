@@ -168,7 +168,7 @@ export function ConfigLogsRoute() {
                       return (
                         <TableHead
                           key={header.id}
-                          className="text-zinc-400 bg-zinc-900 px-3 py-2 cursor-pointer select-none"
+                          className="text-zinc-400 bg-zinc-900 px-3 h-9 cursor-pointer select-none"
                           style={colMeta?.minWidth ? { minWidth: colMeta.minWidth } : undefined}
                           onClick={header.column.getToggleSortingHandler()}
                         >
@@ -186,7 +186,7 @@ export function ConfigLogsRoute() {
                     {row.getVisibleCells().map((cell) => {
                       const cellMeta = cell.column.columnDef.meta as { minWidth?: number } | undefined
                       return (
-                        <TableCell key={cell.id} className="px-3 py-2 text-zinc-300"
+                        <TableCell key={cell.id} className="px-3 py-1.5 text-zinc-300"
                           style={cellMeta?.minWidth ? { minWidth: cellMeta.minWidth } : undefined}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
