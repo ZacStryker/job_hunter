@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   createColumnHelper,
   flexRender,
@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table'
 import type { WebhookRun } from '@shared/schemas'
 import { useWebhookRunsQuery } from '@/hooks/useWebhookRunsQuery'
+import { KeywordFilterInput } from '@/components/shared/KeywordFilterInput'
 
 const PAGE_SIZE = 20
 
@@ -115,9 +116,23 @@ const columns = [
 export function ConfigLogsRoute() {
   const { data: runs = [], isPending, isError, error } = useWebhookRunsQuery()
   const [sorting, setSorting] = useState<SortingState>([{ id: 'runAt', desc: true }])
+  const [keyword, setKeyword] = useState('')
+
+  const filteredRuns = useMemo(() => {
+    const q = keyword.trim().toLowerCase()
+    if (!q) return runs
+    const tokens = q.split(/\s+/)
+    return runs.filter((run) => {
+      const haystack = [run.name, run.errorMessage]
+        .filter((f): f is string => typeof f === 'string')
+        .join(' ')
+        .toLowerCase()
+      return tokens.every((token) => haystack.includes(token))
+    })
+  }, [runs, keyword])
 
   const table = useReactTable({
-    data: runs,
+    data: filteredRuns,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -157,6 +172,9 @@ export function ConfigLogsRoute() {
       )}
       {!isPending && !isError && runs.length > 0 && (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col">
+          <div className="flex items-center px-3 py-2 border-b border-zinc-800 shrink-0">
+            <KeywordFilterInput value={keyword} onChange={setKeyword} placeholder="Filter logs…" />
+          </div>
           <div className="overflow-auto">
             <table className="w-full text-sm">
               <TableHeader>

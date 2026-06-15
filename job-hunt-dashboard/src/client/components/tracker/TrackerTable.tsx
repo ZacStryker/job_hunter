@@ -19,6 +19,8 @@ import { Button } from '../ui/button'
 import type { Job } from '@shared/schemas'
 import { ScoreBadge } from '../pipeline/ScoreBadge'
 import { parseLocation } from '../../utils/parseLocation'
+import { jobMatchesKeyword } from '../../utils/jobMatchesKeyword'
+import { KeywordFilterInput } from '../shared/KeywordFilterInput'
 
 const PAGE_SIZE = 20
 const SIZING_KEY = 'hitlobster-column-sizing-tracker'
@@ -140,12 +142,17 @@ interface TrackerTableProps {
 
 export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTableProps) {
   const appliedJobs = useMemo(() => jobs.filter((j) => j.applied), [jobs])
+  const [keyword, setKeyword] = useState('')
+  const filteredAppliedJobs = useMemo(
+    () => appliedJobs.filter((job) => jobMatchesKeyword(job, keyword)),
+    [appliedJobs, keyword]
+  )
   const [sorting, setSorting] = useState<SortingState>([{ id: 'dateApplied', desc: true }])
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing())
   const containerRef = useRef<HTMLDivElement>(null)
 
   const table = useReactTable({
-    data: appliedJobs,
+    data: filteredAppliedJobs,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -210,6 +217,9 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col max-h-[calc(100vh-88px)]">
+      <div className="flex items-center px-3 py-2 border-b border-zinc-800 shrink-0">
+        <KeywordFilterInput value={keyword} onChange={setKeyword} placeholder="Filter applications…" />
+      </div>
       <div ref={containerRef} className="overflow-auto flex-1">
         <table className="caption-bottom text-sm" style={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <TableHeader className="sticky top-0 backdrop-blur-sm bg-zinc-900/80 border-b border-zinc-800">

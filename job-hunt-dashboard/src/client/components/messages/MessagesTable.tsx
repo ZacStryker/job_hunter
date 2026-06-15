@@ -18,6 +18,7 @@ import type { Message } from '@shared/schemas'
 import type { Job } from '@shared/schemas'
 import { MESSAGE_TYPES } from '@shared/schemas'
 import { useMessageMutation } from '../../hooks/useMessageMutation'
+import { KeywordFilterInput } from '../shared/KeywordFilterInput'
 
 const NONE_SENTINEL = '__none__'
 const PAGE_SIZE = 20
@@ -199,8 +200,22 @@ interface MessagesTableProps {
 export function MessagesTable({ messages, jobs }: MessagesTableProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'receivedAt', desc: true }])
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing())
+  const [keyword, setKeyword] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const { mutate } = useMessageMutation()
+
+  const filteredMessages = useMemo(() => {
+    const q = keyword.trim().toLowerCase()
+    if (!q) return messages
+    const tokens = q.split(/\s+/)
+    return messages.filter((m) => {
+      const haystack = [m.fromAddress, m.subject, m.company, m.jobTitle, m.type]
+        .filter((f): f is string => typeof f === 'string')
+        .join(' ')
+        .toLowerCase()
+      return tokens.every((token) => haystack.includes(token))
+    })
+  }, [messages, keyword])
 
   const distinctCompanies = useMemo(
     () => [...new Set(jobs.map((j) => j.company))].sort(),
@@ -354,7 +369,7 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
   ], [mutate, distinctCompanies, companyToJobs])
 
   const table = useReactTable({
-    data: messages,
+    data: filteredMessages,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -407,6 +422,9 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col">
+      <div className="flex items-center px-3 py-2 border-b border-zinc-800 shrink-0">
+        <KeywordFilterInput value={keyword} onChange={setKeyword} placeholder="Filter messages…" />
+      </div>
       <div ref={containerRef} className="overflow-auto">
         <table className="caption-bottom text-sm" style={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <TableHeader className="border-b border-zinc-800">

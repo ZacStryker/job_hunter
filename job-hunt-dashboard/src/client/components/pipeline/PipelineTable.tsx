@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect } from 'react'
+import { useState, useRef, useLayoutEffect, useMemo } from 'react'
 import {
   createColumnHelper,
   flexRender,
@@ -22,7 +22,9 @@ import { ScoreBadge } from './ScoreBadge'
 import { ActionChip } from './ActionChip'
 import { ColumnVisibilityToggle } from './ColumnVisibilityToggle'
 import { parseLocation } from '../../utils/parseLocation'
+import { jobMatchesKeyword } from '../../utils/jobMatchesKeyword'
 import { cn } from '../../lib/utils'
+import { KeywordFilterInput } from '../shared/KeywordFilterInput'
 
 const NO_STATUS = '__none__'
 
@@ -321,6 +323,8 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
   const [sorting, setSorting] = useState<SortingState>(initialSort ?? [{ id: 'fitScore', desc: true }])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => loadSizing(sizingStorageKey))
+  const [keyword, setKeyword] = useState('')
+  const filteredJobs = useMemo(() => jobs.filter((job) => jobMatchesKeyword(job, keyword)), [jobs, keyword])
   const lastSelectedIndexRef = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -403,7 +407,7 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
   const columns = [selectionColumn, ...staticColumns]
 
   const table = useReactTable({
-    data: jobs,
+    data: filteredJobs,
     columns,
     getRowId: (row) => String(row.id),
     getCoreRowModel: getCoreRowModel(),
@@ -469,8 +473,9 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col max-h-[calc(100vh-88px)]">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 shrink-0">
-        <div>
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-zinc-800 shrink-0">
+        <div className="flex items-center gap-2">
+          <KeywordFilterInput value={keyword} onChange={setKeyword} placeholder="Filter jobs…" />
           {onBulkArchive && selectedCount > 0 && (
             <Button size="sm" variant="outline" onClick={handleBulkArchive} disabled={isBulkArchiving}>
               {isBulkArchiving ? 'Archiving…' : `Archive (${selectedCount})`}
