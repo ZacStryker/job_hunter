@@ -69,7 +69,7 @@ export function LinkedInBrowserModal({ open, onClose, status, sendClick, sendKey
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-[500px] p-0 overflow-hidden">
+      <DialogContent className="max-w-[1000px] p-0 overflow-hidden">
         <DialogHeader className="p-4 pb-0">
           <DialogTitle>Connect to LinkedIn</DialogTitle>
         </DialogHeader>
@@ -83,10 +83,10 @@ export function LinkedInBrowserModal({ open, onClose, status, sendClick, sendKey
           {status === 'active' && (
             <canvas
               ref={canvasRef}
-              width={480}
-              height={300}
+              width={1280}
+              height={800}
               tabIndex={0}
-              style={{ width: 480, height: 300, display: 'block' }}
+              style={{ maxWidth: '100%', maxHeight: '80vh', display: 'block' }}
               onMouseDown={handleMouseDown}
               onKeyDown={handleKeyDown}
             />
