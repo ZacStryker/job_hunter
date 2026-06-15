@@ -186,7 +186,7 @@ export function ConfigLogsRoute() {
                     {row.getVisibleCells().map((cell) => {
                       const cellMeta = cell.column.columnDef.meta as { minWidth?: number } | undefined
                       return (
-                        <TableCell key={cell.id} className="px-3 py-1.5 text-zinc-300"
+                        <TableCell key={cell.id} className="h-[40.8px] px-3 py-1.5 text-zinc-300"
                           style={cellMeta?.minWidth ? { minWidth: cellMeta.minWidth } : undefined}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}

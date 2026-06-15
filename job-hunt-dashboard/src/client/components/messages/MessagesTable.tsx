@@ -447,7 +447,7 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
                     key={cell.id}
-                    className="py-1.5 px-3 text-sm text-zinc-200 overflow-hidden"
+                    className="h-[40.8px] py-1.5 px-3 text-sm text-zinc-200 overflow-hidden"
                     style={{ width: cell.column.getSize() }}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
