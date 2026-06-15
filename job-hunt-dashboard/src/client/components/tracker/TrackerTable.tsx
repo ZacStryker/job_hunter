@@ -15,12 +15,12 @@ import {
   TableHeader,
   TableRow,
 } from '../ui/table'
-import { Button } from '../ui/button'
 import type { Job } from '@shared/schemas'
 import { ScoreBadge } from '../pipeline/ScoreBadge'
 import { parseLocation } from '../../utils/parseLocation'
 import { jobMatchesKeyword } from '../../utils/jobMatchesKeyword'
 import { KeywordFilterInput } from '../shared/KeywordFilterInput'
+import { TablePagination } from '../shared/TablePagination'
 
 const PAGE_SIZE = 20
 const SIZING_KEY = 'hitlobster-column-sizing-tracker'
@@ -217,8 +217,20 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col max-h-[calc(100vh-88px)]">
-      <div className="flex items-center px-3 py-2 border-b border-zinc-800 shrink-0">
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-zinc-800 shrink-0">
         <KeywordFilterInput value={keyword} onChange={setKeyword} placeholder="Filter applications…" />
+        <TablePagination
+          from={from}
+          to={to}
+          totalRows={totalRows}
+          pageIndex={pageIndex}
+          pageCount={table.getPageCount()}
+          canPrevious={table.getCanPreviousPage()}
+          canNext={table.getCanNextPage()}
+          onPrevious={() => table.previousPage()}
+          onNext={() => table.nextPage()}
+          noun="applications"
+        />
       </div>
       <div ref={containerRef} className="overflow-auto flex-1">
         <table className="caption-bottom text-sm" style={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
@@ -276,35 +288,6 @@ export function TrackerTable({ jobs, onRowClick, selectedJobId }: TrackerTablePr
             ))}
           </TableBody>
         </table>
-      </div>
-
-      <div className="flex items-center justify-between px-3 py-2 border-t border-zinc-800 shrink-0">
-        <span className="text-xs text-zinc-500">
-          {totalRows === 0 ? '0 applications' : `${from}–${to} of ${totalRows}`}
-        </span>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            ←
-          </Button>
-          <span className="text-xs text-zinc-400 px-2">
-            {pageIndex + 1} / {table.getPageCount()}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            →
-          </Button>
-        </div>
       </div>
     </div>
   )

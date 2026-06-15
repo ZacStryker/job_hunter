@@ -25,6 +25,7 @@ import { parseLocation } from '../../utils/parseLocation'
 import { jobMatchesKeyword } from '../../utils/jobMatchesKeyword'
 import { cn } from '../../lib/utils'
 import { KeywordFilterInput } from '../shared/KeywordFilterInput'
+import { TablePagination } from '../shared/TablePagination'
 
 const NO_STATUS = '__none__'
 
@@ -482,7 +483,21 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
             </Button>
           )}
         </div>
-        {!fixedColumns && <ColumnVisibilityToggle table={table} />}
+        <div className="flex items-center gap-2">
+          <TablePagination
+            from={from}
+            to={to}
+            totalRows={totalRows}
+            pageIndex={pageIndex}
+            pageCount={table.getPageCount()}
+            canPrevious={table.getCanPreviousPage()}
+            canNext={table.getCanNextPage()}
+            onPrevious={() => table.previousPage()}
+            onNext={() => table.nextPage()}
+            noun="jobs"
+          />
+          {!fixedColumns && <ColumnVisibilityToggle table={table} />}
+        </div>
       </div>
       <div ref={containerRef} className="overflow-auto flex-1">
         <table className="caption-bottom text-sm" style={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
@@ -559,35 +574,6 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
             ))}
           </TableBody>
         </table>
-      </div>
-
-      <div className="flex items-center justify-between px-3 py-2 border-t border-zinc-800 shrink-0">
-        <span className="text-xs text-zinc-500">
-          {totalRows === 0 ? '0 jobs' : `${from}–${to} of ${totalRows}`}
-        </span>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            ←
-          </Button>
-          <span className="text-xs text-zinc-400 px-2">
-            {pageIndex + 1} / {table.getPageCount()}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            →
-          </Button>
-        </div>
       </div>
     </div>
   )

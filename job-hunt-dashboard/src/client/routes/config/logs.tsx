@@ -8,7 +8,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import type { SortingState } from '@tanstack/react-table'
-import { Button } from '@/components/ui/button'
+import { TablePagination } from '@/components/shared/TablePagination'
 import {
   TableBody,
   TableCell,
@@ -172,8 +172,20 @@ export function ConfigLogsRoute() {
       )}
       {!isPending && !isError && runs.length > 0 && (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col">
-          <div className="flex items-center px-3 py-2 border-b border-zinc-800 shrink-0">
+          <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-zinc-800 shrink-0">
             <KeywordFilterInput value={keyword} onChange={setKeyword} placeholder="Filter logs…" />
+            <TablePagination
+              from={from}
+              to={to}
+              totalRows={totalRows}
+              pageIndex={pageIndex}
+              pageCount={table.getPageCount()}
+              canPrevious={table.getCanPreviousPage()}
+              canNext={table.getCanNextPage()}
+              onPrevious={() => table.previousPage()}
+              onNext={() => table.nextPage()}
+              noun="runs"
+            />
           </div>
           <div className="overflow-auto">
             <table className="w-full text-sm">
@@ -215,35 +227,6 @@ export function ConfigLogsRoute() {
                 ))}
               </TableBody>
             </table>
-          </div>
-
-          <div className="flex items-center justify-between px-3 py-2 border-t border-zinc-800 shrink-0">
-            <span className="text-xs text-zinc-500">
-              {totalRows === 0 ? '0 runs' : `${from}–${to} of ${totalRows}`}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                ←
-              </Button>
-              <span className="text-xs text-zinc-400 px-2">
-                {pageIndex + 1} / {table.getPageCount()}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                →
-              </Button>
-            </div>
           </div>
         </div>
       )}

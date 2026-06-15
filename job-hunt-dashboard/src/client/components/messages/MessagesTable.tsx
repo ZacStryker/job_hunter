@@ -13,7 +13,7 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/ta
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import * as SelectPrimitive from '@radix-ui/react-select'
 import { Check } from 'lucide-react'
-import { Button } from '../ui/button'
+import { TablePagination } from '../shared/TablePagination'
 import type { Message } from '@shared/schemas'
 import type { Job } from '@shared/schemas'
 import { MESSAGE_TYPES } from '@shared/schemas'
@@ -422,8 +422,20 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
 
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden flex flex-col">
-      <div className="flex items-center px-3 py-2 border-b border-zinc-800 shrink-0">
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-zinc-800 shrink-0">
         <KeywordFilterInput value={keyword} onChange={setKeyword} placeholder="Filter messages…" />
+        <TablePagination
+          from={from}
+          to={to}
+          totalRows={totalRows}
+          pageIndex={pageIndex}
+          pageCount={table.getPageCount()}
+          canPrevious={table.getCanPreviousPage()}
+          canNext={table.getCanNextPage()}
+          onPrevious={() => table.previousPage()}
+          onNext={() => table.nextPage()}
+          noun="messages"
+        />
       </div>
       <div ref={containerRef} className="overflow-auto">
         <table className="caption-bottom text-sm" style={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
@@ -475,35 +487,6 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
             ))}
           </TableBody>
         </table>
-      </div>
-
-      <div className="flex items-center justify-between px-3 py-2 border-t border-zinc-800 shrink-0">
-        <span className="text-xs text-zinc-500">
-          {totalRows === 0 ? '0 messages' : `${from}–${to} of ${totalRows}`}
-        </span>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            ←
-          </Button>
-          <span className="text-xs text-zinc-400 px-2">
-            {pageIndex + 1} / {table.getPageCount()}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            →
-          </Button>
-        </div>
       </div>
     </div>
   )
