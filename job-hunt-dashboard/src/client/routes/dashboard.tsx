@@ -16,6 +16,7 @@ import {
 import type { StatsPeriod } from '@shared/schemas'
 import { STATS_PERIODS } from '@shared/schemas'
 import { useStatsQuery, type ArchivedFilter } from '../hooks/useStatsQuery'
+import { SCORE_COLORS } from '../utils/scoreColors'
 
 const PERIOD_LABELS: Record<StatsPeriod, string> = {
   '24h': '24h',
@@ -36,8 +37,6 @@ const REC_COLOR_MAP: Record<string, string> = {
   Apply: '#4ade80',
   Investigate: '#facc15',
 }
-
-const SCORE_COLORS = ['#ef4444', '#f87171', '#fb923c', '#fbbf24', '#facc15', '#a3e635', '#4ade80', '#34d399', '#22d3ee', '#60a5fa']
 
 const STATUS_COLOR_MAP: Record<string, string> = {
   'No Response': '#a1a1aa',
