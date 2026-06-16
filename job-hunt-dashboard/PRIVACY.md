@@ -18,7 +18,7 @@ organize your job search by collecting application-related information in one
 place, including — with your explicit permission — relevant email correspondence
 from your Gmail account.
 
-The Service is operated by HITLOBSTER and hosted at **https://[YOUR-DOMAIN]**.
+The Service is operated by HITLOBSTER and hosted at **https://hitlobster.ai/**.
 
 ---
 

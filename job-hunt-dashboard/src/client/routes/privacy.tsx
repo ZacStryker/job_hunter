@@ -45,7 +45,7 @@ export function PrivacyRoute() {
             relevant email correspondence from your Gmail account.
           </p>
           <p>
-            The Service is operated by HITLOBSTER and hosted at <strong className="text-zinc-200">https://[YOUR-DOMAIN]</strong>.
+            The Service is operated by HITLOBSTER and hosted at <strong className="text-zinc-200">https://hitlobster.ai/</strong>.
           </p>
         </Section>
 
