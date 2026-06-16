@@ -1,5 +1,5 @@
 # generated: 2026-03-27
-# last_updated: 2026-03-27
+# last_updated: 2026-06-16
 # project: bmad
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27
-last_updated: 2026-06-12 # stories 31.1–31.5 done; story 43.1 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1–35.6 done; epic 37 added; story 37.1 done; epic 37 done; epic 38 added (config UX polish); story 38.1 done; story 38.2 done; story 38.3 done; epic 39 added (add job manual description); story 39.1 done; story 39.2 done; epic 40 added (relevance pre-scoring); story 40.1 done; story 40.3B skipped; story 40.2 done; story 40.3A done; story 40.4 done; story 40.5 done; epic 41 added (company blacklist); story 41.1 done; story 41.2 done; story 41.3 done; story 41.4 done; epic 42 added (resume pipeline schema alignment); story 42.1 done; story 42.2 done; story 42.3 done; story 42.4 done; epic 43 added (profile schema redesign & form UI); story 43.1 done; story 43.2 done; story 43.3 done; story 43.4 done; story 43.5 done; epic 44 added (public-facing tour page); story 44.1 done; story 44.2 done; story 44.3 done; story 44.4 done
+last_updated: 2026-06-16 # story 45.4 done (code review: 2 patches applied — disconnect res.ok check + gmail-labels invalidation, connect try/catch; 4 findings deferred, 7 dismissed; all 8 ACs verified MET); story 45.4 review (Connect Gmail UI — Config & onboarding surfaces; /status returns gmailAddress, Gmail connect/disconnect + label-dropdown mapping table, onboarding either/or with OAuth round-trip); story 45.4 ready-for-dev (Connect Gmail UI — Config & onboarding surfaces); story 45.3 done (code review: 2 patches applied — header.name guard, internalDate NaN guard; 7 findings deferred as IMAP-mirrored pre-existing); epic 45 added (Gmail inbox integration); story 45.1 ready-for-dev; stories 31.1–31.5 done; story 43.1 done; story 36.1 done; story 33.1 done; story 34.1 done; story 35.1–35.6 done; epic 37 added; story 37.1 done; epic 37 done; epic 38 added (config UX polish); story 38.1 done; story 38.2 done; story 38.3 done; epic 39 added (add job manual description); story 39.1 done; story 39.2 done; epic 40 added (relevance pre-scoring); story 40.1 done; story 40.3B skipped; story 40.2 done; story 40.3A done; story 40.4 done; story 40.5 done; epic 41 added (company blacklist); story 41.1 done; story 41.2 done; story 41.3 done; story 41.4 done; epic 42 added (resume pipeline schema alignment); story 42.1 done; story 42.2 done; story 42.3 done; story 42.4 done; epic 43 added (profile schema redesign & form UI); story 43.1 done; story 43.2 done; story 43.3 done; story 43.4 done; story 43.5 done; epic 44 added (public-facing tour page); story 44.1 done; story 44.2 done; story 44.3 done; story 44.4 done; story 45.1 done (code review: 4 patches applied — callback error handling, atomic upsert, auth-callback graceful redirect, test hardening); story 45.2 done (code review: 2 patches applied — labels 502 on revoked token, duplicate-label 400 guard)
 project: bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -301,3 +301,10 @@ development_status:
   44-2-feature-sections-2-5-static-content-and-scroll-animations: done
   44-3-interactive-demo: done
   44-4-faq-section-closing-cta-and-copy-finalization: done
+
+  # Epic 45: Gmail Inbox Integration (Google API + OAuth 2.0)
+  epic-45: in-progress
+  45-1-connect-and-disconnect-gmail-via-oauth: done
+  45-2-gmail-label-mapping-data-model-list-crud: done
+  45-3-gmail-sync-into-messages-view: done
+  45-4-connect-gmail-ui-config-onboarding: done

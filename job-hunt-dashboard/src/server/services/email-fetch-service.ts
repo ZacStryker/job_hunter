@@ -9,7 +9,7 @@ export interface ImapCredentials {
   pass: string
 }
 
-const BLOCKED_SENDERS = ['zac@zacstryker.com', 'indeedapply@indeed.com']
+export const BLOCKED_SENDERS = ['zac@zacstryker.com', 'indeedapply@indeed.com']
 
 export async function fetchAndStoreEmails(credentials: ImapCredentials, userId: number): Promise<{ added: number }> {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)

@@ -33,6 +33,7 @@ import { ProfileResumeRoute } from '../routes/config/profile-resume'
 import { ProfileApiKeysRoute } from '../routes/config/profile-api-keys'
 import { ProfileInboxMappingRoute } from '../routes/config/profile-inbox-mapping'
 import { fetchInboxMappings } from '../hooks/useInboxMappingsQuery'
+import { fetchGmailMappings } from '../hooks/useGmailMappingsQuery'
 import { JobSourcesAuthSetupRoute } from '../routes/config/job-sources-auth-setup'
 import { JobSourcesSearchesRoute } from '../routes/config/job-sources-searches'
 import { ConfigJobSourcesBlacklistRoute } from '../routes/config/job-sources-blacklist'
@@ -121,7 +122,8 @@ const onboardingRoute = createRoute({
     if (res.status === 401) throw redirect({ to: '/login' })
     if (!res.ok) throw new Error(`Unexpected onboarding status response: ${res.status}`)
     const status = await res.json() as OnboardingStatusResponse
-    if (status.onboardingComplete) throw redirect({ to: '/' })
+    const returningFromGmail = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('gmail')
+    if (status.onboardingComplete && !returningFromGmail) throw redirect({ to: '/' })
   },
 })
 
@@ -227,6 +229,7 @@ const configProfileInboxMappingRoute = createRoute({
   loader: () => Promise.all([
     queryClient.ensureQueryData({ queryKey: ['onboarding-status'], queryFn: fetchOnboardingStatus }),
     queryClient.ensureQueryData({ queryKey: ['inbox-mappings'], queryFn: fetchInboxMappings }),
+    queryClient.ensureQueryData({ queryKey: ['gmail-mappings'], queryFn: fetchGmailMappings }),
   ]),
 })
 

@@ -239,6 +239,13 @@
       "when": 1781199016649,
       "tag": "0033_curly_punisher",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1781562166654,
+      "tag": "0034_sleepy_maximus",
+      "breakpoints": true
     }
   ]
 }

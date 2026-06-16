@@ -5,6 +5,7 @@ import { db } from '../../db/client'
 import { messages, userSecrets } from '../../db/schema'
 import { MESSAGE_TYPES } from '../../shared/schemas'
 import { fetchAndStoreEmails } from '../services/email-fetch-service'
+import { fetchAndStoreGmail } from '../services/gmail-fetch-service'
 import { decrypt } from '../lib/crypto'
 import type { AppEnv } from '../types'
 
@@ -30,6 +31,28 @@ app.get('/', (c) => {
 
 app.post('/sync', async (c) => {
   const userId = c.get('userId')
+
+  const gmailRow = db.select({ ciphertext: userSecrets.ciphertext })
+    .from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.keyName, 'gmail_refresh_token')))
+    .get()
+
+  if (gmailRow) {
+    let refreshToken: string
+    try {
+      refreshToken = decrypt(gmailRow.ciphertext)
+    } catch {
+      console.error('[messages/sync] Failed to decrypt Gmail refresh token')
+      return c.json({ error: 'Failed to read Gmail credentials' }, 500)
+    }
+    try {
+      const result = await fetchAndStoreGmail(refreshToken, userId)
+      return c.json({ added: result.added })
+    } catch (err) {
+      console.error('[messages/sync] Gmail sync failed:', err instanceof Error ? err.message : 'unknown')
+      return c.json({ error: 'Gmail sync failed — reconnect Gmail and try again' }, 502)
+    }
+  }
 
   const rows = db.select({ keyName: userSecrets.keyName, ciphertext: userSecrets.ciphertext })
     .from(userSecrets)

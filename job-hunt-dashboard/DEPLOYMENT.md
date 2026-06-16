@@ -73,6 +73,9 @@ SMTP_USER=
 SMTP_PASS=
 SMTP_FROM=                         # e.g., "HITLOBSTER <noreply@yourdomain.com>"
 
+GOOGLE_CLIENT_ID=                  # Optional — Gmail sync only; app boots fine without it (see "Gmail Inbox Integration" below)
+GOOGLE_CLIENT_SECRET=              # Optional — Gmail sync only
+
 ADMIN_EMAIL=                       # First-deploy only — creates the seed admin account
 ADMIN_PASSWORD=                    # First-deploy only — rotate or remove after setup
 ```
@@ -180,6 +183,34 @@ Expected: HTTP 200 from `curl`, application loads in browser at `https://yourdom
 5. Click **Generate** to create an invite key for new users
 
 > **Note:** Invite keys are required for user registration. Share the generated key with users who need access.
+
+---
+
+## Gmail Inbox Integration (optional)
+
+Gmail sync lets users connect a Gmail account so HITLOBSTER can read job-related emails. It is entirely optional — the app boots and runs normally without it, and only the Gmail connect/sync actions return `503` until `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set.
+
+The integration uses the **restricted** `gmail.readonly` scope. Google requires a production-verification process plus an annual third-party CASA security assessment to publish such an app publicly. That is **out of scope** here — run the OAuth consent screen in **Testing** mode, which works without verification for a small, manually-added set of test users (≤100).
+
+1. **Create / select a Google Cloud project** at <https://console.cloud.google.com>.
+2. **Enable the Gmail API:** APIs & Services → Library → search "Gmail API" → **Enable**.
+3. **Configure the OAuth consent screen:** APIs & Services → OAuth consent screen.
+   - User type: **External**, publishing status left in **Testing**.
+   - Add the scope `https://www.googleapis.com/auth/gmail.readonly` (restricted).
+   - Under **Test users**, add each Gmail address that will connect (max 100). Only these accounts can complete the flow while in Testing mode.
+4. **Create an OAuth Client ID:** APIs & Services → Credentials → Create Credentials → **OAuth client ID**.
+   - Application type: **Web application**.
+   - Authorized redirect URIs — add both:
+     - `https://yourdomain.com/api/onboarding/gmail/callback` (must equal `${APP_URL}/api/onboarding/gmail/callback`)
+     - `http://localhost:3000/api/onboarding/gmail/callback` (for local development)
+5. **Copy the credentials into `.env`:**
+   ```env
+   GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=<your-client-secret>
+   ```
+6. Restart the app. Connected users will see Gmail as an available inbox source.
+
+> **Important:** The redirect URI in Google Cloud must match `${APP_URL}/api/onboarding/gmail/callback` exactly (scheme, host, and path) or Google rejects the callback with `redirect_uri_mismatch`.
 
 ---
 

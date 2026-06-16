@@ -166,6 +166,17 @@ export const inboxFolderMappings = sqliteTable('inbox_folder_mappings', {
   uniqueIndex('inbox_folder_mappings_user_folder_unique_idx').on(table.userId, table.folderPath),
 ])
 
+export const gmailLabelMappings = sqliteTable('gmail_label_mappings', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id),
+  label: text('label').notNull(),
+  jobStatus: text('job_status').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  index('gmail_label_mappings_user_id_idx').on(table.userId),
+  uniqueIndex('gmail_label_mappings_user_label_unique_idx').on(table.userId, table.label),
+])
+
 export const sourceSettings = sqliteTable('source_settings', {
   source: text('source').primaryKey(),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),

@@ -6,14 +6,20 @@ import { sessions } from '../../db/schema'
 import type { AppEnv } from '../types'
 
 export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
+  // Google's top-level OAuth redirect lands here; if the session cookie is gone
+  // (expired during consent, or dropped), redirect gracefully instead of a raw 401.
+  const unauthorized = c.req.path === '/api/onboarding/gmail/callback'
+    ? c.redirect('/config/profile/inbox-mapping?gmail=error')
+    : c.json({ error: 'Unauthorized' }, 401)
+
   const sessionId = getCookie(c, 'session')
-  if (!sessionId) return c.json({ error: 'Unauthorized' }, 401)
+  if (!sessionId) return unauthorized
 
   const now = new Date().toISOString()
   const session = db.select().from(sessions)
     .where(and(eq(sessions.id, sessionId), gte(sessions.expiresAt, now)))
     .get()
-  if (!session) return c.json({ error: 'Unauthorized' }, 401)
+  if (!session) return unauthorized
 
   const method = c.req.method
   if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {

@@ -28,6 +28,7 @@ import indeedBrowserRoute from './server/routes/api-indeed-browser'
 import * as indeedBrowserService from './server/services/indeed-browser-service'
 import onboardingRoute from './server/routes/api-onboarding'
 import inboxMappingsRoute from './server/routes/api-config-inbox-mappings'
+import gmailMappingsRoute from './server/routes/api-config-gmail-mappings'
 import adminRoute from './server/routes/api-admin'
 import blacklistRoute from './server/routes/api-blacklist'
 import type { AppEnv } from './server/types'
@@ -107,6 +108,7 @@ app.route('/api/onboarding/linkedin/browser', linkedInBrowserRoute)
 app.route('/api/onboarding/indeed/browser', indeedBrowserRoute)
 app.route('/api/onboarding', onboardingRoute)
 app.route('/api/config/inbox-mappings', inboxMappingsRoute)
+app.route('/api/config/gmail-mappings', gmailMappingsRoute)
 app.route('/api/admin', adminRoute)
 app.route('/api/blacklist', blacklistRoute)
 app.route('/auth', authRoute)

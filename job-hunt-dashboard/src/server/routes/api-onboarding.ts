@@ -1,17 +1,18 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { ImapFlow } from 'imapflow'
 import { db } from '../../db/client'
-import { userSecrets } from '../../db/schema'
-import { encrypt } from '../lib/crypto'
+import { userSecrets, gmailLabelMappings } from '../../db/schema'
+import { encrypt, decrypt } from '../lib/crypto'
+import { GMAIL_SCOPES, isGmailConfigured, getOAuthClient, getAccessToken, encodeState, decodeState } from '../lib/gmail-oauth'
 import type { AppEnv } from '../types'
 
 const app = new Hono<AppEnv>()
 
 app.get('/status', (c) => {
   const userId = c.get('userId')
-  const rows = db.select({ keyName: userSecrets.keyName })
+  const rows = db.select({ keyName: userSecrets.keyName, ciphertext: userSecrets.ciphertext })
     .from(userSecrets)
     .where(eq(userSecrets.userId, userId))
     .all()
@@ -20,8 +21,16 @@ app.get('/status', (c) => {
   const hasImap = keys.has('imap_host') && keys.has('imap_user') && keys.has('imap_pass')
   const hasLinkedinAuth = keys.has('linkedin_storage_state')
   const hasIndeedAuth = keys.has('indeed_storage_state')
+  const hasGmail = keys.has('gmail_refresh_token')
   const onboardingComplete = hasAnthropicKey
-  return c.json({ hasAnthropicKey, hasImap, hasLinkedinAuth, hasIndeedAuth, onboardingComplete })
+
+  let gmailAddress: string | null = null
+  const addressRow = rows.find((r) => r.keyName === 'gmail_address')
+  if (addressRow) {
+    try { gmailAddress = decrypt(addressRow.ciphertext) } catch { gmailAddress = null }
+  }
+
+  return c.json({ hasAnthropicKey, hasImap, hasLinkedinAuth, hasIndeedAuth, hasGmail, gmailAddress, onboardingComplete })
 })
 
 const anthropicSchema = z.object({ apiKey: z.string().min(1) })
@@ -172,6 +181,123 @@ app.put('/indeed', async (c) => {
       set: { ciphertext, updatedAt: now },
     })
     .run()
+
+  return c.json({ ok: true })
+})
+
+app.get('/gmail/connect', (c) => {
+  if (!isGmailConfigured()) {
+    return c.json({ error: 'Gmail not configured — set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET' }, 503)
+  }
+  const ret = c.req.query('return') === 'onboarding' ? 'onboarding' : 'config'
+  const state = encodeState({ uid: c.get('sessionUserId'), ret })
+  const url = getOAuthClient().generateAuthUrl({
+    access_type: 'offline',
+    prompt: 'consent',
+    scope: GMAIL_SCOPES,
+    state,
+  })
+  return c.json({ url })
+})
+
+app.get('/gmail/callback', async (c) => {
+  const rawState = c.req.query('state')
+  const parsed = rawState ? decodeState(rawState) : null
+  const surface = parsed?.ret === 'onboarding' ? '/onboarding' : '/config/profile/inbox-mapping'
+
+  if (c.req.query('error')) return c.redirect(`${surface}?gmail=error`)
+
+  if (!parsed || parsed.uid !== c.get('sessionUserId')) {
+    return c.json({ error: 'Invalid state' }, 403)
+  }
+
+  const code = c.req.query('code')
+  if (!code) return c.redirect(`${surface}?gmail=error`)
+
+  try {
+    const { tokens } = await getOAuthClient().getToken(code)
+    if (!tokens.refresh_token || !tokens.access_token) {
+      return c.redirect(`${surface}?gmail=error`)
+    }
+
+    const profileRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    })
+    if (!profileRes.ok) return c.redirect(`${surface}?gmail=error`)
+    const { emailAddress } = await profileRes.json() as { emailAddress?: string }
+    if (!emailAddress) return c.redirect(`${surface}?gmail=error`)
+
+    const userId = c.get('userId')
+    const now = new Date().toISOString()
+    const secrets = [
+      { keyName: 'gmail_refresh_token', value: tokens.refresh_token },
+      { keyName: 'gmail_address', value: emailAddress },
+    ]
+    db.transaction((tx) => {
+      for (const { keyName, value } of secrets) {
+        const ciphertext = encrypt(value)
+        tx.insert(userSecrets)
+          .values({ userId, keyName, ciphertext, updatedAt: now })
+          .onConflictDoUpdate({
+            target: [userSecrets.userId, userSecrets.keyName],
+            set: { ciphertext, updatedAt: now },
+          })
+          .run()
+      }
+    })
+  } catch {
+    return c.redirect(`${surface}?gmail=error`)
+  }
+
+  return c.redirect(`${surface}?gmail=connected`)
+})
+
+app.get('/gmail/labels', async (c) => {
+  if (!isGmailConfigured()) {
+    return c.json({ error: 'Gmail not configured — set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET' }, 503)
+  }
+  const userId = c.get('userId')
+  const row = db.select({ ciphertext: userSecrets.ciphertext })
+    .from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.keyName, 'gmail_refresh_token')))
+    .get()
+  if (!row) return c.json({ error: 'Gmail not connected' }, 503)
+
+  let res: Response
+  try {
+    const accessToken = await getAccessToken(decrypt(row.ciphertext))
+    res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+  } catch {
+    return c.json({ error: 'Failed to fetch Gmail labels — reconnect Gmail and try again' }, 502)
+  }
+  if (!res.ok) return c.json({ error: 'Failed to fetch Gmail labels — reconnect Gmail and try again' }, 502)
+  const { labels } = await res.json() as { labels?: Array<{ id: string; name: string }> }
+  return c.json((labels ?? []).map((l) => ({ id: l.id, name: l.name })))
+})
+
+app.delete('/gmail', async (c) => {
+  const userId = c.get('userId')
+
+  const row = db.select({ ciphertext: userSecrets.ciphertext })
+    .from(userSecrets)
+    .where(and(eq(userSecrets.userId, userId), eq(userSecrets.keyName, 'gmail_refresh_token')))
+    .get()
+  if (row) {
+    try {
+      await getOAuthClient().revokeToken(decrypt(row.ciphertext))
+    } catch (err) {
+      console.error('[gmail] revoke failed:', (err as Error).message)
+    }
+  }
+
+  db.transaction((tx) => {
+    tx.delete(userSecrets)
+      .where(and(eq(userSecrets.userId, userId), inArray(userSecrets.keyName, ['gmail_refresh_token', 'gmail_address'])))
+      .run()
+    tx.delete(gmailLabelMappings).where(eq(gmailLabelMappings.userId, userId)).run()
+  })
 
   return c.json({ ok: true })
 })

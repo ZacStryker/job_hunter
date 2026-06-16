@@ -84,6 +84,23 @@ export const inboxFolderMappingInputSchema = z.array(z.object({
 export type InboxFolderMapping = z.infer<typeof inboxFolderMappingSchema>
 export type InboxFolderMappingInput = z.infer<typeof inboxFolderMappingInputSchema>
 
+export const gmailLabelMappingSchema = z.object({
+  id: z.number().int(),
+  userId: z.number().int(),
+  label: z.string(),
+  jobStatus: z.enum(MESSAGE_TYPES),
+  createdAt: z.string(),
+})
+export const gmailLabelMappingInputSchema = z.array(z.object({
+  label: z.string().min(1),
+  jobStatus: z.enum(MESSAGE_TYPES),
+})).refine(
+  (rows) => new Set(rows.map((r) => r.label)).size === rows.length,
+  { message: 'Duplicate label' },
+)
+export type GmailLabelMapping = z.infer<typeof gmailLabelMappingSchema>
+export type GmailLabelMappingInput = z.infer<typeof gmailLabelMappingInputSchema>
+
 export const messageSchema = z.object({
   id: z.number().int(),
   uid: z.string(),
@@ -329,6 +346,8 @@ export type OnboardingStatusResponse = {
   hasImap: boolean
   hasLinkedinAuth: boolean
   hasIndeedAuth: boolean
+  hasGmail: boolean
+  gmailAddress: string | null
   onboardingComplete: boolean
 }
 

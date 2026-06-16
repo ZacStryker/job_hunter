@@ -6,11 +6,21 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { StepIndicator } from '@/components/onboarding/StepIndicator'
 import { ConnectionTestButton } from '@/components/onboarding/ConnectionTestButton'
+import { GoogleConnectButton } from '@/components/onboarding/GoogleConnectButton'
 import { apiFetch } from '@/lib/api'
+import { toast } from 'sonner'
+import { queryClient } from '@/lib/query-client'
+import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
+import { useGmailConnection } from '@/hooks/useGmailConnection'
 
 export function OnboardingRoute() {
   const navigate = useNavigate()
-  const [step, setStep] = useState(0)
+  const { data: status } = useOnboardingStatusQuery()
+  const { connect } = useGmailConnection()
+  const [step, setStep] = useState(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('gmail') ? 2 : 0
+  )
+  const callbackHandled = useRef(false)
 
   const [apiKey, setApiKey] = useState('')
   const [apiKeyTestState, setApiKeyTestState] = useState<'idle' | 'loading' | 'pass' | 'fail'>('idle')
@@ -34,6 +44,19 @@ export function OnboardingRoute() {
     else if (step === 2) step2Ref.current?.focus()
     else if (step === 3) step3Ref.current?.focus()
   }, [step])
+
+  useEffect(() => {
+    if (callbackHandled.current) return
+    callbackHandled.current = true
+    const result = new URLSearchParams(window.location.search).get('gmail')
+    if (result === 'connected') {
+      toast.success('Gmail connected')
+      queryClient.invalidateQueries({ queryKey: ['onboarding-status'] })
+    } else if (result === 'error') {
+      toast.error('Could not connect Gmail — please try again')
+    }
+    if (result) window.history.replaceState({}, '', window.location.pathname)
+  }, [])
 
   async function handleTestAnthropicKey() {
     setApiKeyTestState('loading')
@@ -150,7 +173,26 @@ export function OnboardingRoute() {
           <div>
             <h2 ref={step2Ref} tabIndex={-1} className="text-xl font-semibold mt-6">Email Setup</h2>
             <p className="text-zinc-400 mt-1 text-sm">Optional — lets the app detect reply emails.</p>
-            <p className="text-xs text-zinc-500 mt-1">Use imap.gmail.com port 993 for Gmail</p>
+
+            {status?.hasGmail ? (
+              <Alert className="mt-4">
+                <AlertDescription>
+                  Gmail connected — {status.gmailAddress}. You can manage label mappings later in Config.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="mt-4">
+                <GoogleConnectButton onClick={() => connect('onboarding')} className="w-full" />
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 my-5">
+              <div className="h-px flex-1 bg-zinc-800" />
+              <span className="text-xs text-zinc-500">or use IMAP</span>
+              <div className="h-px flex-1 bg-zinc-800" />
+            </div>
+
+            <p className="text-xs text-zinc-500 mb-1">Use imap.gmail.com port 993 for Gmail</p>
             <div className="mt-4 flex flex-col gap-3">
               <div>
                 <Label htmlFor="imapHost">IMAP Host</Label>
