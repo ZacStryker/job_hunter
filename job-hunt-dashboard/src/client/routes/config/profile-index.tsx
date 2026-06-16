@@ -97,6 +97,29 @@ export function ConfigProfileIndexRoute() {
               }
             </div>
           </Link>
+
+          <Link to="/privacy" className="border border-zinc-800 rounded-lg p-4 block hover:border-zinc-700 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-zinc-200">Privacy Policy</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="What is this?"
+                      onClick={e => { e.preventDefault(); e.stopPropagation() }}
+                      className="text-zinc-600 hover:text-zinc-400 transition-colors"
+                    >
+                      <CircleHelp className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    How HITLOBSTER collects, uses, and protects your data, including Google account access.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+          </Link>
         </div>
       </div>
     </TooltipProvider>

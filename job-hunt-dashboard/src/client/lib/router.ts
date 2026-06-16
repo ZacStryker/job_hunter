@@ -17,6 +17,7 @@ import { fetchOnboardingStatus } from '../hooks/useOnboardingStatusQuery'
 import { LoginRoute } from '../routes/login'
 import { RegisterRoute } from '../routes/register'
 import { TourRoute } from '../routes/tour'
+import { PrivacyRoute } from '../routes/privacy'
 import { RegisterPendingRoute } from '../routes/register-pending'
 import { OnboardingRoute } from '../routes/onboarding'
 import { AdminUsersRoute } from '../routes/admin-users'
@@ -106,6 +107,12 @@ const tourRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/tour',
   component: TourRoute,
+})
+
+const privacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/privacy',
+  component: PrivacyRoute,
 })
 
 const onboardingRoute = createRoute({
@@ -323,6 +330,7 @@ const routeTree = rootRoute.addChildren([
   registerPendingRoute,
   onboardingRoute,
   tourRoute,
+  privacyRoute,
   protectedRoute.addChildren([
     dashboardRoute,
     indexRoute,

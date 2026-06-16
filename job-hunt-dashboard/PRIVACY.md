@@ -7,7 +7,7 @@ collects, uses, stores, and protects your information when you use our
 application (the "Service"). By using the Service, you agree to the practices
 described in this policy.
 
-If you have any questions, contact us at **zac@zacstryker.com**.
+If you have any questions, contact us at **admin@hitlobster.ai**.
 
 ---
 
@@ -131,7 +131,7 @@ We may share information only:
   [https://myaccount.google.com/permissions](https://myaccount.google.com/permissions).
   Revoking access stops all further data collection from your Google account.
 - You may request deletion of your account and all associated data — including
-  any data obtained from Google — by emailing **zac@zacstryker.com**. We will
+  any data obtained from Google — by emailing **admin@hitlobster.ai**. We will
   delete your data within 30 days of a verified request.
 
 ---
@@ -157,4 +157,4 @@ If you have questions or requests regarding this Privacy Policy or your data,
 contact:
 
 **HITLOBSTER**
-Email: **zac@zacstryker.com**
+Email: **admin@hitlobster.ai**
