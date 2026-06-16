@@ -190,13 +190,13 @@ Expected: HTTP 200 from `curl`, application loads in browser at `https://yourdom
 
 Gmail sync lets users connect a Gmail account so HITLOBSTER can read job-related emails. It is entirely optional — the app boots and runs normally without it, and only the Gmail connect/sync actions return `503` until `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set.
 
-The integration uses the **restricted** `gmail.readonly` scope. Google requires a production-verification process plus an annual third-party CASA security assessment to publish such an app publicly. That is **out of scope** here — run the OAuth consent screen in **Testing** mode, which works without verification for a small, manually-added set of test users (≤100).
+The integration uses the **restricted** `gmail.metadata` scope — HITLOBSTER only reads message metadata (From, Subject, received date), never message bodies. This scope still requires production verification to publish publicly, but unlike `gmail.readonly` it is generally exempt from the annual third-party CASA security assessment. You can also run the OAuth consent screen in **Testing** mode, which works without verification for a small, manually-added set of test users (≤100).
 
 1. **Create / select a Google Cloud project** at <https://console.cloud.google.com>.
 2. **Enable the Gmail API:** APIs & Services → Library → search "Gmail API" → **Enable**.
 3. **Configure the OAuth consent screen:** APIs & Services → OAuth consent screen.
    - User type: **External**, publishing status left in **Testing**.
-   - Add the scope `https://www.googleapis.com/auth/gmail.readonly` (restricted).
+   - Add the scope `https://www.googleapis.com/auth/gmail.metadata` (restricted).
    - Under **Test users**, add each Gmail address that will connect (max 100). Only these accounts can complete the flow while in Testing mode.
 4. **Create an OAuth Client ID:** APIs & Services → Credentials → Create Credentials → **OAuth client ID**.
    - Application type: **Web application**.

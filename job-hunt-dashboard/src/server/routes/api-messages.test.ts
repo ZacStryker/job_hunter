@@ -177,6 +177,11 @@ describe('POST /api/messages/sync (Gmail)', () => {
   const originalFetch = globalThis.fetch
   const originalGetAccessToken = OAuth2Client.prototype.getAccessToken
 
+  // Recent timestamp so the message falls inside the server's 30-day sync window
+  // (the gmail.metadata scope can't pre-filter by date, so the cutoff is applied
+  // client-side against internalDate).
+  const recentInternalMs = Date.now() - 60_000
+
   let fromHeader = 'Acme HR <hr@acme.com>'
   let labelsCalled = false
 
@@ -190,7 +195,7 @@ describe('POST /api/messages/sync (Gmail)', () => {
         payload = { labels: [{ id: 'Label_1', name: 'Jobs' }] }
       } else if (url.includes('/messages/m1')) {
         payload = {
-          internalDate: '1718409600000',
+          internalDate: String(recentInternalMs),
           payload: {
             headers: [
               { name: 'From', value: fromHeader },
@@ -255,7 +260,7 @@ describe('POST /api/messages/sync (Gmail)', () => {
     expect(row.from_address).toBe('Acme HR <hr@acme.com>')
     expect(row.message_id).toBe('<abc@acme.com>')
     expect(typeof row.received_at).toBe('string')
-    expect(row.received_at).toBe(new Date(1718409600000).toISOString())
+    expect(row.received_at).toBe(new Date(recentInternalMs).toISOString())
   })
 
   test('dedup → second sync returns { added: 0 } and count stays 1', async () => {

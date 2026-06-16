@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { OAuth2Client } from 'google-auth-library'
 import { encrypt, decrypt } from './crypto'
 
-export const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+export const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.metadata']
 
 export class GmailNotConfiguredError extends Error {
   constructor() {

@@ -334,11 +334,11 @@ describe('GET /api/onboarding/gmail/connect', () => {
     process.env.APP_URL = 'http://localhost:3000'
   })
 
-  test('configured → 200 with Google consent url (gmail.readonly only, offline, consent, state)', async () => {
+  test('configured → 200 with Google consent url (gmail.metadata only, offline, consent, state)', async () => {
     const res = await onboardingApp.request('/gmail/connect', { method: 'GET' })
     expect(res.status).toBe(200)
     const body = await res.json() as { url: string }
-    expect(body.url).toContain('gmail.readonly')
+    expect(body.url).toContain('gmail.metadata')
     expect(body.url).not.toContain('userinfo.email')
     expect(body.url).not.toContain('openid')
     expect(body.url).toContain('access_type=offline')
