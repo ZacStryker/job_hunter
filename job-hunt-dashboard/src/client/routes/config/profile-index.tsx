@@ -98,7 +98,7 @@ export function ConfigProfileIndexRoute() {
             </div>
           </Link>
 
-          <Link to="/privacy" className="border border-zinc-800 rounded-lg p-4 block hover:border-zinc-700 transition-colors">
+          <Link to="/privacy-policy" className="border border-zinc-800 rounded-lg p-4 block hover:border-zinc-700 transition-colors">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-medium text-zinc-200">Privacy Policy</span>

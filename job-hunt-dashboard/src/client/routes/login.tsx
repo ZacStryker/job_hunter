@@ -82,7 +82,7 @@ export function LoginRoute() {
         <Link to="/tour" className="text-sm text-zinc-500 hover:text-zinc-300 mt-2 block text-center">
           See how it works →
         </Link>
-        <Link to="/privacy" className="text-xs text-zinc-600 hover:text-zinc-400 mt-4 block text-center">
+        <Link to="/privacy-policy" className="text-xs text-zinc-600 hover:text-zinc-400 mt-4 block text-center">
           Privacy Policy
         </Link>
       </form>

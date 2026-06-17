@@ -111,7 +111,7 @@ const tourRoute = createRoute({
 
 const privacyRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/privacy',
+  path: '/privacy-policy',
   component: PrivacyRoute,
 })
 

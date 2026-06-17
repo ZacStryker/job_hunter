@@ -166,7 +166,7 @@ export function TourRoute() {
       <FaqSection />
       <ClosingCta />
       <footer className="border-t border-zinc-800/50 py-8 text-center">
-        <Link to="/privacy" className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+        <Link to="/privacy-policy" className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
           Privacy Policy
         </Link>
       </footer>

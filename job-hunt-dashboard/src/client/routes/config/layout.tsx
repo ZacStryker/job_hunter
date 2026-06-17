@@ -28,7 +28,7 @@ export function ConfigLayout() {
         <Link to="/config/profile/inbox-mapping" activeOptions={{ exact: true }}
           className={childLinkClass} activeProps={childActiveProps} inactiveProps={childInactiveProps}
         >Inbox Mapping</Link>
-        <Link to="/privacy" activeOptions={{ exact: true }}
+        <Link to="/privacy-policy" activeOptions={{ exact: true }}
           className={childLinkClass} activeProps={childActiveProps} inactiveProps={childInactiveProps}
         >Privacy Policy</Link>
 
