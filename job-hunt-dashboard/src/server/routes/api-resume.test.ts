@@ -36,8 +36,8 @@ const CREATE_JOBS_TABLE = `
   CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     company TEXT NOT NULL, job_title TEXT NOT NULL,
-    fit_score INTEGER, recommendation TEXT, role_fit TEXT,
-    requirements_met TEXT, requirements_missed TEXT, red_flags TEXT,
+    fit_score INTEGER, recommendation TEXT, job_reqs_met TEXT,
+    candidate_reqs_met TEXT, candidate_reqs_missed TEXT, job_reqs_missed TEXT,
     job_description TEXT, source_url TEXT, date_scraped TEXT, source TEXT,
     location TEXT, external_job_id TEXT, relevance_score REAL, analysis_status TEXT, salary TEXT,
     benefits TEXT, contact_name TEXT, contact_email TEXT, contact_phone TEXT,

@@ -215,14 +215,18 @@ const staticColumns = [
       )
     },
   }),
-  columnHelper.accessor('roleFit', {
+  columnHelper.accessor('candidateReqsMet', {
     id: 'notes',
     header: 'Notes',
     size: 180,
     cell: (info) => {
       const v = info.getValue()
-      return v ? (
-        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{v}</span>
+      // Strip the per-bullet +/~/- match markers for the compact Notes cell.
+      const display = v
+        ? v.split(',').map((s) => s.trim().replace(/^[+~-]/, '').trim()).filter(Boolean).join(', ')
+        : ''
+      return display ? (
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300">{display}</span>
       ) : (
         <span className="text-zinc-500">—</span>
       )

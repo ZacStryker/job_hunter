@@ -26,11 +26,21 @@ export const DEFAULT_PROMPTS: Record<PromptFlow, PromptConfig> = {
       'You are evaluating a job opportunity for {{CANDIDATE_NAME}}.\n\n' +
       'CANDIDATE BACKGROUND:\n{{CANDIDATE_PROFILE_JSON}}\n\n' +
       'JOB PREFERENCES: full-time, English-speaking environment\n\n' +
-      'Analyze this job for {{CANDIDATE_NAME}}. First, score the match on a <1-99> scale. \n\n' +
-      'If the score is less than 50, respond with this JSON structure:\n' +
-      '{ "score": <integer 1-49>, "role_fit": null, "red_flags": null, "requirements_met": null, "requirements_missed": null,  "salary": null, "benefits": null, "contact_name": null, "contact_email": null, "contact_phone": null, "recommended_action": "skip" } \n\n' +
-      'If the score is 50 or more, respond with this JSON structure:\n' +
-      '{ "score": <integer 50-99>, "role_fit": "<string>", "red_flags": "<string>", "requirements_met": "<string>", "requirements_missed": "<string>", "salary": "<string or null>", "benefits": "<string or null>", "contact_name": "<string or null>", "contact_email": "<string or null>", "contact_phone": "<string or null>", "recommended_action": "apply or investigate or skip" } \n\n' +
+      'Analyze this job for {{CANDIDATE_NAME}}. First, score the match on a 1-99 scale, then ' +
+      'always fill in every field below \u2014 never return null for the four assessment fields.\n\n' +
+      'Respond with this JSON structure:\n' +
+      '{ "score": <integer 1-99>, "job_reqs_met": "<string>", "job_reqs_missed": "<string>", "candidate_reqs_met": "<string>", "candidate_reqs_missed": "<string>", "salary": "<string or null>", "benefits": "<string or null>", "contact_name": "<string or null>", "contact_email": "<string or null>", "contact_phone": "<string or null>", "recommended_action": "apply or investigate or skip" }\n\n' +
+      'FIELD MEANINGS:\n' +
+      '- job_reqs_met: ways this job meets the candidate\'s expectations (e.g. full-time, remote, English-speaking, desirable salary or tech stack).\n' +
+      '- job_reqs_missed: ways this job falls short of the candidate\'s expectations.\n' +
+      '- candidate_reqs_met: job requirements the candidate satisfies.\n' +
+      '- candidate_reqs_missed: job requirements the candidate lacks.\n\n' +
+      'FORMAT for those four fields: a single string of comma-separated shorthand bullets. Prefix EVERY ' +
+      'bullet with exactly one marker character:\n' +
+      '- "+" = full match / met\n' +
+      '- "~" = partial match or an equivalent/transferable substitute\n' +
+      '- "-" = not met / missing\n' +
+      'Example: "+5+ yrs TypeScript, ~Go (Rust transferable), -No Kubernetes exp"\n\n' +
       'Respond with ONLY valid JSON \u2014 no markdown, no code blocks, no explanation.\n\n' +
       'JOB LISTING:\n{{JOB_LISTING_JSON}}',
   },

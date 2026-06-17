@@ -262,10 +262,10 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 items-start">
-                <AssessmentSection label="Role Fit" content={job?.roleFit ?? null} />
-                <AssessmentSection label="Red Flags" content={job?.redFlags ?? null} />
-                <AssessmentSection label="Requirements Met" content={job?.requirementsMet ?? null} />
-                <AssessmentSection label="Requirements Missed" content={job?.requirementsMissed ?? null} />
+                <AssessmentSection label="Job Meets Expectations" content={job?.jobReqsMet ?? null} defaultMet />
+                <AssessmentSection label="Job Falls Short" content={job?.jobReqsMissed ?? null} defaultMet={false} />
+                <AssessmentSection label="Requirements Met" content={job?.candidateReqsMet ?? null} defaultMet />
+                <AssessmentSection label="Requirements Missed" content={job?.candidateReqsMissed ?? null} defaultMet={false} />
               </div>
             </TabsContent>
             <TabsContent value="description" className="pt-4">

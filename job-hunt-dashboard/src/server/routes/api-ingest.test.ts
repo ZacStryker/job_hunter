@@ -45,10 +45,10 @@ const CREATE_JOBS_TABLE = `
     job_title TEXT NOT NULL,
     fit_score INTEGER,
     recommendation TEXT,
-    role_fit TEXT,
-    requirements_met TEXT,
-    requirements_missed TEXT,
-    red_flags TEXT,
+    job_reqs_met TEXT,
+    candidate_reqs_met TEXT,
+    candidate_reqs_missed TEXT,
+    job_reqs_missed TEXT,
     job_description TEXT,
     source_url TEXT,
     date_scraped TEXT,
@@ -138,10 +138,10 @@ const baseJob: JobInput = {
   jobTitle: 'Senior Engineer',
   fitScore: 80,
   recommendation: 'apply',
-  roleFit: 'Strong match for backend systems',
-  requirementsMet: 'TypeScript, Node.js, REST APIs',
-  requirementsMissed: 'Kubernetes experience',
-  redFlags: null,
+  jobReqsMet: '+Remote, +Full-time',
+  jobReqsMissed: '-No relocation budget',
+  candidateReqsMet: '+TypeScript, +Node.js, +REST APIs',
+  candidateReqsMissed: '-Kubernetes experience',
   jobDescription: 'Build and maintain scalable services',
   sourceUrl: 'https://example.com/job/1',
   dateScraped: '2026-03-29T00:00:00.000Z',
@@ -204,10 +204,10 @@ describe('upsert business logic', () => {
       jobTitle: 'Staff Engineer',
       fitScore: 65,
       recommendation: 'investigate',
-      roleFit: null,
-      requirementsMet: null,
-      requirementsMissed: null,
-      redFlags: 'Early stage startup',
+      jobReqsMet: null,
+      jobReqsMissed: null,
+      candidateReqsMet: null,
+      candidateReqsMissed: '-Early stage startup',
       jobDescription: null,
       sourceUrl: null,
       dateScraped: null,
@@ -379,7 +379,7 @@ describe('POST /api/ingest HTTP contract (production handler)', () => {
     prodSqlite.run(
       `INSERT INTO jobs (company, job_title, applied, archived) VALUES ('Acme', 'Engineer', 0, 1)`
     )
-    const payload: JobInput[] = [{ company: 'Acme', jobTitle: 'Engineer', fitScore: 80, recommendation: 'apply', roleFit: null, requirementsMet: null, requirementsMissed: null, redFlags: null, jobDescription: null, sourceUrl: null, dateScraped: null, source: null, location: null, salary: null, benefits: null, contactName: null, contactEmail: null, contactPhone: null, analysisStatus: null, externalJobId: null }]
+    const payload: JobInput[] = [{ company: 'Acme', jobTitle: 'Engineer', fitScore: 80, recommendation: 'apply', jobReqsMet: null, jobReqsMissed: null, candidateReqsMet: null, candidateReqsMissed: null, jobDescription: null, sourceUrl: null, dateScraped: null, source: null, location: null, salary: null, benefits: null, contactName: null, contactEmail: null, contactPhone: null, analysisStatus: null, externalJobId: null }]
     const res = await ingestApp.request('/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

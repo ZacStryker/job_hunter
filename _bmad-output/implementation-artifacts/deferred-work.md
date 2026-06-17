@@ -945,3 +945,18 @@ On narrow viewports (≤375 px), the demo drawer is capped at `max-h-[500px]`. J
 - **Migration snapshot drift (`date_archived`)**: `0034_snapshot.json` declares `jobs.date_archived`, but no migration `.sql` file creates that column. Runtime is safe — the column is added on boot by `repairSchema` / `JOBS_NULLABLE_COLUMNS` in `migrate.ts`. Root cause belongs to the separate `spec-add-date-archived-field.md`. The only hazard is a wrong diff baseline for the next `drizzle-kit generate`. Resolve by regenerating cleanly once the date_archived spec lands. [`src/db/migrations/meta/0034_snapshot.json`]
 - **OAuth `state` nonce unused**: The `nonce` in `encodeState`/`decodeState` is generated and encrypted into the state but never stored or verified, so a captured valid state ciphertext is replayable within the 10-min `exp` window. Low impact (encrypted, bound to `uid`+`exp`, self-scoped). This is Story 45.1's CSRF/state design, explicitly out of scope for 45.2. [`src/server/lib/gmail-oauth.ts:646-662`]
 - **No size bound on gmail-mappings PUT input**: `gmailLabelMappingInputSchema` has no `.max()` on the array length nor on `label` length, so a large authenticated payload runs an unbounded delete+N-insert transaction. Mild self-scoped abuse vector (only bloats the caller's own rows); shared pattern with `api-config-inbox-mappings.ts`. Add bounds to both routes in a hardening pass. [`src/shared/schemas.ts:54-57`]
+
+## Custom analysis prompts predate the four-field schema (from spec-analysis-four-field-schema)
+
+Discovered during review of the four-field analysis schema change (2026-06-17).
+
+A user who has customized their **analysis** prompt via the prompts UI has an old-format
+template stored in the `prompts` table. `loadEffectivePrompt('analysis')` returns that stored
+row in preference to `DEFAULT_PROMPTS`, so such users will keep emitting the old
+`role_fit`/`red_flags`/`requirements_met`/`requirements_missed` JSON. Those keys no longer map to
+columns, so their new `job_reqs_*` / `candidate_reqs_*` columns will be written null until they
+reset/update their prompt.
+
+This is inherent to the prompt-customization feature, not a regression in this change. Options for
+later: detect-and-reset stale analysis prompts on deploy, version the prompt schema, or surface a
+"your custom analysis prompt is outdated" nudge in the prompts UI.

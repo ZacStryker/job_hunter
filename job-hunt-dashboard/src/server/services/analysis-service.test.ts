@@ -22,10 +22,10 @@ const CREATE_JOBS_TABLE = `
     date_analyzed TEXT,
     fit_score INTEGER,
     recommendation TEXT,
-    role_fit TEXT,
-    requirements_met TEXT,
-    requirements_missed TEXT,
-    red_flags TEXT,
+    job_reqs_met TEXT,
+    candidate_reqs_met TEXT,
+    candidate_reqs_missed TEXT,
+    job_reqs_missed TEXT,
     job_description TEXT,
     salary TEXT,
     benefits TEXT,
@@ -75,10 +75,10 @@ const CREATE_USER_SECRETS_TABLE = `
 
 const VALID_ANALYSIS_RESPONSE = {
   score: 85,
-  role_fit: 'Strong match for senior dev role',
-  red_flags: 'None',
-  requirements_met: 'TypeScript, React, Node.js',
-  requirements_missed: 'Kubernetes',
+  job_reqs_met: '+Remote, +Full-time',
+  job_reqs_missed: '-No relocation budget',
+  candidate_reqs_met: '+TypeScript, +React, +Node.js',
+  candidate_reqs_missed: '-Kubernetes',
   salary: '$120k-$150k',
   benefits: 'Remote, health insurance',
   contact_name: 'Jane Smith',
@@ -165,10 +165,10 @@ describe('runAnalysis()', () => {
     expect(row.date_analyzed).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(row.fit_score).toBe(85)
     expect(row.recommendation).toBe('apply')
-    expect(row.role_fit).toBe('Strong match for senior dev role')
-    expect(row.requirements_met).toBe('TypeScript, React, Node.js')
-    expect(row.requirements_missed).toBe('Kubernetes')
-    expect(row.red_flags).toBe('None')
+    expect(row.job_reqs_met).toBe('+Remote, +Full-time')
+    expect(row.job_reqs_missed).toBe('-No relocation budget')
+    expect(row.candidate_reqs_met).toBe('+TypeScript, +React, +Node.js')
+    expect(row.candidate_reqs_missed).toBe('-Kubernetes')
     expect(row.job_description).toBe('Job description text.')
     expect(row.salary).toBe('$120k-$150k')
     expect(row.benefits).toBe('Remote, health insurance')
@@ -459,7 +459,7 @@ describe('runAnalysis()', () => {
     expect(blocks.length).toBe(2)
     // Prefix block is cached and contains the output schema (moved ahead of the breakpoint).
     expect(blocks[0].cache_control).toEqual({ type: 'ephemeral' })
-    expect(blocks[0].text).toContain('respond with this JSON structure')
+    expect(blocks[0].text).toContain('Respond with this JSON structure')
     expect(blocks[0].text).not.toContain('JOB LISTING')
     // Trailing block is the volatile job listing, not cached.
     expect(blocks[1].cache_control).toBeUndefined()

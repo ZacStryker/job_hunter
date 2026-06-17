@@ -33,10 +33,10 @@ type TextBlock = { type: 'text'; text: string; cache_control?: { type: 'ephemera
 
 interface AnalysisResult {
   score: number
-  role_fit: string | null
-  red_flags: string | null
-  requirements_met: string | null
-  requirements_missed: string | null
+  job_reqs_met: string | null
+  job_reqs_missed: string | null
+  candidate_reqs_met: string | null
+  candidate_reqs_missed: string | null
   salary: string | null
   benefits: string | null
   contact_name: string | null
@@ -232,10 +232,10 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
         .set({
           fitScore: typeof result.score === 'number' ? result.score : null,
           recommendation: result.recommended_action ?? null,
-          roleFit: result.role_fit ?? null,
-          requirementsMet: result.requirements_met ?? null,
-          requirementsMissed: result.requirements_missed ?? null,
-          redFlags: result.red_flags ?? null,
+          jobReqsMet: result.job_reqs_met ?? null,
+          jobReqsMissed: result.job_reqs_missed ?? null,
+          candidateReqsMet: result.candidate_reqs_met ?? null,
+          candidateReqsMissed: result.candidate_reqs_missed ?? null,
           jobDescription: description || null,
           salary: result.salary ?? null,
           benefits: result.benefits ?? null,

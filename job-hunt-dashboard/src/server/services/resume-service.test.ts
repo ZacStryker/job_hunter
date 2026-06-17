@@ -37,8 +37,8 @@ const CREATE_PROMPTS_TABLE = `
 const MOCK_JOB = {
   id: 1, company: 'Acme Corp', jobTitle: 'Senior Engineer',
   jobDescription: 'Build great things at scale.', location: 'Amsterdam',
-  fitScore: null, recommendation: null, roleFit: null, requirementsMet: null,
-  requirementsMissed: null, redFlags: null, sourceUrl: null, dateScraped: null,
+  fitScore: null, recommendation: null, jobReqsMet: null, jobReqsMissed: null,
+  candidateReqsMet: null, candidateReqsMissed: null, sourceUrl: null, dateScraped: null,
   source: null, externalJobId: null, analysisStatus: null, salary: null,
   benefits: null, contactName: null, contactEmail: null, contactPhone: null,
   applied: false, status: null, statusOverride: null, coverLetterSentAt: null,

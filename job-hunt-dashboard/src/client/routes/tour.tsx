@@ -8,16 +8,18 @@ import { ActionChip } from '../components/pipeline/ActionChip'
 
 type Recommendation = 'apply' | 'investigate' | 'skip'
 
+// Each assessment bullet is prefixed with a match marker the drawer renders as an icon:
+// "+" → ✓ full match, "~" → ○ partial/transferable, "-" → ✕ not met.
 interface DemoJob {
   id: number
   company: string
   title: string
   score: number
   recommendation: Recommendation
-  summary: string
-  reqsMet: string[]
-  reqsMissed: string[]
-  redFlags: string[]
+  jobReqsMet: string[]
+  jobReqsMissed: string[]
+  candidateReqsMet: string[]
+  candidateReqsMissed: string[]
 }
 
 const DEMO_JOBS: DemoJob[] = [
@@ -27,10 +29,10 @@ const DEMO_JOBS: DemoJob[] = [
     title: 'Senior Software Engineer',
     score: 87,
     recommendation: 'apply',
-    summary: 'Strong alignment with distributed-systems experience and TypeScript depth. Payment domain background is a direct advantage.',
-    reqsMet: ['5+ yrs TypeScript', 'Distributed systems', 'Payment platforms'],
-    reqsMissed: ['Go proficiency preferred'],
-    redFlags: [],
+    jobReqsMet: ['+Full-time', '+Remote-friendly', '+Competitive salary', '+TypeScript-first stack'],
+    jobReqsMissed: ['~Occasional on-call rotation'],
+    candidateReqsMet: ['+5+ yrs TypeScript', '+Distributed systems', '+Payment platforms'],
+    candidateReqsMissed: ['~Go (TypeScript transferable)'],
   },
   {
     id: 2,
@@ -38,10 +40,10 @@ const DEMO_JOBS: DemoJob[] = [
     title: 'Staff Engineer, Platform',
     score: 72,
     recommendation: 'investigate',
-    summary: 'Solid backend and API design fit. Design tooling domain is new territory — worth exploring if adjacent skills transfer.',
-    reqsMet: ['API design', 'High-scale systems'],
-    reqsMissed: ['Graphics/rendering experience', 'C++ proficiency'],
-    redFlags: [],
+    jobReqsMet: ['+Full-time', '+Remote', '+Strong equity'],
+    jobReqsMissed: ['~Hybrid 2 days/week', '-Base below target'],
+    candidateReqsMet: ['+API design', '+High-scale systems'],
+    candidateReqsMissed: ['-Graphics/rendering exp', '~C++ (C familiarity)'],
   },
   {
     id: 3,
@@ -49,10 +51,10 @@ const DEMO_JOBS: DemoJob[] = [
     title: 'Principal Engineer',
     score: 64,
     recommendation: 'investigate',
-    summary: 'Observability platform experience is a gap but systems background transfers well. Verify seniority expectations match your target level.',
-    reqsMet: ['Distributed systems', 'TypeScript/Go breadth'],
-    reqsMissed: ['Observability tooling domain', '10+ yrs expected'],
-    redFlags: ['Compensation range below stated target'],
+    jobReqsMet: ['+Full-time', '+Remote', '+Modern stack'],
+    jobReqsMissed: ['-Compensation below target', '~Large org structure'],
+    candidateReqsMet: ['+Distributed systems', '+TypeScript/Go breadth'],
+    candidateReqsMissed: ['-Observability tooling domain', '-10+ yrs expected'],
   },
   {
     id: 4,
@@ -60,10 +62,10 @@ const DEMO_JOBS: DemoJob[] = [
     title: 'Senior Backend Developer',
     score: 81,
     recommendation: 'apply',
-    summary: 'E-commerce infrastructure and Ruby/Rails stack is a good match. TypeScript usage is growing across the organisation.',
-    reqsMet: ['Ruby on Rails', 'API design', 'High-traffic systems'],
-    reqsMissed: ['GraphQL expert preferred'],
-    redFlags: [],
+    jobReqsMet: ['+Full-time', '+Remote', '+E-commerce domain'],
+    jobReqsMissed: ['~Ruby-primary (TypeScript growing)'],
+    candidateReqsMet: ['+Ruby on Rails', '+API design', '+High-traffic systems'],
+    candidateReqsMissed: ['~GraphQL expert preferred'],
   },
   {
     id: 5,
@@ -71,12 +73,38 @@ const DEMO_JOBS: DemoJob[] = [
     title: 'Software Engineer III',
     score: 41,
     recommendation: 'skip',
-    summary: 'Role centres on Creative Cloud desktop integration with C++ and native platform APIs. Limited overlap with current skill set.',
-    reqsMet: ['Software engineering fundamentals'],
-    reqsMissed: ['C++ (required)', 'Native desktop APIs', 'Creative domain knowledge'],
-    redFlags: ['Strong C++ requirement — non-negotiable per JD'],
+    jobReqsMet: ['+Full-time', '~Hybrid Amsterdam'],
+    jobReqsMissed: ['-Mostly on-site', '-C++/native focus'],
+    candidateReqsMet: ['+Software engineering fundamentals'],
+    candidateReqsMissed: ['-C++ (required)', '-Native desktop APIs', '-Creative domain knowledge'],
   },
 ]
+
+const DEMO_MARKER_ICON: Record<string, { glyph: string; className: string }> = {
+  '+': { glyph: '✓', className: 'text-emerald-500' },
+  '~': { glyph: '○', className: 'text-amber-500' },
+  '-': { glyph: '✕', className: 'text-red-400' },
+}
+
+function DemoAssessment({ label, bullets }: { label: string; bullets: string[] }) {
+  if (bullets.length === 0) return null
+  return (
+    <div className="space-y-1">
+      <p className="text-zinc-500 uppercase tracking-wide mb-1">{label}</p>
+      <ul className="space-y-0.5">
+        {bullets.map(b => {
+          const icon = DEMO_MARKER_ICON[b[0]] ?? DEMO_MARKER_ICON['+']
+          const text = DEMO_MARKER_ICON[b[0]] ? b.slice(1).trim() : b
+          return (
+            <li key={b} className="flex gap-1.5 text-zinc-300">
+              <span className={`${icon.className} shrink-0`}>{icon.glyph}</span>{text}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
 
 export function TourRoute() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -517,43 +545,11 @@ function DemoDrawer({ job, onClose }: DemoDrawerProps) {
       </div>
 
       <div className="px-4 py-3 space-y-4 text-xs overflow-y-auto flex-1">
-        <div>
-          <p className="text-zinc-500 uppercase tracking-wide mb-1">Role Fit</p>
-          <p className="text-zinc-300 leading-relaxed">{job.summary}</p>
-        </div>
-        <div>
-          <p className="text-zinc-500 uppercase tracking-wide mb-1">Requirements Met</p>
-          <ul className="space-y-0.5">
-            {job.reqsMet.map(r => (
-              <li key={r} className="flex gap-1.5 text-zinc-300">
-                <span className="text-emerald-500 shrink-0">✓</span>{r}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <p className="text-zinc-500 uppercase tracking-wide mb-1">Requirements Missed</p>
-          <ul className="space-y-0.5">
-            {job.reqsMissed.map(r => (
-              <li key={r} className="flex gap-1.5 text-zinc-400">
-                <span className="text-amber-500 shrink-0">○</span>{r}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <p className="text-zinc-500 uppercase tracking-wide mb-1">Red Flags</p>
-          {job.redFlags.length > 0 ? (
-            <ul className="space-y-0.5">
-              {job.redFlags.map(r => (
-                <li key={r} className="flex gap-1.5 text-red-400">
-                  <span className="shrink-0">✕</span>{r}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-zinc-500 italic">None identified</p>
-          )}
+        <div className="grid grid-cols-2 gap-4 items-start">
+          <DemoAssessment label="Job Meets Expectations" bullets={job.jobReqsMet} />
+          <DemoAssessment label="Job Falls Short" bullets={job.jobReqsMissed} />
+          <DemoAssessment label="Requirements Met" bullets={job.candidateReqsMet} />
+          <DemoAssessment label="Requirements Missed" bullets={job.candidateReqsMissed} />
         </div>
         <div>
           <p className="text-zinc-500 uppercase tracking-wide mb-1">Recommendation</p>
