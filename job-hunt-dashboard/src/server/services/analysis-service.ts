@@ -72,7 +72,7 @@ function buildAnalysisContent(
   ]
 }
 
-export async function runAnalysis(onProgress?: (msg: string) => void, userId?: number): Promise<{ processed: number; failed: number; matched: number; archived: number; inputTokens: number; outputTokens: number }> {
+export async function runAnalysis(onProgress?: (msg: string) => void, userId?: number): Promise<{ processed: number; failed: number; matched: number; archived: number; inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number }> {
   let apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey && userId !== undefined) {
     const row = db.select({ ciphertext: userSecrets.ciphertext })
@@ -268,5 +268,5 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
     console.log('[analysis] prompt caching did not engage (prefix likely below the ~2048-token minimum, or no cache breakpoint)')
   }
 
-  return { processed, failed, matched: processed - archivedInRun, archived: archivedInRun, inputTokens: totalInputTokens, outputTokens: totalOutputTokens }
+  return { processed, failed, matched: processed - archivedInRun, archived: archivedInRun, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, cacheCreationTokens: totalCacheCreationTokens, cacheReadTokens: totalCacheReadTokens }
 }

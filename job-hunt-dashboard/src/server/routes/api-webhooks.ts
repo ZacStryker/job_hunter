@@ -8,9 +8,12 @@ import { runDiscovery } from '../services/discovery-service'
 import { runAnalysis } from '../services/analysis-service'
 import type { AppEnv } from '../types'
 
-// USD per token (per-million prices / 1_000_000)
-const OPUS_4_7_INPUT = 15 / 1_000_000
-const OPUS_4_7_OUTPUT = 75 / 1_000_000
+// USD per token for claude-sonnet-4-6 (the model runAnalysis calls): $3 input / $15 output per 1M.
+// Prompt-cached input is discounted: cache writes bill at 1.25x, cache reads at 0.1x, uncached at 1x.
+const SONNET_INPUT = 3 / 1_000_000
+const SONNET_OUTPUT = 15 / 1_000_000
+const CACHE_WRITE_MULT = 1.25
+const CACHE_READ_MULT = 0.1
 
 const app = new Hono<AppEnv>()
 
@@ -52,8 +55,16 @@ app.post('/analysis', async (c) => {
     const write = (ev: object) => s.writeln(JSON.stringify(ev))
     const startMs = Date.now()
     try {
-      const { processed, failed, matched, archived, inputTokens, outputTokens } = await runAnalysis((msg) => write({ status: msg }), userId)
-      const costUsd = inputTokens * OPUS_4_7_INPUT + outputTokens * OPUS_4_7_OUTPUT
+      const result = await runAnalysis((msg) => write({ status: msg }), userId)
+      const { processed, failed, matched, archived, inputTokens, outputTokens } = result
+      // inputTokens is the folded total (uncached + cache writes + cache reads). Bill each tier at its
+      // real rate so prompt-cache savings (reads at 0.1x) actually show up in the recorded cost.
+      const cacheWrite = result.cacheCreationTokens ?? 0
+      const cacheRead = result.cacheReadTokens ?? 0
+      const uncachedInput = Math.max(0, inputTokens - cacheWrite - cacheRead)
+      const costUsd =
+        (uncachedInput + cacheWrite * CACHE_WRITE_MULT + cacheRead * CACHE_READ_MULT) * SONNET_INPUT +
+        outputTokens * SONNET_OUTPUT
       recordRun({ userId, name: 'Analysis', success: true, itemCount: processed, errorMessage: null,
         durationMs: Date.now() - startMs, inputTokens, outputTokens, costUsd, matchedCount: matched, archivedCount: archived })
       write({ done: true, processed, failed, matched, archived })
