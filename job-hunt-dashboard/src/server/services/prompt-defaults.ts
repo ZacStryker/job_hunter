@@ -35,8 +35,10 @@ export const DEFAULT_PROMPTS: Record<PromptFlow, PromptConfig> = {
       '- job_reqs_missed: ways this job falls short of the candidate\'s expectations.\n' +
       '- candidate_reqs_met: job requirements the candidate satisfies.\n' +
       '- candidate_reqs_missed: job requirements the candidate lacks.\n\n' +
-      'FORMAT for those four fields: a single string of comma-separated shorthand bullets. Prefix EVERY ' +
-      'bullet with exactly one marker character:\n' +
+      'FORMAT for those four fields: a single string of comma-separated shorthand bullets. The comma ' +
+      'is a reserved delimiter that separates one bullet from the next — NEVER use a comma inside ' +
+      'a bullet\'s text. Use a different separator (e.g. "/", ";", "and", or just a space) if you need ' +
+      'to list things within one bullet. Prefix EVERY bullet with exactly one marker character:\n' +
       '- "+" = full match / met\n' +
       '- "~" = partial match or an equivalent/transferable substitute\n' +
       '- "-" = not met / missing\n' +
