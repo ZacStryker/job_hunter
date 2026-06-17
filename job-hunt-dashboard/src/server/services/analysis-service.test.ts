@@ -38,6 +38,7 @@ const CREATE_JOBS_TABLE = `
     cover_letter_sent_at TEXT,
     date_applied TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
+    date_archived TEXT,
     resume_generated_at TEXT,
     user_id INTEGER NOT NULL DEFAULT 1,
     UNIQUE(company, job_title, user_id)
@@ -426,14 +427,85 @@ describe('runAnalysis()', () => {
     expect(result.processed).toBe(1)
     expect(result.failed).toBe(0)
 
-    const messages = (anthropicBody?.messages as Array<{ content: string }> | undefined) ?? []
-    expect(messages[0]?.content).toContain('We build developer tools for AI teams.')
+    const messages = (anthropicBody?.messages as Array<{ content: Array<{ type: string; text: string }> }> | undefined) ?? []
+    const blocks = messages[0]?.content ?? []
+    // The job listing (with the scraped description) is the final, non-cached block.
+    expect(blocks[blocks.length - 1]?.text).toContain('We build developer tools for AI teams.')
 
     const row = prodSqlite.prepare('SELECT job_description, analysis_status FROM jobs WHERE id = ?').get(id) as {
       job_description: string | null; analysis_status: string
     }
     expect(row.job_description).toBe('We build developer tools for AI teams.')
     expect(row.analysis_status).toBe('done')
+  })
+
+  test('prompt caching: stable prefix block carries cache_control; job listing is the trailing non-cached block', async () => {
+    insertPendingJob()
+    let anthropicBody: Record<string, unknown> | null = null
+    globalThis.fetch = mock((url: string, init?: RequestInit) => {
+      if (String(url).includes('scrape/listing')) {
+        return Promise.resolve(new Response(JSON.stringify({ description: 'Acme builds rockets.' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      }
+      anthropicBody = JSON.parse((init?.body as string) ?? '{}') as Record<string, unknown>
+      return Promise.resolve(new Response(JSON.stringify({
+        content: [{ type: 'text', text: JSON.stringify(VALID_ANALYSIS_RESPONSE) }],
+        usage: { input_tokens: 50, output_tokens: 30 },
+      }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    }) as typeof globalThis.fetch
+
+    await runAnalysis(undefined, 1)
+
+    const blocks = ((anthropicBody?.messages as Array<{ content: Array<{ type: string; text: string; cache_control?: unknown }> }>)[0]).content
+    expect(blocks.length).toBe(2)
+    // Prefix block is cached and contains the output schema (moved ahead of the breakpoint).
+    expect(blocks[0].cache_control).toEqual({ type: 'ephemeral' })
+    expect(blocks[0].text).toContain('respond with this JSON structure')
+    expect(blocks[0].text).not.toContain('JOB LISTING')
+    // Trailing block is the volatile job listing, not cached.
+    expect(blocks[1].cache_control).toBeUndefined()
+    expect(blocks[1].text).toContain('JOB LISTING:')
+    expect(blocks[1].text).toContain('Acme builds rockets.')
+  })
+
+  test('prompt caching: cached prefix is byte-identical across jobs in a run', async () => {
+    insertPendingJob({ company: 'Company A', job_title: 'Job A', external_job_id: 'ext-a' })
+    insertPendingJob({ company: 'Company B', job_title: 'Job B', external_job_id: 'ext-b' })
+    const prefixes: string[] = []
+    globalThis.fetch = mock((url: string, init?: RequestInit) => {
+      if (String(url).includes('scrape/listing')) {
+        return Promise.resolve(new Response(JSON.stringify({ description: 'desc' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      }
+      const body = JSON.parse((init?.body as string) ?? '{}') as { messages: Array<{ content: Array<{ text: string }> }> }
+      prefixes.push(body.messages[0].content[0].text)
+      return Promise.resolve(new Response(JSON.stringify({
+        content: [{ type: 'text', text: JSON.stringify(VALID_ANALYSIS_RESPONSE) }],
+        usage: { input_tokens: 50, output_tokens: 30 },
+      }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    }) as typeof globalThis.fetch
+
+    await runAnalysis(undefined, 1)
+
+    expect(prefixes.length).toBe(2)
+    expect(prefixes[0]).toBe(prefixes[1])
+  })
+
+  test('prompt caching: cache tokens are folded into inputTokens, not lost', async () => {
+    insertPendingJob()
+    globalThis.fetch = mock((url: string) => {
+      if (String(url).includes('scrape/listing')) {
+        return Promise.resolve(new Response(JSON.stringify({ description: 'desc' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      }
+      return Promise.resolve(new Response(JSON.stringify({
+        content: [{ type: 'text', text: JSON.stringify(VALID_ANALYSIS_RESPONSE) }],
+        usage: { input_tokens: 20, output_tokens: 30, cache_creation_input_tokens: 100, cache_read_input_tokens: 0 },
+      }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    }) as typeof globalThis.fetch
+
+    const result = await runAnalysis(undefined, 1)
+
+    // 20 uncached + 100 cache-creation = 120 total input tokens.
+    expect(result.inputTokens).toBe(120)
+    expect(result.outputTokens).toBe(30)
   })
 
   test('processes only up to 10 pending jobs per run', async () => {

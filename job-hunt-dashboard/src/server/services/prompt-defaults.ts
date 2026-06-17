@@ -10,20 +10,29 @@ export interface PromptConfig {
   userMessage: string
 }
 
+// Boundary between the cacheable stable prefix and the volatile per-job section of the analysis
+// prompt. analysis-service splits the (possibly user-customised) template here to place the prompt
+// cache breakpoint. A custom prompt that omits this marker simply sends one uncached block.
+export const ANALYSIS_JOB_LISTING_MARKER = 'JOB LISTING:'
+
 export const DEFAULT_PROMPTS: Record<PromptFlow, PromptConfig> = {
   analysis: {
     systemPrompt: null,
+    // The stable prefix (intro + profile + preferences + scoring + output schema) comes first so it
+    // is byte-identical across every job in a run and can be prompt-cached. The volatile per-job
+    // section ("JOB LISTING:" + the listing JSON) is last; analysis-service splits on the
+    // ANALYSIS_JOB_LISTING_MARKER below and places the cache breakpoint at the end of the prefix.
     userMessage:
       'You are evaluating a job opportunity for {{CANDIDATE_NAME}}.\n\n' +
       'CANDIDATE BACKGROUND:\n{{CANDIDATE_PROFILE_JSON}}\n\n' +
       'JOB PREFERENCES: full-time, English-speaking environment\n\n' +
-      'JOB LISTING:\n{{JOB_LISTING_JSON}}\n\n' +
       'Analyze this job for {{CANDIDATE_NAME}}. First, score the match on a <1-99> scale. \n\n' +
       'If the score is less than 50, respond with this JSON structure:\n' +
       '{ "score": <integer 1-49>, "role_fit": null, "red_flags": null, "requirements_met": null, "requirements_missed": null,  "salary": null, "benefits": null, "contact_name": null, "contact_email": null, "contact_phone": null, "recommended_action": "skip" } \n\n' +
       'If the score is 50 or more, respond with this JSON structure:\n' +
       '{ "score": <integer 50-99>, "role_fit": "<string>", "red_flags": "<string>", "requirements_met": "<string>", "requirements_missed": "<string>", "salary": "<string or null>", "benefits": "<string or null>", "contact_name": "<string or null>", "contact_email": "<string or null>", "contact_phone": "<string or null>", "recommended_action": "apply or investigate or skip" } \n\n' +
-      'Respond with ONLY valid JSON \u2014 no markdown, no code blocks, no explanation.',
+      'Respond with ONLY valid JSON \u2014 no markdown, no code blocks, no explanation.\n\n' +
+      'JOB LISTING:\n{{JOB_LISTING_JSON}}',
   },
   cover_letter: {
     systemPrompt:

@@ -2,7 +2,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { jobs, profile, userSecrets } from '../../db/schema'
 import { decrypt } from '../lib/crypto'
-import { loadEffectivePrompt } from './prompt-defaults'
+import { loadEffectivePrompt, ANALYSIS_JOB_LISTING_MARKER } from './prompt-defaults'
 import { profileDataSchema } from '../../shared/schemas'
 import type { ProfileData } from '../../shared/schemas'
 
@@ -21,8 +21,15 @@ function parseProfileData(raw: string | null | undefined): ProfileData {
 
 interface AnthropicMessage {
   content: Array<{ type: string; text: string }>
-  usage: { input_tokens: number; output_tokens: number }
+  usage: {
+    input_tokens: number
+    output_tokens: number
+    cache_creation_input_tokens?: number
+    cache_read_input_tokens?: number
+  }
 }
+
+type TextBlock = { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }
 
 interface AnalysisResult {
   score: number
@@ -38,16 +45,31 @@ interface AnalysisResult {
   recommended_action: string
 }
 
-function applyAnalysisTemplate(
+// Builds the user-message content blocks. The candidate-dependent prefix (everything before the
+// JOB LISTING marker) is a single cacheable block — byte-identical across every job in a run — with
+// an ephemeral cache breakpoint; the per-job listing is a separate trailing block with no
+// cache_control. A custom template that lacks the marker degrades gracefully to one uncached block.
+function buildAnalysisContent(
   template: string,
   candidateName: string,
   profileJson: string,
   jobJson: string
-): string {
-  return template
-    .replaceAll('{{CANDIDATE_NAME}}', candidateName)
-    .replaceAll('{{CANDIDATE_PROFILE_JSON}}', profileJson)
-    .replaceAll('{{JOB_LISTING_JSON}}', jobJson)
+): TextBlock[] {
+  const applyStable = (s: string) =>
+    s.replaceAll('{{CANDIDATE_NAME}}', candidateName).replaceAll('{{CANDIDATE_PROFILE_JSON}}', profileJson)
+
+  const markerIndex = template.indexOf(ANALYSIS_JOB_LISTING_MARKER)
+  if (markerIndex === -1) {
+    const full = applyStable(template).replaceAll('{{JOB_LISTING_JSON}}', jobJson)
+    return [{ type: 'text', text: full }]
+  }
+
+  const prefix = applyStable(template.slice(0, markerIndex)).trimEnd()
+  const listing = applyStable(template.slice(markerIndex)).replaceAll('{{JOB_LISTING_JSON}}', jobJson)
+  return [
+    { type: 'text', text: prefix, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: listing },
+  ]
 }
 
 export async function runAnalysis(onProgress?: (msg: string) => void, userId?: number): Promise<{ processed: number; failed: number; matched: number; archived: number; inputTokens: number; outputTokens: number }> {
@@ -92,11 +114,33 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
 
   onProgress?.(`Found ${pendingJobs.length} jobs to analyze`)
 
+  // Candidate name + profile JSON are constant for the whole run — compute once so the cached
+  // prefix is byte-identical across all per-job calls (call 1 writes the cache, calls 2+ read it).
+  const profileData = parseProfileData(profileRow?.profileData)
+  const candidateName = profileData.personal.fullName || 'a candidate'
+  const profileJson = JSON.stringify({
+    Name: profileData.personal.fullName || null,
+    Email: profileData.personal.email || null,
+    Phone: profileData.personal.phone,
+    Location: profileData.personal.location,
+    Summary: profileData.personal.summary,
+    ...(profileData.personal.skills ? { Skills: profileData.personal.skills } : {}),
+    Websites: profileData.personal.websites,
+    Jobs: profileData.experience.jobs,
+    Education: profileData.experience.education,
+    Projects: profileData.experience.projects.map(p => ({ name: p.name, description: p.description })),
+    Certifications: profileData.experience.certifications,
+    Licences: profileData.experience.licences,
+    Awards: profileData.experience.awards,
+  })
+
   let processed = 0
   let failed = 0
   let archivedInRun = 0
   let totalInputTokens = 0
   let totalOutputTokens = 0
+  let totalCacheCreationTokens = 0
+  let totalCacheReadTokens = 0
   let i = 0
 
   for (const job of pendingJobs) {
@@ -139,30 +183,13 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
         }
       }
 
-      const profileData = parseProfileData(profileRow?.profileData)
-      const candidateName = profileData.personal.fullName || 'a candidate'
-      const profileJson = JSON.stringify({
-        Name: profileData.personal.fullName || null,
-        Email: profileData.personal.email || null,
-        Phone: profileData.personal.phone,
-        Location: profileData.personal.location,
-        Summary: profileData.personal.summary,
-        ...(profileData.personal.skills ? { Skills: profileData.personal.skills } : {}),
-        Websites: profileData.personal.websites,
-        Jobs: profileData.experience.jobs,
-        Education: profileData.experience.education,
-        Projects: profileData.experience.projects.map(p => ({ name: p.name, description: p.description })),
-        Certifications: profileData.experience.certifications,
-        Licences: profileData.experience.licences,
-        Awards: profileData.experience.awards,
-      })
       const jobJson = JSON.stringify({
         Company: job.company,
         Title: job.jobTitle,
         Location: job.location ?? null,
         Description: description || null,
       })
-      const userMessage = applyAnalysisTemplate(promptConfig.userMessage, candidateName, profileJson, jobJson)
+      const userContent = buildAnalysisContent(promptConfig.userMessage, candidateName, profileJson, jobJson)
 
       const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -174,15 +201,21 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 1024,
-          messages: [{ role: 'user', content: userMessage }],
+          messages: [{ role: 'user', content: userContent }],
         }),
         signal: AbortSignal.timeout(120_000),
       })
       if (!anthropicRes.ok) throw new Error(`Anthropic error ${anthropicRes.status}`)
 
       const anthropicData = await anthropicRes.json() as AnthropicMessage
-      totalInputTokens += anthropicData.usage?.input_tokens ?? 0
+      const cacheCreation = anthropicData.usage?.cache_creation_input_tokens ?? 0
+      const cacheRead = anthropicData.usage?.cache_read_input_tokens ?? 0
+      // input_tokens from the API is the uncached remainder; fold the cached portions back in so the
+      // returned inputTokens stays the true total prompt size (preserves the existing cost contract).
+      totalInputTokens += (anthropicData.usage?.input_tokens ?? 0) + cacheCreation + cacheRead
       totalOutputTokens += anthropicData.usage?.output_tokens ?? 0
+      totalCacheCreationTokens += cacheCreation
+      totalCacheReadTokens += cacheRead
       const text = anthropicData.content.find((b) => b.type === 'text')?.text ?? ''
 
       let result: AnalysisResult
@@ -225,6 +258,14 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
         .run()
       failed++
     }
+  }
+
+  // Per-run cache visibility (not surfaced in the UI). cache_read > 0 on calls 2+ confirms the
+  // profile prefix is being reused; both staying 0 means the prefix is under Sonnet 4.6's ~2048-token
+  // minimum (caching silently no-ops) or a custom prompt omitted the JOB LISTING marker.
+  console.log(`[analysis] prompt cache — creation: ${totalCacheCreationTokens}, read: ${totalCacheReadTokens} tokens`)
+  if (totalCacheCreationTokens === 0 && totalCacheReadTokens === 0) {
+    console.log('[analysis] prompt caching did not engage (prefix likely below the ~2048-token minimum, or no cache breakpoint)')
   }
 
   return { processed, failed, matched: processed - archivedInRun, archived: archivedInRun, inputTokens: totalInputTokens, outputTokens: totalOutputTokens }
