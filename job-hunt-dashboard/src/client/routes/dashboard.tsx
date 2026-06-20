@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import {
   ResponsiveContainer,
   Cell,
@@ -13,10 +13,9 @@ import {
   Tooltip,
   Legend,
 } from 'recharts'
-import type { StatsPeriod } from '@shared/schemas'
+import type { Stats, StatsPeriod } from '@shared/schemas'
 import { STATS_PERIODS } from '@shared/schemas'
 import { useStatsQuery, type ArchivedFilter } from '../hooks/useStatsQuery'
-import { SCORE_COLORS } from '../utils/scoreColors'
 
 const PERIOD_LABELS: Record<StatsPeriod, string> = {
   '24h': '24h',
@@ -25,39 +24,18 @@ const PERIOD_LABELS: Record<StatsPeriod, string> = {
   all: 'All time',
 }
 
-const SOURCE_COLOR_MAP: Record<string, string> = {
-  linkedin: '#60a5fa',
-  indeed: '#4ade80',
-  indeed_nl: '#a78bfa',
-  arc: '#fb923c',
-  manual: '#f472b6',
-}
+const DARK_GRID = '#3f3f46'
+const DARK_TICK = '#a1a1aa'
+const TOOLTIP_STYLE = { background: '#18181b', border: '1px solid #3f3f46', color: '#f4f4f5', borderRadius: 4, padding: '8px 12px' }
 
-const REC_COLOR_MAP: Record<string, string> = {
-  Apply: '#4ade80',
-  Investigate: '#facc15',
-}
-
-const STATUS_COLOR_MAP: Record<string, string> = {
-  'No Response': '#a1a1aa',
-  Submitted: '#60a5fa',
-  Rejected: '#f87171',
-  Screening: '#facc15',
-  Interview: '#86efac',
-  Offer: '#16a34a',
-  Other: '#fb923c',
-}
-
-const WORKFLOW_COLOR_MAP: Record<string, string> = {
+const WORKFLOW_FILL: Record<string, string> = {
   Discovery: '#60a5fa',
   Analysis: '#4ade80',
   'Cover Letter': '#facc15',
   Resume: '#a78bfa',
 }
 
-const DARK_GRID = '#3f3f46'
-const DARK_TICK = '#a1a1aa'
-const TOOLTIP_STYLE = { background: '#18181b', border: '1px solid #3f3f46', color: '#f4f4f5', borderRadius: 4, padding: '8px 12px' }
+const GATE_MESSAGE = 'Set application statuses to unlock conversion insights.'
 
 type TooltipPayloadItem = { name: string; value: number; color: string }
 
@@ -86,14 +64,14 @@ function FilteredTooltip({ active, payload, label }: {
 
 type LabelContentProps = { x?: number; y?: number; width?: number; height?: number; value?: number }
 
-function LabelInsideTop({ x = 0, y = 0, width = 0, height = 0, value = 0 }: LabelContentProps): React.JSX.Element {
-  if (!value || height < 30) return <></>
-  return <text x={x + width / 2} y={y + 20} fill="#ffffff" textAnchor="middle" fontSize={13} fontWeight={600}>{value}</text>
+function LabelInsideTop({ x = 0, y = 0, width = 0, value = 0 }: LabelContentProps): React.JSX.Element {
+  if (!value) return <></>
+  return <text x={x + width / 2} y={y - 4} fill="#e4e4e7" textAnchor="middle" fontSize={12} fontWeight={600}>{value}</text>
 }
 
-function LabelInsideCostTop({ x = 0, y = 0, width = 0, height = 0, value = 0 }: LabelContentProps): React.JSX.Element {
-  if (!value || height < 30) return <></>
-  return <text x={x + width / 2} y={y + 20} fill="#ffffff" textAnchor="middle" fontSize={13} fontWeight={600}>{(value as number).toFixed(2)}</text>
+function LabelInsideCostTop({ x = 0, y = 0, width = 0, value = 0 }: LabelContentProps): React.JSX.Element {
+  if (!value) return <></>
+  return <text x={x + width / 2} y={y - 4} fill="#e4e4e7" textAnchor="middle" fontSize={12} fontWeight={600}>{(value as number).toFixed(1)}</text>
 }
 
 const AXIS_PROPS = {
@@ -117,6 +95,14 @@ function NoData() {
   return (
     <div className="flex items-center justify-center h-[120px] text-sm text-zinc-500">
       No data for this period
+    </div>
+  )
+}
+
+function GateMessage() {
+  return (
+    <div className="flex items-center justify-center h-[120px] px-4 text-sm text-zinc-500 text-center">
+      {GATE_MESSAGE}
     </div>
   )
 }
@@ -154,7 +140,7 @@ function ChartCard({
         </button>
       </div>
       {showTable ? (
-        <div className="overflow-auto h-[120px]">
+        <div className="overflow-auto h-[160px]">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-zinc-900">
               <tr className="border-b border-zinc-700">
@@ -185,320 +171,413 @@ function formatTokens(n: number): string {
   return String(n)
 }
 
-const APP_STATUS_KEYS = ['No Response', 'Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other'] as const
-const WORKFLOW_KEYS = ['Discovery', 'Analysis', 'Cover Letter', 'Resume'] as const
+function heroBorderClass(sentence: string): string {
+  if (sentence.startsWith('Active search')) return 'border-green-700'
+  if (sentence.startsWith('Moderate activity')) return 'border-amber-600'
+  return 'border-zinc-700'
+}
+
+const FUNNEL_STAGES = [
+  { key: 'scraped', label: 'Scraped', gated: false },
+  { key: 'matched', label: 'Matched', gated: false },
+  { key: 'applied', label: 'Applied', gated: false },
+  { key: 'response', label: 'Response', gated: true },
+  { key: 'interview', label: 'Interview', gated: true },
+  { key: 'offer', label: 'Offer', gated: true },
+] as const
+
+function FunnelBar({ funnel }: { funnel: Stats['funnel'] }) {
+  const counts: Record<string, number> = {
+    scraped: funnel.scraped, matched: funnel.matched, applied: funnel.applied,
+    response: funnel.response, interview: funnel.interview, offer: funnel.offer,
+  }
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-3">Pipeline Funnel</h3>
+      <div className="flex items-stretch">
+        {FUNNEL_STAGES.map((stage, i) => {
+          const locked = stage.gated && !funnel.hasStatusData
+          const prev = i > 0 ? counts[FUNNEL_STAGES[i - 1].key] : null
+          const cur = counts[stage.key]
+          const conv = prev !== null && prev > 0 && !locked ? Math.round((cur / prev) * 100) : null
+          return (
+            <Fragment key={stage.key}>
+              {i > 0 && (
+                <div className="flex flex-col items-center justify-center px-0.5 min-w-[34px] text-[10px] text-zinc-600">
+                  <span>→</span>
+                  {conv !== null && <span className="text-zinc-500">{conv}%</span>}
+                </div>
+              )}
+              <div className={`flex-1 rounded-md border p-2 text-center ${locked ? 'border-zinc-800 bg-zinc-900/40' : 'border-zinc-700 bg-zinc-800/40'}`}>
+                <div className="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">{stage.label}</div>
+                {locked
+                  ? <div className="text-zinc-600 text-lg leading-7">🔒</div>
+                  : <div className="text-2xl font-semibold text-zinc-100">{cur}</div>}
+              </div>
+            </Fragment>
+          )
+        })}
+      </div>
+      {!funnel.hasStatusData && <p className="text-xs text-zinc-500 mt-2">{GATE_MESSAGE}</p>}
+    </div>
+  )
+}
+
+function ValuePanel({ value }: { value: Stats['value'] }) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 flex flex-col justify-center">
+      <div className="text-xs text-zinc-500 uppercase tracking-widest mb-2">Value Delivered</div>
+      <div className="text-3xl font-bold text-green-400">⏱ ~{Math.round(value.timeSavedHours)} hrs saved</div>
+      <div className="text-sm text-zinc-400 mt-2">
+        💸 ${value.totalCostUsd.toFixed(2)} spent
+        {value.costPerApplication > 0 && <> · ${value.costPerApplication.toFixed(2)} per application</>}
+      </div>
+    </div>
+  )
+}
+
+function FitVsOutcome({ fitVsOutcome }: { fitVsOutcome: Stats['fitVsOutcome'] }) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <div className="text-xs text-zinc-500 uppercase tracking-widest mb-2">Fit Score vs Outcome</div>
+      {!fitVsOutcome.hasData ? <GateMessage /> : (
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={fitVsOutcome.buckets} margin={{ top: 16, right: 8, bottom: 0, left: -20 }}>
+            <CartesianGrid stroke={DARK_GRID} strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="fitRange" {...AXIS_PROPS} fontSize={11} />
+            <YAxis {...AXIS_PROPS} />
+            <Tooltip content={<FilteredTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="applied" name="Applied" fill="#60a5fa">
+              <LabelList dataKey="applied" content={LabelInsideTop as (props: object) => React.JSX.Element} />
+            </Bar>
+            <Bar dataKey="responded" name="Responded" fill="#4ade80">
+              <LabelList dataKey="responded" content={LabelInsideTop as (props: object) => React.JSX.Element} />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  )
+}
+
+function DaysSinceAppCard({ days }: { days: number | null }) {
+  const color = days === null ? 'text-zinc-400'
+    : days < 3 ? 'text-green-400'
+    : days <= 7 ? 'text-amber-400'
+    : 'text-red-400'
+  const text = days === null ? 'Never' : `${days}d`
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
+      <div className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Days Since Last Application</div>
+      <div className={`text-2xl font-semibold ${color}`}>{text}</div>
+    </div>
+  )
+}
+
+function SparklineStatCard({ label, value, sparkData, sparkKey }: {
+  label: string
+  value: string
+  sparkData: { date: string }[]
+  sparkKey: string
+}) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
+      <div className="text-xs text-zinc-500 uppercase tracking-wide mb-1">{label}</div>
+      <div className="text-2xl font-semibold text-zinc-100 mb-1">{value}</div>
+      <div className="h-[34px]">
+        {sparkData.length > 1 && (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={sparkData} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+              <Area type="monotone" dataKey={sparkKey} stroke="#4ade80" fill="#4ade8033" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SourceEffectivenessPanel({ data, gated }: { data: Stats['detail']['sourceEffectiveness']; gated: boolean }) {
+  if (gated) return <GateMessage />
+  if (data.length === 0) return <NoData />
+  const rows = data.map(s => ({
+    source: s.source,
+    applyRate: s.scraped > 0 ? Math.round((s.applied / s.scraped) * 100) : 0,
+    responseRate: s.applied > 0 ? Math.round((s.responded / s.applied) * 100) : 0,
+  }))
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(120, rows.length * 38)}>
+      <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 28, bottom: 4, left: 8 }}>
+        <CartesianGrid stroke={DARK_GRID} strokeDasharray="3 3" horizontal={false} />
+        <XAxis type="number" {...AXIS_PROPS} domain={[0, 100]} unit="%" />
+        <YAxis type="category" dataKey="source" {...AXIS_PROPS} width={72} />
+        <Tooltip content={<FilteredTooltip />} />
+        <Legend wrapperStyle={{ fontSize: 11 }} />
+        <Bar dataKey="applyRate" name="Apply rate" fill="#60a5fa">
+          <LabelList dataKey="applyRate" position="right" fill="#a1a1aa" fontSize={11} />
+        </Bar>
+        <Bar dataKey="responseRate" name="Response rate" fill="#4ade80">
+          <LabelList dataKey="responseRate" position="right" fill="#a1a1aa" fontSize={11} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+function StageAgingPanel({ data, gated }: { data: Stats['detail']['stageAging']; gated: boolean }) {
+  if (gated) return <GateMessage />
+  if (data.length === 0) return <NoData />
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(120, data.length * 38)}>
+      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 28, bottom: 4, left: 8 }}>
+        <CartesianGrid stroke={DARK_GRID} strokeDasharray="3 3" horizontal={false} />
+        <XAxis type="number" {...AXIS_PROPS} unit="d" allowDecimals />
+        <YAxis type="category" dataKey="stage" {...AXIS_PROPS} width={80} />
+        <Tooltip content={<FilteredTooltip />} />
+        <Bar dataKey="medianDays" name="Median days" fill="#a78bfa">
+          <LabelList dataKey="medianDays" position="right" fill="#a1a1aa" fontSize={11} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+function CumulativeTimeSavedPanel({ data }: { data: Stats['detail']['cumulativeTimeSaved'] }) {
+  if (data.length === 0) return <NoData />
+  return (
+    <ResponsiveContainer width="100%" height={160}>
+      <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+        <defs>
+          <linearGradient id="gradCumSaved" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#4ade80" stopOpacity={0.6} />
+            <stop offset="100%" stopColor="#4ade80" stopOpacity={0.05} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid stroke={DARK_GRID} strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} fontSize={11} />
+        <YAxis {...AXIS_PROPS} unit="h" allowDecimals />
+        <Tooltip content={<FilteredTooltip />} />
+        <Area type="monotone" dataKey="totalHours" name="Hours saved" stroke="#4ade80" fill="url(#gradCumSaved)" strokeWidth={2} />
+      </AreaChart>
+    </ResponsiveContainer>
+  )
+}
+
+function TimeSavedByWorkflowPanel({ data }: { data: Stats['detail']['timeSavedByWorkflow'] }) {
+  if (data.every(d => d.hours === 0)) return <NoData />
+  return (
+    <ResponsiveContainer width="100%" height={160}>
+      <BarChart data={data} margin={{ top: 18, right: 8, bottom: 0, left: -16 }}>
+        <CartesianGrid stroke={DARK_GRID} strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="workflow" {...AXIS_PROPS} fontSize={11} />
+        <YAxis {...AXIS_PROPS} unit="h" allowDecimals />
+        <Tooltip content={<FilteredTooltip />} />
+        <Bar dataKey="hours" name="Hours">
+          {data.map((d) => <Cell key={d.workflow} fill={WORKFLOW_FILL[d.workflow] ?? '#60a5fa'} />)}
+          <LabelList dataKey="hours" content={LabelInsideCostTop as (props: object) => React.JSX.Element} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+function ActivityHeatmap({ data }: { data: Stats['detail']['activityHeatmap'] }) {
+  const countByDate = new Map(data.map(d => [d.date, d.count]))
+  const cells: { date: string; count: number }[] = []
+  for (let i = 89; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10)
+    cells.push({ date: d, count: countByDate.get(d) ?? 0 })
+  }
+  const cellColor = (c: number) => c === 0 ? '#27272a' : c === 1 ? '#14532d' : c <= 3 ? '#15803d' : '#22c55e'
+  const cols = Math.ceil(cells.length / 7)
+  return (
+    <div className="flex gap-[3px] overflow-x-auto py-2">
+      {Array.from({ length: cols }, (_, col) => (
+        <div key={col} className="flex flex-col gap-[3px]">
+          {cells.slice(col * 7, col * 7 + 7).map(cell => (
+            <div
+              key={cell.date}
+              title={`${cell.date}: ${cell.count} ${cell.count === 1 ? 'activity' : 'activities'}`}
+              className="w-3 h-3 rounded-sm shrink-0"
+              style={{ background: cellColor(cell.count) }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DetailCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-2">
+      <div className="text-sm font-medium text-zinc-400 mb-1.5">{title}</div>
+      {children}
+    </div>
+  )
+}
 
 export function DashboardRoute() {
   const [period, setPeriod] = useState<StatsPeriod>('all')
   const [archivedFilter, setArchivedFilter] = useState<ArchivedFilter>('active')
   const { data, isPending, isError, error } = useStatsQuery(period, archivedFilter)
 
+  const filterBar = (
+    <div className="flex items-center gap-1">
+      {STATS_PERIODS.map((p) => (
+        <button
+          key={p}
+          onClick={() => setPeriod(p)}
+          className={[
+            'px-2.5 py-1 text-xs rounded transition-colors',
+            period === p ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800',
+          ].join(' ')}
+        >
+          {PERIOD_LABELS[p]}
+        </button>
+      ))}
+      <div className="w-px h-4 bg-zinc-700 mx-1.5" />
+      {(['active', 'archived', 'all'] as ArchivedFilter[]).map((f) => (
+        <button
+          key={f}
+          onClick={() => setArchivedFilter(f)}
+          className={[
+            'px-2.5 py-1 text-xs rounded transition-colors',
+            archivedFilter === f ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800',
+          ].join(' ')}
+        >
+          {f.charAt(0).toUpperCase() + f.slice(1)}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
-    <div className="p-2 space-y-4">
-      {/* Filter bar: period + archivedFilter only */}
-      <div className="flex items-center gap-1">
-        {STATS_PERIODS.map((p) => (
-          <button
-            key={p}
-            onClick={() => setPeriod(p)}
-            className={[
-              'px-2.5 py-1 text-xs rounded transition-colors',
-              period === p
-                ? 'bg-zinc-700 text-zinc-100'
-                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800',
-            ].join(' ')}
-          >
-            {PERIOD_LABELS[p]}
-          </button>
-        ))}
+    <div className="p-4 space-y-6 max-w-5xl mx-auto">
+      {filterBar}
 
-        <div className="w-px h-4 bg-zinc-700 mx-1.5" />
+      {isPending && <div className="flex items-center justify-center py-16 text-sm text-zinc-400">Loading…</div>}
+      {isError && <div className="text-sm text-red-400">{error instanceof Error ? error.message : 'Error loading stats'}</div>}
 
-        {(['active', 'archived', 'all'] as ArchivedFilter[]).map((f) => (
-          <button
-            key={f}
-            onClick={() => setArchivedFilter(f)}
-            className={[
-              'px-2.5 py-1 text-xs rounded transition-colors',
-              archivedFilter === f
-                ? 'bg-zinc-700 text-zinc-100'
-                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800',
-            ].join(' ')}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {isPending && (
-        <div className="flex items-center justify-center py-16 text-sm text-zinc-400">Loading…</div>
-      )}
-
-      {isError && (
-        <div className="text-sm text-red-400">{error instanceof Error ? error.message : 'Error loading stats'}</div>
-      )}
-
-      {data && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-
-          {/* ── Q01 Automations ── */}
-          <section className="space-y-1.5 min-w-0">
-            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Automations</h2>
-            <div className="grid grid-cols-3 gap-2">
-              <StatCard label="Workflow Runs" value={String(data.automation.totalRuns)} />
-              <StatCard label="Tokens" value={formatTokens(data.automation.totalTokens)} />
-              <StatCard label="Cost" value={`$${data.automation.totalCost.toFixed(2)}`} />
-            </div>
-            {data.automation.perDay.length > 0 && (
-              <ChartCard
-                title="Workflows per Day by Workflow Type"
-                tableHeaders={['Date', 'Discovery', 'Analysis', 'Cover Letter', 'Resume']}
-                tableData={data.automation.perDay.map(e => [e.date, e.Discovery, e.Analysis, e['Cover Letter'], e.Resume]).reverse()}
-              >
-                <ResponsiveContainer width="100%" height={120}>
-                  <AreaChart data={data.automation.perDay}>
-                    <defs>
-                      {WORKFLOW_KEYS.map(k => (
-                        <linearGradient key={k} id={`gradAuto${k.replace(/ /g, '')}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={WORKFLOW_COLOR_MAP[k]} stopOpacity={0.6} />
-                          <stop offset="95%" stopColor={WORKFLOW_COLOR_MAP[k]} stopOpacity={0.1} />
-                        </linearGradient>
-                      ))}
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
-                    <YAxis {...AXIS_PROPS} />
-                    <Tooltip content={<FilteredTooltip />} wrapperStyle={{ zIndex: 10 }} />
-                    <Legend wrapperStyle={{ color: DARK_TICK, fontSize: 11 }} />
-                    {WORKFLOW_KEYS.map(k => (
-                      <Area key={k} type="monotone" dataKey={k} stackId="1" stroke={WORKFLOW_COLOR_MAP[k]} fill={`url(#gradAuto${k.replace(/ /g, '')})`} />
-                    ))}
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            )}
-            <ChartCard
-              title="Cost Breakdown"
-              tableHeaders={['Workflow', 'Cost ($)']}
-              tableData={data.automation.costByWorkflow.map(e => [e.workflow, e.cost.toFixed(2)])}
-            >
-              {data.automation.costByWorkflow.every(e => e.cost === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={120}>
-                  <BarChart data={data.automation.costByWorkflow}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="workflow" {...AXIS_PROPS} />
-                    <YAxis {...AXIS_PROPS} allowDecimals={true} />
-                    <Tooltip content={<FilteredTooltip />} wrapperStyle={{ zIndex: 10 }} />
-                    <Bar dataKey="cost">
-                      {data.automation.costByWorkflow.map(entry => (
-                        <Cell key={entry.workflow} fill={WORKFLOW_COLOR_MAP[entry.workflow] ?? '#a1a1aa'} />
-                      ))}
-                      <LabelList dataKey="cost" content={LabelInsideCostTop as (props: object) => React.JSX.Element} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </ChartCard>
-          </section>
-
-          {/* ── Q02 Jobs ── */}
-          <section className="space-y-1.5 min-w-0">
-            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Jobs</h2>
-            <div className="grid grid-cols-3 gap-2">
-              <StatCard label="Jobs" value={String(data.jobs.total)} />
-              <StatCard label="Companies" value={String(data.jobs.companies)} />
-              <StatCard label="Sources" value={String(data.jobs.sources)} />
-            </div>
-            {data.jobs.perDay.length > 0 && (
-              <ChartCard
-                title="Jobs per Day by Source"
-                tableHeaders={['Date', 'LinkedIn', 'Indeed', 'Indeed NL', 'Arc', 'Manual']}
-                tableData={data.jobs.perDay.map(e => [e.date, e.linkedin, e.indeed, e.indeed_nl, e.arc, e.manual]).reverse()}
-              >
-                <ResponsiveContainer width="100%" height={120}>
-                  <AreaChart data={data.jobs.perDay}>
-                    <defs>
-                      <linearGradient id="gradJobsLinkedin" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={SOURCE_COLOR_MAP.linkedin} stopOpacity={0.6} />
-                        <stop offset="95%" stopColor={SOURCE_COLOR_MAP.linkedin} stopOpacity={0.1} />
-                      </linearGradient>
-                      <linearGradient id="gradJobsIndeed" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={SOURCE_COLOR_MAP.indeed} stopOpacity={0.6} />
-                        <stop offset="95%" stopColor={SOURCE_COLOR_MAP.indeed} stopOpacity={0.1} />
-                      </linearGradient>
-                      <linearGradient id="gradJobsIndeedNl" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={SOURCE_COLOR_MAP.indeed_nl} stopOpacity={0.6} />
-                        <stop offset="95%" stopColor={SOURCE_COLOR_MAP.indeed_nl} stopOpacity={0.1} />
-                      </linearGradient>
-                      <linearGradient id="gradJobsArc" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={SOURCE_COLOR_MAP.arc} stopOpacity={0.6} />
-                        <stop offset="95%" stopColor={SOURCE_COLOR_MAP.arc} stopOpacity={0.1} />
-                      </linearGradient>
-                      <linearGradient id="gradJobsManual" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={SOURCE_COLOR_MAP.manual} stopOpacity={0.6} />
-                        <stop offset="95%" stopColor={SOURCE_COLOR_MAP.manual} stopOpacity={0.1} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
-                    <YAxis {...AXIS_PROPS} />
-                    <Tooltip content={<FilteredTooltip />} wrapperStyle={{ zIndex: 10 }} />
-                    <Legend wrapperStyle={{ color: DARK_TICK, fontSize: 11 }} />
-                    <Area type="monotone" dataKey="linkedin" stackId="1" stroke={SOURCE_COLOR_MAP.linkedin} fill="url(#gradJobsLinkedin)" />
-                    <Area type="monotone" dataKey="indeed" stackId="1" stroke={SOURCE_COLOR_MAP.indeed} fill="url(#gradJobsIndeed)" />
-                    <Area type="monotone" dataKey="indeed_nl" stackId="1" stroke={SOURCE_COLOR_MAP.indeed_nl} fill="url(#gradJobsIndeedNl)" />
-                    <Area type="monotone" dataKey="arc" stackId="1" stroke={SOURCE_COLOR_MAP.arc} fill="url(#gradJobsArc)" />
-                    <Area type="monotone" dataKey="manual" stackId="1" stroke={SOURCE_COLOR_MAP.manual} fill="url(#gradJobsManual)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            )}
-            <ChartCard
-              title="Source Breakdown"
-              tableHeaders={['Source', 'Count']}
-              tableData={data.jobs.bySource.filter(e => e.value > 0).map(e => [e.name, e.value])}
-            >
-              {data.jobs.bySource.every(e => e.value === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={120}>
-                  <BarChart data={data.jobs.bySource.filter(e => e.value > 0)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="name" {...AXIS_PROPS} />
-                    <YAxis {...AXIS_PROPS} />
-                    <Tooltip content={<FilteredTooltip />} wrapperStyle={{ zIndex: 10 }} />
-                    <Bar dataKey="value">
-                      {data.jobs.bySource.filter(e => e.value > 0).map(entry => (
-                        <Cell key={entry.name} fill={SOURCE_COLOR_MAP[entry.name] ?? '#a1a1aa'} />
-                      ))}
-                      <LabelList dataKey="value" content={LabelInsideTop as (props: object) => React.JSX.Element} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </ChartCard>
-          </section>
-
-          {/* ── Q03 Matches ── */}
-          <section className="space-y-1.5 min-w-0">
-            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Matches</h2>
-            <div className="grid grid-cols-3 gap-2">
-              <StatCard label="Matches" value={String(data.matches.total)} />
-              <StatCard label="Investigate" value={String(data.matches.investigate)} />
-              <StatCard label="Apply" value={String(data.matches.apply)} />
-            </div>
-            {data.matches.perDay.length > 0 && (
-              <ChartCard
-                title="Matches per Day by Recommendation"
-                tableHeaders={['Date', 'Apply', 'Investigate']}
-                tableData={data.matches.perDay.map(e => [e.date, e.apply, e.investigate]).reverse()}
-              >
-                <ResponsiveContainer width="100%" height={120}>
-                  <AreaChart data={data.matches.perDay}>
-                    <defs>
-                      <linearGradient id="gradMatchesApply" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={REC_COLOR_MAP.Apply} stopOpacity={0.6} />
-                        <stop offset="95%" stopColor={REC_COLOR_MAP.Apply} stopOpacity={0.1} />
-                      </linearGradient>
-                      <linearGradient id="gradMatchesInvestigate" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={REC_COLOR_MAP.Investigate} stopOpacity={0.6} />
-                        <stop offset="95%" stopColor={REC_COLOR_MAP.Investigate} stopOpacity={0.1} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
-                    <YAxis {...AXIS_PROPS} />
-                    <Tooltip content={<FilteredTooltip />} wrapperStyle={{ zIndex: 10 }} />
-                    <Legend wrapperStyle={{ color: DARK_TICK, fontSize: 11 }} />
-                    <Area type="monotone" dataKey="apply" stackId="1" stroke={REC_COLOR_MAP.Apply} fill="url(#gradMatchesApply)" />
-                    <Area type="monotone" dataKey="investigate" stackId="1" stroke={REC_COLOR_MAP.Investigate} fill="url(#gradMatchesInvestigate)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            )}
-            <ChartCard
-              title="Score Breakdown"
-              tableHeaders={['Score', 'Count']}
-              tableData={data.matches.byScore.map(e => [e.score, e.count])}
-            >
-              {data.matches.byScore.every(e => e.count === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={140} style={{ overflow: 'visible' }}>
-                  <BarChart data={data.matches.byScore} style={{ overflow: 'visible' }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="score" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={45} />
-                    <YAxis {...AXIS_PROPS} />
-                    <Tooltip content={<FilteredTooltip />} wrapperStyle={{ zIndex: 10 }} />
-                    <Bar dataKey="count">
-                      {data.matches.byScore.map((entry, i) => (
-                        <Cell key={entry.score} fill={SCORE_COLORS[i] ?? '#a1a1aa'} />
-                      ))}
-                      <LabelList dataKey="count" content={LabelInsideTop as (props: object) => React.JSX.Element} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </ChartCard>
-          </section>
-
-          {/* ── Q04 Applications ── */}
-          <section className="space-y-1.5 min-w-0">
-            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Applications</h2>
-            <div className="grid grid-cols-3 gap-2">
-              <StatCard label="Applications" value={String(data.applications.total)} />
-              <StatCard label="Companies" value={String(data.applications.companies)} />
-              <StatCard label="Responses" value={String(data.applications.responses)} />
-            </div>
-            {data.applications.perDay.length > 0 && (
-              <ChartCard
-                title="Applications per Day by Response Type"
-                tableHeaders={['Date', 'No Response', 'Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other']}
-                tableData={data.applications.perDay.map(e => [e.date, e['No Response'], e.Submitted, e.Rejected, e.Screening, e.Interview, e.Offer, e.Other]).reverse()}
-              >
-                <ResponsiveContainer width="100%" height={120}>
-                  <AreaChart data={data.applications.perDay}>
-                    <defs>
-                      {APP_STATUS_KEYS.map(k => (
-                        <linearGradient key={k} id={`gradApp${k.replace(/ /g, '')}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={STATUS_COLOR_MAP[k]} stopOpacity={0.6} />
-                          <stop offset="95%" stopColor={STATUS_COLOR_MAP[k]} stopOpacity={0.1} />
-                        </linearGradient>
-                      ))}
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="date" {...AXIS_PROPS} tickFormatter={formatPerDayDate} />
-                    <YAxis {...AXIS_PROPS} />
-                    <Tooltip content={<FilteredTooltip />} wrapperStyle={{ zIndex: 10 }} />
-                    <Legend wrapperStyle={{ color: DARK_TICK, fontSize: 11 }} />
-                    {APP_STATUS_KEYS.map(k => (
-                      <Area key={k} type="monotone" dataKey={k} stackId="1" stroke={STATUS_COLOR_MAP[k]} fill={`url(#gradApp${k.replace(/ /g, '')})`} />
-                    ))}
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            )}
-            <ChartCard
-              title="Status Breakdown"
-              tableHeaders={['Status', 'Count']}
-              tableData={data.applications.byStatus.filter(e => e.status !== 'No Response').map(e => [e.status, e.count])}
-            >
-              {data.applications.byStatus.filter(e => e.status !== 'No Response').every(e => e.count === 0) ? <NoData /> : (
-                <ResponsiveContainer width="100%" height={140} style={{ overflow: 'visible' }}>
-                  <BarChart data={data.applications.byStatus.filter(e => e.status !== 'No Response')} style={{ overflow: 'visible' }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={DARK_GRID} />
-                    <XAxis dataKey="status" {...AXIS_PROPS} angle={-35} textAnchor="end" interval={0} height={55} />
-                    <YAxis {...AXIS_PROPS} />
-                    <Tooltip content={<FilteredTooltip />} wrapperStyle={{ zIndex: 10 }} />
-                    <Bar dataKey="count">
-                      {data.applications.byStatus.filter(e => e.status !== 'No Response').map(entry => (
-                        <Cell key={entry.status} fill={STATUS_COLOR_MAP[entry.status] ?? '#a1a1aa'} />
-                      ))}
-                      <LabelList dataKey="count" content={LabelInsideTop as (props: object) => React.JSX.Element} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </ChartCard>
-          </section>
-
+      {data && data.funnel.scraped === 0 && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-400">
+          No jobs scraped yet — start a Discovery run to populate your dashboard.
         </div>
+      )}
+
+      {data && data.funnel.scraped > 0 && (
+        <>
+          {data.funnel.offer > 0 && (
+            <div className="rounded-lg border border-green-700 bg-green-950 p-3 text-sm text-green-300">
+              🎉 You have an offer! Update the status in your tracker.
+            </div>
+          )}
+
+          {/* TIER 0 — THE ANSWER */}
+          <div className="space-y-2">
+            <div className={`rounded-lg border p-4 bg-zinc-900 ${heroBorderClass(data.heroSentence)}`}>
+              <p className="text-sm text-zinc-200">{data.heroSentence}</p>
+            </div>
+            {(data.nextAction.applyMatchesWaiting > 0 || data.nextAction.staleApplications > 0) && (
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3 text-sm space-y-1">
+                {data.nextAction.applyMatchesWaiting > 0 && (
+                  <p className="text-zinc-300">
+                    ▶ {data.nextAction.applyMatchesWaiting} Apply-grade match{data.nextAction.applyMatchesWaiting !== 1 ? 'es' : ''} waiting for review
+                  </p>
+                )}
+                {data.nextAction.staleApplications > 0 && (
+                  <p className="text-zinc-400">
+                    ▶ {data.nextAction.staleApplications} application{data.nextAction.staleApplications !== 1 ? 's' : ''} idle 14d+ — update status to keep your pipeline current
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* TIER 1 — THE EVIDENCE */}
+          <div className="space-y-4">
+            <FunnelBar funnel={data.funnel} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ValuePanel value={data.value} />
+              <FitVsOutcome fitVsOutcome={data.fitVsOutcome} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <DaysSinceAppCard days={data.statCards.daysSinceLastApplication} />
+              <SparklineStatCard
+                label="Match Quality"
+                value={`${Math.round(data.statCards.matchQualityRate)}%`}
+                sparkData={data.sparklines.matchQuality}
+                sparkKey="rate"
+              />
+              <SparklineStatCard
+                label="Cost / Application"
+                value={data.value.costPerApplication > 0 ? `$${data.value.costPerApplication.toFixed(2)}` : '—'}
+                sparkData={data.sparklines.costPerApp}
+                sparkKey="costPerApp"
+              />
+            </div>
+          </div>
+
+          {/* TIER 2 — THE DETAIL */}
+          <details className="group">
+            <summary className="cursor-pointer text-xs font-semibold text-zinc-500 uppercase tracking-widest list-none flex items-center gap-2 select-none">
+              <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+              Drill-in Details
+            </summary>
+            <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <DetailCard title="Apply → Response Rate">
+                {!data.detail.applyResponseRate.hasData ? <GateMessage /> : (
+                  <div className="flex items-baseline gap-3 py-6 px-2">
+                    <span className="text-3xl font-bold text-green-400">
+                      {data.detail.applyResponseRate.responded}/{data.detail.applyResponseRate.applied}
+                    </span>
+                    <span className="text-sm text-zinc-400">
+                      replied ({data.detail.applyResponseRate.applied > 0
+                        ? Math.round((data.detail.applyResponseRate.responded / data.detail.applyResponseRate.applied) * 100)
+                        : 0}%)
+                    </span>
+                  </div>
+                )}
+              </DetailCard>
+
+              <DetailCard title="Source Effectiveness">
+                <SourceEffectivenessPanel data={data.detail.sourceEffectiveness} gated={!data.detail.applyResponseRate.hasData} />
+              </DetailCard>
+
+              <DetailCard title="Stage Aging (median days)">
+                <StageAgingPanel data={data.detail.stageAging} gated={!data.funnel.hasStatusData} />
+              </DetailCard>
+
+              <DetailCard title="Activity (last 90 days)">
+                <ActivityHeatmap data={data.detail.activityHeatmap} />
+              </DetailCard>
+
+              <ChartCard
+                title="Cumulative Time Saved"
+                tableHeaders={['Date', 'Hours']}
+                tableData={data.detail.cumulativeTimeSaved.map(e => [e.date, e.totalHours.toFixed(1)])}
+              >
+                <CumulativeTimeSavedPanel data={data.detail.cumulativeTimeSaved} />
+              </ChartCard>
+
+              <ChartCard
+                title="Time Saved by Workflow"
+                tableHeaders={['Workflow', 'Hours']}
+                tableData={data.detail.timeSavedByWorkflow.map(e => [e.workflow, e.hours.toFixed(1)])}
+              >
+                <TimeSavedByWorkflowPanel data={data.detail.timeSavedByWorkflow} />
+              </ChartCard>
+
+              <DetailCard title="Automation">
+                <div className="grid grid-cols-2 gap-2">
+                  <StatCard label="Workflow Runs" value={String(data.automation.totalRuns)} />
+                  <StatCard label="Tokens" value={formatTokens(data.automation.totalTokens)} />
+                </div>
+              </DetailCard>
+            </div>
+          </details>
+        </>
       )}
     </div>
   )

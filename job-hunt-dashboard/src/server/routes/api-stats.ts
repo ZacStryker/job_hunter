@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { db } from '../../db/client'
-import { jobs, webhookRuns, messages } from '../../db/schema'
-import { and, eq, gte, isNotNull } from 'drizzle-orm'
+import { jobs, webhookRuns, coverLetters, statusEvents } from '../../db/schema'
+import { and, eq, gte } from 'drizzle-orm'
 import { STATS_PERIODS } from '../../shared/schemas'
 import type { AppEnv } from '../types'
 
@@ -28,6 +28,18 @@ function buildBaseWhere(archivedFilter: ArchivedFilter) {
   return undefined
 }
 
+function median(nums: number[]): number {
+  const sorted = [...nums].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+}
+
+// Net minutes saved per task (NET model — manual baseline minus residual review effort)
+const NET_MIN = { source: 3, analyze: 4, coverLetter: 4.75, resume: 14.25 }
+const RESPONSE_STATUSES = ['Submitted', 'Screening', 'Interview', 'Offer', 'Rejected']
+const INTERVIEW_STATUSES = ['Interview', 'Offer']
+const FIT_RANGES = ['0-20', '20-40', '40-60', '60-80', '80-100']
+
 app.get('/', (c) => {
   const userId = c.get('userId')
   const rawPeriod = c.req.query('period') ?? 'all'
@@ -40,68 +52,11 @@ app.get('/', (c) => {
 
   const baseWhere = buildBaseWhere(archivedFilter)
 
-  // All jobs matching archivedFilter + dateScraped cutoff + userId
+  // viewJobs — archivedFilter + dateScraped cutoff + userId
   const scrapedWhere = and(baseWhere, dateCutoff ? gte(jobs.dateScraped, dateCutoff) : undefined, eq(jobs.userId, userId))
   const viewJobs = db.select().from(jobs).where(scrapedWhere).all()
 
-  // ── Jobs section ──
-  const scrapedTotal = viewJobs.length
-  const companies = new Set(viewJobs.map(j => j.company)).size
-  const sources = new Set(viewJobs.filter(j => j.source).map(j => j.source!)).size
-
-  const sourceKeys = ['linkedin', 'indeed', 'indeed_nl', 'arc', 'manual'] as const
-  const jobsDailyMap: Record<string, Record<string, number>> = {}
-  for (const job of viewJobs) {
-    if (!job.dateScraped) continue
-    const date = job.dateScraped.slice(0, 10)
-    if (!jobsDailyMap[date]) jobsDailyMap[date] = { linkedin: 0, indeed: 0, indeed_nl: 0, arc: 0, manual: 0 }
-    const src = (job.source ?? '').toLowerCase()
-    if (src in jobsDailyMap[date]) jobsDailyMap[date][src]++
-  }
-  const jobsPerDay = Object.entries(jobsDailyMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, counts]) => ({ date, linkedin: counts.linkedin, indeed: counts.indeed, indeed_nl: counts.indeed_nl, arc: counts.arc, manual: counts.manual }))
-
-  const sourceCountMap: Record<string, number> = { linkedin: 0, indeed: 0, indeed_nl: 0, arc: 0, manual: 0 }
-  for (const job of viewJobs) {
-    const src = (job.source ?? '').toLowerCase()
-    if (src in sourceCountMap) sourceCountMap[src]++
-  }
-  const bySource = sourceKeys.map(k => ({ name: k, value: sourceCountMap[k] }))
-
-  // ── Matches section ──
-  const applyCount = viewJobs.filter(j => j.recommendation === 'apply').length
-  const investigateCount = viewJobs.filter(j => j.recommendation === 'investigate').length
-
-  const matchesDailyMap: Record<string, { apply: number; investigate: number }> = {}
-  for (const job of viewJobs) {
-    if (job.recommendation !== 'apply' && job.recommendation !== 'investigate') continue
-    if (!job.dateScraped) continue
-    const date = job.dateScraped.slice(0, 10)
-    if (!matchesDailyMap[date]) matchesDailyMap[date] = { apply: 0, investigate: 0 }
-    if (job.recommendation === 'apply') matchesDailyMap[date].apply++
-    else matchesDailyMap[date].investigate++
-  }
-  const matchesPerDay = Object.entries(matchesDailyMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, c]) => ({ date, apply: c.apply, investigate: c.investigate }))
-
-  const byRecommendation = [
-    { name: 'Apply', value: applyCount },
-    { name: 'Investigate', value: investigateCount },
-  ]
-
-  const SCORE_BUCKETS = ['0-9', '10-19', '20-29', '30-39', '40-49', '50-59', '60-69', '70-79', '80-89', '90-100'] as const
-  const scoreCounts: Record<string, number> = Object.fromEntries(SCORE_BUCKETS.map(k => [k, 0]))
-  for (const job of viewJobs) {
-    if (job.recommendation !== 'apply' && job.recommendation !== 'investigate') continue
-    if (job.fitScore === null) continue
-    const bucketIdx = Math.min(Math.floor(job.fitScore / 10), 9)
-    scoreCounts[SCORE_BUCKETS[bucketIdx]]++
-  }
-  const byScore = SCORE_BUCKETS.map(k => ({ score: k, count: scoreCounts[k] }))
-
-  // ── Applications section (applied=true, archivedFilter, dateApplied cutoff) ──
+  // appliedJobs — applied=true, archivedFilter, dateApplied cutoff, userId
   const archivedAppCond =
     archivedFilter === 'active'   ? eq(jobs.archived, false) :
     archivedFilter === 'archived' ? eq(jobs.archived, true)  : undefined
@@ -113,75 +68,214 @@ app.get('/', (c) => {
   )
   const appliedJobs = db.select().from(jobs).where(appWhere).all()
 
-  const allMessages = db.select({
-    company: messages.company,
-    jobTitle: messages.jobTitle,
-    type: messages.type,
-    receivedAt: messages.receivedAt,
-  }).from(messages).where(and(isNotNull(messages.type), eq(messages.userId, userId))).all()
+  // All-time user data (time-saved, days-since-app, stale, stage-aging are cumulative — not period-scoped)
+  const allUserJobs = db.select().from(jobs).where(eq(jobs.userId, userId)).all()
+  const userJobIds = new Set(allUserJobs.map(j => j.id))
+  const allAppliedJobs = allUserJobs.filter(j => j.applied)
+  const coverLetterRows = db.select().from(coverLetters).where(eq(coverLetters.userId, userId)).all()
+  const coverLetterCount = coverLetterRows.length
+  const allStatusEvents = db.select().from(statusEvents).all().filter(e => userJobIds.has(e.jobId))
+  const allRuns = db.select().from(webhookRuns).where(eq(webhookRuns.userId, userId)).all()
 
-  const latestMessageByKey = new Map<string, { type: string; receivedAt: string }>()
-  for (const msg of allMessages) {
-    if (!msg.company || !msg.jobTitle) continue
-    const key = `${msg.company.toLowerCase()}|||${msg.jobTitle.toLowerCase()}`
-    const existing = latestMessageByKey.get(key)
-    if (!existing || msg.receivedAt > existing.receivedAt) {
-      latestMessageByKey.set(key, { type: msg.type!, receivedAt: msg.receivedAt })
-    }
-  }
-
-  const appTotal = appliedJobs.length
-  const appCompanies = new Set(appliedJobs.map(j => j.company)).size
-  const appResponses = appliedJobs.filter(j => {
-    const key = `${j.company.toLowerCase()}|||${j.jobTitle.toLowerCase()}`
-    return latestMessageByKey.has(key)
-  }).length
-
-  const STATUS_KEYS = ['No Response', 'Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other'] as const
-  const statusCounts: Record<string, number> = Object.fromEntries(STATUS_KEYS.map(k => [k, 0]))
-  for (const job of appliedJobs) {
-    const msgKey = `${job.company.toLowerCase()}|||${job.jobTitle.toLowerCase()}`
-    const status = latestMessageByKey.get(msgKey)?.type ?? null
-    const key = status ?? 'No Response'
-    const bucket = (STATUS_KEYS as readonly string[]).includes(key) ? key : 'Other'
-    statusCounts[bucket]++
-  }
-
-  const appDailyMap: Record<string, Record<string, number>> = {}
-  for (const job of appliedJobs) {
-    if (!job.dateApplied) continue
-    const date = job.dateApplied.slice(0, 10)
-    if (!appDailyMap[date]) appDailyMap[date] = Object.fromEntries(STATUS_KEYS.map(k => [k, 0]))
-    const msgKey = `${job.company.toLowerCase()}|||${job.jobTitle.toLowerCase()}`
-    const status = latestMessageByKey.get(msgKey)?.type ?? null
-    const key = status ?? 'No Response'
-    const bucket = (STATUS_KEYS as readonly string[]).includes(key) ? key : 'Other'
-    appDailyMap[date][bucket]++
-  }
-  const appPerDay = Object.entries(appDailyMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, counts]) => ({
-      date,
-      'No Response': counts['No Response'] ?? 0,
-      Submitted: counts['Submitted'] ?? 0,
-      Rejected: counts['Rejected'] ?? 0,
-      Screening: counts['Screening'] ?? 0,
-      Interview: counts['Interview'] ?? 0,
-      Offer: counts['Offer'] ?? 0,
-      Other: counts['Other'] ?? 0,
-    }))
-
-  const byStatus = STATUS_KEYS.map(k => ({ status: k, count: statusCounts[k] }))
-
-  // ── Automation section (period cutoff on runAt, no archivedFilter) ──
+  // Period-filtered runs for the automation detail section
   const runRows = db.select().from(webhookRuns).where(
     and(eq(webhookRuns.userId, userId), datetimeCutoff ? gte(webhookRuns.runAt, datetimeCutoff) : undefined)
   ).all()
 
+  const now = Date.now()
+
+  // ── Funnel ──
+  const scraped = viewJobs.length
+  const matched = viewJobs.filter(j => j.recommendation === 'apply' || j.recommendation === 'investigate').length
+  const applied = appliedJobs.length
+  const hasStatusData = appliedJobs.some(j => j.statusOverride !== null)
+  const response = hasStatusData ? appliedJobs.filter(j => j.statusOverride !== null && RESPONSE_STATUSES.includes(j.statusOverride)).length : 0
+  const interview = hasStatusData ? appliedJobs.filter(j => j.statusOverride !== null && INTERVIEW_STATUSES.includes(j.statusOverride)).length : 0
+  const offer = hasStatusData ? appliedJobs.filter(j => j.statusOverride === 'Offer').length : 0
+  const funnel = { scraped, matched, applied, response, interview, offer, hasStatusData }
+
+  // ── Value (time-saved — all-time cumulative) ──
+  const analyzedCount = allUserJobs.filter(j => j.dateAnalyzed !== null).length
+  const resumeCount = allUserJobs.filter(j => j.resumeGeneratedAt !== null).length
+  const timeSavedMinutes =
+    allUserJobs.length * NET_MIN.source +
+    analyzedCount * NET_MIN.analyze +
+    coverLetterCount * NET_MIN.coverLetter +
+    resumeCount * NET_MIN.resume
+  const timeSavedHours = timeSavedMinutes / 60
+  const totalCostUsd = allRuns.reduce((s, r) => s + (r.costUsd ?? 0), 0)
+  const costPerApplication = applied > 0 ? totalCostUsd / applied : 0
+  const value = { timeSavedHours, totalCostUsd, costPerApplication }
+
+  // ── Fit-score vs outcome (gated) ──
+  const fitHasData = hasStatusData && appliedJobs.some(j => j.fitScore !== null)
+  const fitBuckets = FIT_RANGES.map(fitRange => ({ fitRange, applied: 0, responded: 0 }))
+  if (fitHasData) {
+    for (const j of appliedJobs) {
+      if (j.fitScore === null) continue
+      const idx = Math.min(Math.floor(j.fitScore / 20), 4)
+      fitBuckets[idx].applied++
+      if (j.statusOverride !== null && j.statusOverride !== 'No Response') fitBuckets[idx].responded++
+    }
+  }
+  const fitVsOutcome = { hasData: fitHasData, buckets: fitBuckets }
+
+  // ── Stat cards ──
+  let daysSinceLastApplication: number | null = null
+  const appliedDates = allAppliedJobs.filter(j => j.dateApplied).map(j => new Date(j.dateApplied! + 'T00:00:00Z').getTime())
+  if (appliedDates.length > 0) {
+    daysSinceLastApplication = Math.floor((now - Math.max(...appliedDates)) / 86_400_000)
+  }
+  const matchQualityRate = viewJobs.length > 0
+    ? (viewJobs.filter(j => j.recommendation === 'apply').length / viewJobs.length) * 100
+    : 0
+  const statCards = { daysSinceLastApplication, matchQualityRate }
+
+  // ── Sparklines (per active day) ──
+  const scrapedByDate: Record<string, { total: number; apply: number }> = {}
+  for (const j of viewJobs) {
+    if (!j.dateScraped) continue
+    const d = j.dateScraped.slice(0, 10)
+    if (!scrapedByDate[d]) scrapedByDate[d] = { total: 0, apply: 0 }
+    scrapedByDate[d].total++
+    if (j.recommendation === 'apply') scrapedByDate[d].apply++
+  }
+  const matchQualitySpark = Object.entries(scrapedByDate)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, c]) => ({ date, rate: c.total > 0 ? (c.apply / c.total) * 100 : 0 }))
+
+  const appsByDate: Record<string, number> = {}
+  for (const j of appliedJobs) {
+    if (!j.dateApplied) continue
+    const d = j.dateApplied.slice(0, 10)
+    appsByDate[d] = (appsByDate[d] ?? 0) + 1
+  }
+  const costByDate: Record<string, number> = {}
+  for (const r of runRows) {
+    const d = r.runAt.slice(0, 10)
+    costByDate[d] = (costByDate[d] ?? 0) + (r.costUsd ?? 0)
+  }
+  let cumApps = 0
+  const costPerAppSpark = Object.keys(appsByDate).sort((a, b) => a.localeCompare(b)).map(date => {
+    cumApps += appsByDate[date]
+    let cumCost = 0
+    for (const [cd, cv] of Object.entries(costByDate)) if (cd <= date) cumCost += cv
+    return { date, costPerApp: cumApps > 0 ? cumCost / cumApps : 0 }
+  })
+
+  // ── Next action ──
+  const applyMatchesWaiting = allUserJobs.filter(j => j.recommendation === 'apply' && !j.applied && !j.archived).length
+  const fourteenDaysMs = 14 * 86_400_000
+  const latestEventByJob = new Map<number, number>()
+  for (const e of allStatusEvents) {
+    const t = new Date(e.timestamp).getTime()
+    const prev = latestEventByJob.get(e.jobId)
+    if (prev === undefined || t > prev) latestEventByJob.set(e.jobId, t)
+  }
+  let staleApplications = 0
+  for (const j of allAppliedJobs) {
+    if (!j.dateApplied) continue
+    const appliedMs = new Date(j.dateApplied + 'T00:00:00Z').getTime()
+    if (now - appliedMs <= fourteenDaysMs) continue
+    const latestEvent = latestEventByJob.get(j.id)
+    if (latestEvent === undefined || now - latestEvent > fourteenDaysMs) staleApplications++
+  }
+  const nextAction = { applyMatchesWaiting, staleApplications }
+
+  // ── Hero sentence ──
+  const thirtyDaysAgoIso = new Date(now - 30 * 86_400_000).toISOString()
+  const recentApps = allAppliedJobs.filter(j => j.dateApplied && (j.dateApplied + 'T00:00:00Z') >= thirtyDaysAgoIso).length
+  const momentumStatus = recentApps >= 3 ? 'Active search' : recentApps >= 1 ? 'Moderate activity' : 'Search paused'
+  const conversionPct = applied > 0 && hasStatusData ? Math.round((response / applied) * 100) : null
+  const hrs = Math.round(timeSavedHours)
+  let heroSentence = `${momentumStatus} — ${recentApps} application${recentApps !== 1 ? 's' : ''} in the last 30 days.`
+  if (conversionPct !== null) heroSentence += ` Pipeline converting at ${conversionPct}%.`
+  heroSentence += ` HITLobster saved you ~${hrs} hrs ($${totalCostUsd.toFixed(2)}).`
+
+  // ── Detail: apply→response ──
+  const applyResponseRate = { hasData: hasStatusData, applied, responded: response }
+
+  // ── Detail: source effectiveness ──
+  const sourceMap: Record<string, { scraped: number; applied: number; responded: number }> = {}
+  for (const j of viewJobs) {
+    if (!j.source) continue
+    const src = j.source
+    if (!sourceMap[src]) sourceMap[src] = { scraped: 0, applied: 0, responded: 0 }
+    sourceMap[src].scraped++
+    if (j.applied) sourceMap[src].applied++
+    if (j.statusOverride !== null) sourceMap[src].responded++
+  }
+  const sourceEffectiveness = Object.entries(sourceMap).map(([source, c]) => ({ source, ...c }))
+
+  // ── Detail: stage-aging (from statusEvents, ≥3 data points per stage) ──
+  const eventsByJob = new Map<number, { status: string; timestamp: string }[]>()
+  for (const e of allStatusEvents) {
+    const arr = eventsByJob.get(e.jobId)
+    if (arr) arr.push({ status: e.status, timestamp: e.timestamp })
+    else eventsByJob.set(e.jobId, [{ status: e.status, timestamp: e.timestamp }])
+  }
+  const stageDurations: Record<string, number[]> = {}
+  for (const events of eventsByJob.values()) {
+    const sorted = events.sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const days = (new Date(sorted[i + 1].timestamp).getTime() - new Date(sorted[i].timestamp).getTime()) / 86_400_000
+      if (!stageDurations[sorted[i].status]) stageDurations[sorted[i].status] = []
+      stageDurations[sorted[i].status].push(days)
+    }
+  }
+  const stageAging = Object.entries(stageDurations)
+    .filter(([, durs]) => durs.length >= 3)
+    .map(([stage, durs]) => ({ stage, medianDays: median(durs) }))
+
+  // ── Detail: activity heatmap (last 90 days) ──
+  const ninetyDaysAgo = new Date(now - 90 * 86_400_000).toISOString().slice(0, 10)
+  const heatmapMap: Record<string, number> = {}
+  for (const j of allUserJobs) {
+    if (j.dateScraped) {
+      const d = j.dateScraped.slice(0, 10)
+      if (d >= ninetyDaysAgo) heatmapMap[d] = (heatmapMap[d] ?? 0) + 1
+    }
+    if (j.dateAnalyzed) {
+      const d = j.dateAnalyzed.slice(0, 10)
+      if (d >= ninetyDaysAgo) heatmapMap[d] = (heatmapMap[d] ?? 0) + 1
+    }
+  }
+  const activityHeatmap = Object.entries(heatmapMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, count]) => ({ date, count }))
+
+  // ── Detail: cumulative time-saved ──
+  const savedByDate: Record<string, number> = {}
+  const addSaved = (dateStr: string | null, minutes: number) => {
+    if (!dateStr) return
+    const d = dateStr.slice(0, 10)
+    savedByDate[d] = (savedByDate[d] ?? 0) + minutes
+  }
+  for (const j of allUserJobs) {
+    addSaved(j.dateScraped, NET_MIN.source)
+    if (j.dateAnalyzed) addSaved(j.dateAnalyzed, NET_MIN.analyze)
+    if (j.resumeGeneratedAt) addSaved(j.resumeGeneratedAt, NET_MIN.resume)
+  }
+  for (const cl of coverLetterRows) addSaved(cl.createdAt, NET_MIN.coverLetter)
+  let cumMinutes = 0
+  const cumulativeTimeSaved = Object.keys(savedByDate)
+    .sort((a, b) => a.localeCompare(b))
+    .map(date => {
+      cumMinutes += savedByDate[date]
+      return { date, totalHours: cumMinutes / 60 }
+    })
+
+  // ── Detail: time-saved by workflow ──
+  const timeSavedByWorkflow = [
+    { workflow: 'Discovery', hours: allUserJobs.length * NET_MIN.source / 60 },
+    { workflow: 'Analysis', hours: analyzedCount * NET_MIN.analyze / 60 },
+    { workflow: 'Cover Letter', hours: coverLetterCount * NET_MIN.coverLetter / 60 },
+    { workflow: 'Resume', hours: resumeCount * NET_MIN.resume / 60 },
+  ]
+
+  // ── Automation (period-filtered) ──
   const totalRuns = runRows.length
   const totalTokens = runRows.reduce((s, r) => s + (r.inputTokens ?? 0) + (r.outputTokens ?? 0), 0)
-  const totalCost = runRows.reduce((s, r) => s + (r.costUsd ?? 0), 0)
-
   const WORKFLOW_KEYS = ['Discovery', 'Analysis', 'Cover Letter', 'Resume'] as const
   const autoDailyMap: Record<string, Record<string, number>> = {}
   for (const run of runRows) {
@@ -199,19 +293,23 @@ app.get('/', (c) => {
       'Cover Letter': counts['Cover Letter'] ?? 0,
       Resume: counts['Resume'] ?? 0,
     }))
-
   const costMap: Record<string, number> = Object.fromEntries(WORKFLOW_KEYS.map(k => [k, 0]))
   for (const run of runRows) {
     const wf = parseWorkflow(run.name)
     if ((WORKFLOW_KEYS as readonly string[]).includes(wf)) costMap[wf] += (run.costUsd ?? 0)
   }
-  const costByWorkflow = WORKFLOW_KEYS.filter(k => k !== 'Discovery').map(k => ({ workflow: k, cost: costMap[k] }))
+  const costByWorkflow = WORKFLOW_KEYS.map(k => ({ workflow: k, cost: costMap[k] }))
 
   return c.json({
-    jobs: { total: scrapedTotal, companies, sources, perDay: jobsPerDay, bySource },
-    matches: { total: applyCount + investigateCount, apply: applyCount, investigate: investigateCount, perDay: matchesPerDay, byRecommendation, byScore },
-    applications: { total: appTotal, companies: appCompanies, responses: appResponses, perDay: appPerDay, byStatus },
-    automation: { totalRuns, totalTokens, totalCost, perDay: autoPerDay, costByWorkflow },
+    heroSentence,
+    nextAction,
+    funnel,
+    value,
+    fitVsOutcome,
+    statCards,
+    sparklines: { matchQuality: matchQualitySpark, costPerApp: costPerAppSpark },
+    detail: { applyResponseRate, sourceEffectiveness, stageAging, activityHeatmap, cumulativeTimeSaved, timeSavedByWorkflow },
+    automation: { totalRuns, totalTokens, perDay: autoPerDay, costByWorkflow },
   })
 })
 

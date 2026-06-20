@@ -5,7 +5,7 @@ export type ArchivedFilter = 'active' | 'archived' | 'all'
 
 export function useStatsQuery(period: StatsPeriod, archivedFilter: ArchivedFilter) {
   return useQuery<Stats>({
-    queryKey: ['stats', period, archivedFilter],
+    queryKey: ['stats', 'v2', period, archivedFilter],
     queryFn: async () => {
       const params = new URLSearchParams({ period })
       if (archivedFilter !== 'active') params.set('archivedFilter', archivedFilter)

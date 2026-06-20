@@ -133,59 +133,49 @@ export const STATS_PERIODS = ['24h', '7d', '30d', 'all'] as const
 export type StatsPeriod = typeof STATS_PERIODS[number]
 
 export const statsSchema = z.object({
-  jobs: z.object({
-    total: z.number(),
-    companies: z.number(),
-    sources: z.number(),
-    perDay: z.array(z.object({
-      date: z.string(),
-      linkedin: z.number(),
-      indeed: z.number(),
-      indeed_nl: z.number(),
-      arc: z.number(),
-      manual: z.number(),
-    })),
-    bySource: z.array(z.object({ name: z.string(), value: z.number() })),
+  heroSentence: z.string(),
+  nextAction: z.object({
+    applyMatchesWaiting: z.number(),
+    staleApplications: z.number(),
   }),
-  matches: z.object({
-    total: z.number(),
-    apply: z.number(),
-    investigate: z.number(),
-    perDay: z.array(z.object({
-      date: z.string(),
-      apply: z.number(),
-      investigate: z.number(),
-    })),
-    byRecommendation: z.array(z.object({ name: z.string(), value: z.number() })),
-    byScore: z.array(z.object({ score: z.string(), count: z.number() })),
+  funnel: z.object({
+    scraped: z.number(),
+    matched: z.number(),
+    applied: z.number(),
+    response: z.number(),
+    interview: z.number(),
+    offer: z.number(),
+    hasStatusData: z.boolean(),
   }),
-  applications: z.object({
-    total: z.number(),
-    companies: z.number(),
-    responses: z.number(),
-    perDay: z.array(z.object({
-      date: z.string(),
-      'No Response': z.number(),
-      Submitted: z.number(),
-      Rejected: z.number(),
-      Screening: z.number(),
-      Interview: z.number(),
-      Offer: z.number(),
-      Other: z.number(),
-    })),
-    byStatus: z.array(z.object({ status: z.string(), count: z.number() })),
+  value: z.object({
+    timeSavedHours: z.number(),
+    totalCostUsd: z.number(),
+    costPerApplication: z.number(),
+  }),
+  fitVsOutcome: z.object({
+    hasData: z.boolean(),
+    buckets: z.array(z.object({ fitRange: z.string(), applied: z.number(), responded: z.number() })),
+  }),
+  statCards: z.object({
+    daysSinceLastApplication: z.number().nullable(),
+    matchQualityRate: z.number(),
+  }),
+  sparklines: z.object({
+    matchQuality: z.array(z.object({ date: z.string(), rate: z.number() })),
+    costPerApp: z.array(z.object({ date: z.string(), costPerApp: z.number() })),
+  }),
+  detail: z.object({
+    applyResponseRate: z.object({ hasData: z.boolean(), applied: z.number(), responded: z.number() }),
+    sourceEffectiveness: z.array(z.object({ source: z.string(), scraped: z.number(), applied: z.number(), responded: z.number() })),
+    stageAging: z.array(z.object({ stage: z.string(), medianDays: z.number() })),
+    activityHeatmap: z.array(z.object({ date: z.string(), count: z.number() })),
+    cumulativeTimeSaved: z.array(z.object({ date: z.string(), totalHours: z.number() })),
+    timeSavedByWorkflow: z.array(z.object({ workflow: z.string(), hours: z.number() })),
   }),
   automation: z.object({
     totalRuns: z.number(),
     totalTokens: z.number(),
-    totalCost: z.number(),
-    perDay: z.array(z.object({
-      date: z.string(),
-      Discovery: z.number(),
-      Analysis: z.number(),
-      'Cover Letter': z.number(),
-      Resume: z.number(),
-    })),
+    perDay: z.array(z.object({ date: z.string(), Discovery: z.number(), Analysis: z.number(), 'Cover Letter': z.number(), Resume: z.number() })),
     costByWorkflow: z.array(z.object({ workflow: z.string(), cost: z.number() })),
   }),
 })
