@@ -18,9 +18,11 @@ import profileRoute from './server/routes/api-profile'
 import promptsRoute from './server/routes/api-prompts'
 import searchConfigsRoute from './server/routes/api-search-configs'
 import sourceSettingsRoute from './server/routes/api-source-settings'
+import featureSettingsRoute from './server/routes/api-feature-settings'
 import { errorHandler } from './server/middleware/error-handler'
 import { authMiddleware } from './server/middleware/auth-middleware'
 import { adminMiddleware } from './server/middleware/admin-middleware'
+import { emailFeaturesMiddleware } from './server/middleware/email-features-middleware'
 import authRoute from './server/routes/api-auth'
 import linkedInBrowserRoute from './server/routes/api-linkedin-browser'
 import * as linkedInBrowserService from './server/services/linkedin-browser-service'
@@ -94,6 +96,16 @@ if (!/^[0-9a-fA-F]{64}$/.test(process.env.ENCRYPTION_KEY!)) {
 app.use('/api/*', authMiddleware)
 app.use('/api/admin/*', adminMiddleware)
 
+app.use('/api/messages', emailFeaturesMiddleware)
+app.use('/api/messages/*', emailFeaturesMiddleware)
+app.use('/api/config/inbox-mappings', emailFeaturesMiddleware)
+app.use('/api/config/inbox-mappings/*', emailFeaturesMiddleware)
+app.use('/api/config/gmail-mappings', emailFeaturesMiddleware)
+app.use('/api/config/gmail-mappings/*', emailFeaturesMiddleware)
+app.use('/api/onboarding/imap', emailFeaturesMiddleware)
+app.use('/api/onboarding/imap/*', emailFeaturesMiddleware)
+app.use('/api/onboarding/gmail/*', emailFeaturesMiddleware)
+
 app.route('/api/ingest', ingestRoute)
 app.route('/api/jobs', jobsRoute)
 app.route('/api/messages', messagesRoute)
@@ -104,6 +116,7 @@ app.route('/api/profile', profileRoute)
 app.route('/api/prompts', promptsRoute)
 app.route('/api/search-configs', searchConfigsRoute)
 app.route('/api/source-settings', sourceSettingsRoute)
+app.route('/api/feature-settings', featureSettingsRoute)
 app.route('/api/onboarding/linkedin/browser', linkedInBrowserRoute)
 app.route('/api/onboarding/indeed/browser', indeedBrowserRoute)
 app.route('/api/onboarding', onboardingRoute)

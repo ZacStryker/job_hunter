@@ -289,6 +289,11 @@ export const sourceSettingSchema = z.object({
 })
 export type SourceSetting = z.infer<typeof sourceSettingSchema>
 
+export const featureSettingsSchema = z.object({
+  emailFeatures: z.boolean(),
+})
+export type FeatureSettings = z.infer<typeof featureSettingsSchema>
+
 export const PROMPT_FLOWS = ['analysis', 'cover_letter', 'resume'] as const
 export const promptFlowSchema = z.enum(PROMPT_FLOWS)
 export const promptSchema = z.object({

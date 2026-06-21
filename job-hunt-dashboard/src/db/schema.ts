@@ -182,6 +182,11 @@ export const sourceSettings = sqliteTable('source_settings', {
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
 })
 
+export const featureSettings = sqliteTable('feature_settings', {
+  feature: text('feature').primaryKey(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+})
+
 export const sessions = sqliteTable('sessions', {
   id: text('id').primaryKey(),         // 32-byte hex string; NOT autoincrement
   userId: integer('user_id').notNull().references(() => users.id),

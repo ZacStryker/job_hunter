@@ -12,6 +12,7 @@ import { fetchPrompts } from '../hooks/usePromptsQuery'
 import { MatchesRoute } from '../routes/matches'
 import { fetchSearchConfigs } from '../hooks/useSearchConfigsQuery'
 import { fetchSourceSettings } from '../hooks/useSourceSettingsQuery'
+import { fetchFeatureSettings } from '../hooks/useFeatureSettingsQuery'
 import { fetchSession } from '../hooks/useSessionQuery'
 import { fetchOnboardingStatus } from '../hooks/useOnboardingStatusQuery'
 import { LoginRoute } from '../routes/login'
@@ -42,7 +43,7 @@ import { fetchBlacklist } from '../hooks/useBlacklistQuery'
 import { PromptsAnalysisRoute } from '../routes/config/prompts-analysis'
 import { PromptsCoverLetterRoute } from '../routes/config/prompts-cover-letter'
 import { PromptsResumeRoute } from '../routes/config/prompts-resume'
-import type { OnboardingStatusResponse, SessionResponse } from '@shared/schemas'
+import type { OnboardingStatusResponse, SessionResponse, FeatureSettings } from '@shared/schemas'
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -59,6 +60,9 @@ const protectedRoute = createRoute({
       if (err instanceof Error && err.message === 'Unauthorized') throw redirect({ to: '/login' })
       throw err
     }
+    await queryClient
+      .ensureQueryData({ queryKey: ['feature-settings'], queryFn: fetchFeatureSettings, staleTime: 5 * 60 * 1000 })
+      .catch(() => {})
   },
 })
 
@@ -120,6 +124,9 @@ const onboardingRoute = createRoute({
   path: '/onboarding',
   component: OnboardingRoute,
   beforeLoad: async () => {
+    await queryClient
+      .ensureQueryData({ queryKey: ['feature-settings'], queryFn: fetchFeatureSettings, staleTime: 5 * 60 * 1000 })
+      .catch(() => {})
     let res: Response
     try {
       res = await fetch('/api/onboarding/status')
@@ -174,6 +181,10 @@ const messagesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/messages',
   component: MessagesRoute,
+  beforeLoad: () => {
+    const flags = queryClient.getQueryData<FeatureSettings>(['feature-settings'])
+    if (!flags?.emailFeatures) throw redirect({ to: '/' })
+  },
   loader: () => queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
 })
 
@@ -233,6 +244,10 @@ const configProfileInboxMappingRoute = createRoute({
   getParentRoute: () => configLayoutRoute,
   path: '/config/profile/inbox-mapping',
   component: ProfileInboxMappingRoute,
+  beforeLoad: () => {
+    const flags = queryClient.getQueryData<FeatureSettings>(['feature-settings'])
+    if (!flags?.emailFeatures) throw redirect({ to: '/' })
+  },
   loader: () => Promise.all([
     queryClient.ensureQueryData({ queryKey: ['onboarding-status'], queryFn: fetchOnboardingStatus }),
     queryClient.ensureQueryData({ queryKey: ['inbox-mappings'], queryFn: fetchInboxMappings }),

@@ -20,6 +20,8 @@ import { useRevokeInviteKeyMutation } from '@/hooks/useRevokeInviteKeyMutation'
 import { useDeleteAdminUserMutation } from '@/hooks/useDeleteAdminUserMutation'
 import { useSourceSettingsQuery } from '@/hooks/useSourceSettingsQuery'
 import { useToggleSourceMutation } from '@/hooks/useToggleSourceMutation'
+import { useFeatureSettingsQuery } from '@/hooks/useFeatureSettingsQuery'
+import { useToggleEmailFeaturesMutation } from '@/hooks/useToggleEmailFeaturesMutation'
 import { UserEditDrawer } from '@/components/admin/UserEditDrawer'
 import { apiFetch } from '@/lib/api'
 import { toast } from 'sonner'
@@ -51,6 +53,9 @@ export function AdminUsersRoute() {
 
   const { data: sourceSettingsList = [], isLoading: sourceSettingsLoading } = useSourceSettingsQuery()
   const toggleSourceMutation = useToggleSourceMutation()
+
+  const { data: featureSettings, isLoading: featureSettingsLoading } = useFeatureSettingsQuery()
+  const toggleEmailFeaturesMutation = useToggleEmailFeaturesMutation()
 
   function openEditDrawer(user: AdminUser) {
     setDrawerUser(user)
@@ -138,6 +143,14 @@ export function AdminUsersRoute() {
       await toggleSourceMutation.mutateAsync({ source, enabled })
     } catch {
       toast.error('Failed to update source')
+    }
+  }
+
+  async function handleToggleEmailFeatures(enabled: boolean) {
+    try {
+      await toggleEmailFeaturesMutation.mutateAsync({ enabled })
+    } catch {
+      toast.error('Failed to update email features')
     }
   }
 
@@ -348,6 +361,31 @@ export function AdminUsersRoute() {
               )}
             </tbody>
           </table>
+        )}
+      </div>
+
+      {/* Email Features section */}
+      <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+          <h2 className="text-sm font-medium text-zinc-100">Email Features</h2>
+        </div>
+        {featureSettingsLoading ? (
+          <div className="px-4 py-6 text-zinc-400 text-sm">Loading…</div>
+        ) : (
+          <div className="flex items-center justify-between px-4 py-4">
+            <div>
+              <div className="text-sm text-zinc-100">Email integration</div>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Enables the Messages page, inbox/Gmail-label mapping, and the onboarding Email Setup step for all users.
+              </p>
+            </div>
+            <Switch
+              checked={!!featureSettings?.emailFeatures}
+              onCheckedChange={handleToggleEmailFeatures}
+              disabled={toggleEmailFeaturesMutation.isPending}
+              aria-label={`${featureSettings?.emailFeatures ? 'Disable' : 'Enable'} email features`}
+            />
+          </div>
         )}
       </div>
 

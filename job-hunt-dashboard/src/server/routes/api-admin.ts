@@ -4,7 +4,7 @@ import { asc, desc, eq, inArray } from 'drizzle-orm'
 import { getCookie } from 'hono/cookie'
 import { randomBytes } from 'node:crypto'
 import { db } from '../../db/client'
-import { users, sessions, inviteKeys, jobs, coverLetters, statusEvents, messages, searchConfigs, userSecrets, sourceSettings } from '../../db/schema'
+import { users, sessions, inviteKeys, jobs, coverLetters, statusEvents, messages, searchConfigs, userSecrets, sourceSettings, featureSettings } from '../../db/schema'
 import { scraperSourceSchema } from '../../shared/schemas'
 import type { AppEnv } from '../types'
 
@@ -257,6 +257,30 @@ app.patch('/source-settings/:source', async (c) => {
     .get()
 
   if (!result) return c.json({ error: 'Not found' }, 404)
+  return c.json(result)
+})
+
+const featureKeySchema = z.enum(['emailFeatures'])
+const toggleFeatureSchema = z.object({ enabled: z.boolean() })
+
+app.patch('/feature-settings/:feature', async (c) => {
+  const parsed = featureKeySchema.safeParse(c.req.param('feature'))
+  if (!parsed.success) return c.json({ error: 'Invalid feature' }, 400)
+
+  let body: unknown
+  try { body = await c.req.json() } catch { return c.json({ error: 'Invalid JSON body' }, 400) }
+
+  const bodyParsed = toggleFeatureSchema.safeParse(body)
+  if (!bodyParsed.success) return c.json({ error: bodyParsed.error.issues[0]?.message ?? 'Invalid body' }, 400)
+
+  const { enabled } = bodyParsed.data
+  const result = db
+    .insert(featureSettings)
+    .values({ feature: parsed.data, enabled })
+    .onConflictDoUpdate({ target: featureSettings.feature, set: { enabled } })
+    .returning()
+    .get()
+
   return c.json(result)
 })
 

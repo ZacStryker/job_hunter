@@ -1,15 +1,18 @@
 import { Outlet, Link, useNavigate } from '@tanstack/react-router'
 import { LogOut } from 'lucide-react'
 import { useSessionQuery } from '@/hooks/useSessionQuery'
+import { useFeatureSettingsQuery } from '@/hooks/useFeatureSettingsQuery'
 import { ImpersonationBanner } from '@/components/admin/ImpersonationBanner'
 import { queryClient } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 
 export function Layout() {
   const { data: session } = useSessionQuery()
+  const { data: featureSettings } = useFeatureSettingsQuery()
   const navigate = useNavigate()
   const isImpersonating = !!session?.impersonating
   const isAdmin = session?.role === 'admin'
+  const emailFeatures = !!featureSettings?.emailFeatures
 
   async function handleLogout() {
     try {
@@ -62,14 +65,16 @@ export function Layout() {
           >
             Applications
           </Link>
-          <Link
-            to="/messages"
-            className="px-3 py-1.5 text-sm transition-colors"
-            activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
-            inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
-          >
-            Messages
-          </Link>
+          {emailFeatures && (
+            <Link
+              to="/messages"
+              className="px-3 py-1.5 text-sm transition-colors"
+              activeProps={{ className: 'text-zinc-100 border-b-2 border-zinc-100' }}
+              inactiveProps={{ className: 'text-zinc-500 hover:text-zinc-300' }}
+            >
+              Messages
+            </Link>
+          )}
           <Link
             to="/archive"
             className="px-3 py-1.5 text-sm transition-colors"

@@ -12,11 +12,15 @@ import { toast } from 'sonner'
 import { queryClient } from '@/lib/query-client'
 import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
 import { useGmailConnection } from '@/hooks/useGmailConnection'
+import { useFeatureSettingsQuery } from '@/hooks/useFeatureSettingsQuery'
 
 export function OnboardingRoute() {
   const navigate = useNavigate()
   const { data: status } = useOnboardingStatusQuery()
   const { connect } = useGmailConnection()
+  const { data: featureSettings } = useFeatureSettingsQuery()
+  const emailEnabled = !!featureSettings?.emailFeatures
+  const readyStep = emailEnabled ? 3 : 2
   const [step, setStep] = useState(() =>
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('gmail') ? 2 : 0
   )
@@ -41,9 +45,9 @@ export function OnboardingRoute() {
 
   useEffect(() => {
     if (step === 1) step1Ref.current?.focus()
-    else if (step === 2) step2Ref.current?.focus()
-    else if (step === 3) step3Ref.current?.focus()
-  }, [step])
+    else if (emailEnabled && step === 2) step2Ref.current?.focus()
+    else if (step === readyStep) step3Ref.current?.focus()
+  }, [step, emailEnabled, readyStep])
 
   useEffect(() => {
     if (callbackHandled.current) return
@@ -113,7 +117,7 @@ export function OnboardingRoute() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4">
       <div className="w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900 p-8">
-        <StepIndicator currentStep={step} totalSteps={4} />
+        <StepIndicator currentStep={step} totalSteps={emailEnabled ? 4 : 3} />
         <div aria-live="polite" className="sr-only">{liveMsg}</div>
 
         {step === 0 && (
@@ -162,14 +166,14 @@ export function OnboardingRoute() {
             <Button
               className="w-full mt-6"
               disabled={apiKeyTestState !== 'pass'}
-              onClick={() => setStep(2)}
+              onClick={() => setStep(emailEnabled ? 2 : readyStep)}
             >
               Continue
             </Button>
           </div>
         )}
 
-        {step === 2 && (
+        {emailEnabled && step === 2 && (
           <div>
             <h2 ref={step2Ref} tabIndex={-1} className="text-xl font-semibold mt-6">Email Setup</h2>
             <p className="text-zinc-400 mt-1 text-sm">Optional — lets the app detect reply emails.</p>
@@ -239,7 +243,7 @@ export function OnboardingRoute() {
           </div>
         )}
 
-        {step === 3 && (
+        {step === readyStep && (
           <div className="text-center">
             <h2 ref={step3Ref} tabIndex={-1} className="text-xl font-semibold mt-6">Your account is ready</h2>
             <p className="text-zinc-400 mt-2">You&apos;re all set. Head to your dashboard to start tracking jobs.</p>

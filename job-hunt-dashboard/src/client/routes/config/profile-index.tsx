@@ -1,16 +1,19 @@
 import { Link } from '@tanstack/react-router'
 import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
 import { useProfileQuery } from '@/hooks/useProfileQuery'
+import { useFeatureSettingsQuery } from '@/hooks/useFeatureSettingsQuery'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { CircleHelp } from 'lucide-react'
 
 export function ConfigProfileIndexRoute() {
   const { data: status } = useOnboardingStatusQuery()
   const { data: profile } = useProfileQuery()
+  const { data: featureSettings } = useFeatureSettingsQuery()
 
   const resumeConfigured = !!profile?.personal?.fullName
   const apiKeysConfigured = !!status?.hasAnthropicKey
   const inboxConfigured = !!status?.hasImap
+  const emailFeatures = !!featureSettings?.emailFeatures
 
   return (
     <TooltipProvider>
@@ -71,32 +74,34 @@ export function ConfigProfileIndexRoute() {
             </div>
           </Link>
 
-          <Link to="/config/profile/inbox-mapping" className="border border-zinc-800 rounded-lg p-4 block hover:border-zinc-700 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium text-zinc-200">Inbox Mapping</span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="What is this?"
-                      onClick={e => { e.preventDefault(); e.stopPropagation() }}
-                      className="text-zinc-600 hover:text-zinc-400 transition-colors"
-                    >
-                      <CircleHelp className="h-3.5 w-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs text-xs">
-                    IMAP credentials and folder rules for automatic email-based application status tracking.
-                  </TooltipContent>
-                </Tooltip>
+          {emailFeatures && (
+            <Link to="/config/profile/inbox-mapping" className="border border-zinc-800 rounded-lg p-4 block hover:border-zinc-700 transition-colors">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium text-zinc-200">Inbox Mapping</span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="What is this?"
+                        onClick={e => { e.preventDefault(); e.stopPropagation() }}
+                        className="text-zinc-600 hover:text-zinc-400 transition-colors"
+                      >
+                        <CircleHelp className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs">
+                      IMAP credentials and folder rules for automatic email-based application status tracking.
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                {inboxConfigured
+                  ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400">Configured</span>
+                  : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
+                }
               </div>
-              {inboxConfigured
-                ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400">Configured</span>
-                : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
-              }
-            </div>
-          </Link>
+            </Link>
+          )}
 
           <Link to="/privacy-policy" className="border border-zinc-800 rounded-lg p-4 block hover:border-zinc-700 transition-colors">
             <div className="flex items-center justify-between">
