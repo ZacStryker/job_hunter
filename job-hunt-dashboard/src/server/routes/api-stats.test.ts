@@ -146,25 +146,26 @@ describe('GET /api/stats - response shape', () => {
     expect(data.totalJobs).toBe(0)
     expect(data.recentActivity).toEqual([])
     expect(data.activityHeatmap).toEqual([])
-    expect(data.jobsByFitScore.map(b => b.count)).toEqual([0, 0, 0, 0, 0])
+    expect(data.jobsByFitScore.map(b => b.count)).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     expect(data.timeSavedByWorkflow.every(w => w.hours === 0)).toBe(true)
   })
 })
 
 describe('GET /api/stats - jobsByFitScore', () => {
-  test('buckets jobs into 5 ranges, clamps 100, excludes null', async () => {
+  test('buckets jobs into 10 ranges, clamps 100, excludes null', async () => {
     for (const [co, score] of [['A', 0], ['B', 19], ['C', 20], ['D', 80], ['E', 100]] as [string, number][]) {
       prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score) VALUES ('${co}', 'Dev', '2026-06-01', ${score})`)
     }
     prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score) VALUES ('F', 'Dev', '2026-06-01', NULL)`)
     const data = await getStats()
     const byRange = Object.fromEntries(data.jobsByFitScore.map(b => [b.fitRange, b.count]))
-    expect(data.jobsByFitScore.map(b => b.fitRange)).toEqual(['0-20', '20-40', '40-60', '60-80', '80-100'])
-    expect(byRange['0-20']).toBe(2)   // 0, 19
-    expect(byRange['20-40']).toBe(1)  // 20
-    expect(byRange['40-60']).toBe(0)
-    expect(byRange['60-80']).toBe(0)
-    expect(byRange['80-100']).toBe(2) // 80, 100 (clamped)
+    expect(data.jobsByFitScore.map(b => b.fitRange)).toEqual(['0-10', '10-20', '20-30', '30-40', '40-50', '50-60', '60-70', '70-80', '80-90', '90-100'])
+    expect(byRange['0-10']).toBe(1)   // 0
+    expect(byRange['10-20']).toBe(1)  // 19
+    expect(byRange['20-30']).toBe(1)  // 20
+    expect(byRange['40-50']).toBe(0)
+    expect(byRange['80-90']).toBe(1)  // 80
+    expect(byRange['90-100']).toBe(1) // 100 (clamped)
   })
 
   test('honors period and archived filters', async () => {
@@ -172,9 +173,9 @@ describe('GET /api/stats - jobsByFitScore', () => {
     prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, archived) VALUES ('New', 'Dev', '${daysAgoDate(1)}', 90, 0)`)
     prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, archived) VALUES ('Arch', 'Dev', '${daysAgoDate(1)}', 90, 1)`)
     const day = await getStats('?period=24h')
-    expect(day.jobsByFitScore.find(b => b.fitRange === '80-100')?.count).toBe(1) // only New (active, recent)
+    expect(day.jobsByFitScore.find(b => b.fitRange === '90-100')?.count).toBe(1) // only New (active, recent)
     const all = await getStats('?period=all&archivedFilter=all')
-    expect(all.jobsByFitScore.find(b => b.fitRange === '80-100')?.count).toBe(3)
+    expect(all.jobsByFitScore.find(b => b.fitRange === '90-100')?.count).toBe(3)
   })
 })
 

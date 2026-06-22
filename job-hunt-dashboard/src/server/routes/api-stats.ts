@@ -29,7 +29,7 @@ function toIso(value: string): string {
 
 // Net minutes saved per task (NET model — manual baseline minus residual review effort)
 const NET_MIN = { source: 3, analyze: 4, coverLetter: 4.75, resume: 14.25 }
-const FIT_RANGES = ['0-20', '20-40', '40-60', '60-80', '80-100']
+const FIT_RANGES = ['0-10', '10-20', '20-30', '30-40', '40-50', '50-60', '60-70', '70-80', '80-90', '90-100']
 const ACTIVITY_CAP = 50
 
 app.get('/', (c) => {
@@ -64,7 +64,7 @@ app.get('/', (c) => {
   const fitCounts = FIT_RANGES.map(() => 0)
   for (const j of viewJobs) {
     if (j.fitScore === null) continue
-    const idx = Math.min(Math.max(Math.floor(j.fitScore / 20), 0), 4)
+    const idx = Math.min(Math.max(Math.floor(j.fitScore / 10), 0), 9)
     fitCounts[idx]++
   }
   const jobsByFitScore = FIT_RANGES.map((fitRange, i) => ({ fitRange, count: fitCounts[i] }))

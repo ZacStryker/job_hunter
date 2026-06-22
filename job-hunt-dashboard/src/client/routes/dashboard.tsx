@@ -13,6 +13,7 @@ import {
 import type { Stats, StatsPeriod } from '@shared/schemas'
 import { STATS_PERIODS } from '@shared/schemas'
 import { useStatsQuery, type ArchivedFilter } from '../hooks/useStatsQuery'
+import { SCORE_COLORS } from '../utils/scoreColors'
 
 const PERIOD_LABELS: Record<StatsPeriod, string> = {
   '24h': '24h',
@@ -145,7 +146,8 @@ function JobsByFitScore({ data }: { data: Stats['jobsByFitScore'] }) {
             <XAxis dataKey="fitRange" {...AXIS_PROPS} fontSize={11} />
             <YAxis {...AXIS_PROPS} />
             <Tooltip content={<FilteredTooltip />} />
-            <Bar dataKey="count" name="Jobs" fill="#60a5fa">
+            <Bar dataKey="count" name="Jobs">
+              {data.map((d, i) => <Cell key={d.fitRange} fill={SCORE_COLORS[i] ?? '#60a5fa'} />)}
               <LabelList dataKey="count" content={LabelInsideTop as (props: object) => React.JSX.Element} />
             </Bar>
           </BarChart>
@@ -190,14 +192,14 @@ function ActivityHeatmap({ data }: { data: Stats['activityHeatmap'] }) {
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-2">
       <div className="text-sm font-medium text-zinc-400 mb-1.5">Activity (last 90 days)</div>
-      <div className="flex gap-[3px] overflow-x-auto py-2">
+      <div className="flex gap-[3px] py-2">
         {Array.from({ length: cols }, (_, col) => (
-          <div key={col} className="flex flex-col gap-[3px]">
+          <div key={col} className="flex flex-1 flex-col gap-[3px]">
             {cells.slice(col * 7, col * 7 + 7).map(cell => (
               <div
                 key={cell.date}
                 title={`${cell.date}: ${cell.count} ${cell.count === 1 ? 'activity' : 'activities'}`}
-                className="w-3 h-3 rounded-sm shrink-0"
+                className="h-3 rounded-sm"
                 style={{ background: cellColor(cell.count) }}
               />
             ))}
