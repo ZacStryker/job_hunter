@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { db } from '../../db/client'
 import { jobs, coverLetters, statusEvents } from '../../db/schema'
-import { and, eq, gte } from 'drizzle-orm'
+import { and, eq, gte, inArray, or } from 'drizzle-orm'
 import { STATS_PERIODS, type ActivityEventType } from '../../shared/schemas'
 import type { AppEnv } from '../types'
 
@@ -45,7 +45,11 @@ app.get('/', (c) => {
   const baseWhere = buildBaseWhere(archivedFilter)
 
   // viewJobs — archivedFilter + dateScraped cutoff + userId (period+archive-scoped: fit-score buckets)
-  const scrapedWhere = and(baseWhere, dateCutoff ? gte(jobs.dateScraped, dateCutoff) : undefined, eq(jobs.userId, userId))
+  // For active filter, restrict to Matches (apply/investigate, not yet applied) + Applications (applied).
+  const matchesOrApplied = archivedFilter === 'active'
+    ? or(eq(jobs.applied, true), inArray(jobs.recommendation, ['apply', 'investigate']))
+    : undefined
+  const scrapedWhere = and(baseWhere, matchesOrApplied, dateCutoff ? gte(jobs.dateScraped, dateCutoff) : undefined, eq(jobs.userId, userId))
   const viewJobs = db.select().from(jobs).where(scrapedWhere).all()
 
   // All-time user data (time-saved is all-time cumulative; totalJobs is the unscoped empty-state gate)

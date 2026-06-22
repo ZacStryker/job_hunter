@@ -154,7 +154,7 @@ describe('GET /api/stats - response shape', () => {
 describe('GET /api/stats - jobsByFitScore', () => {
   test('buckets jobs into 10 ranges, clamps 100, excludes null', async () => {
     for (const [co, score] of [['A', 0], ['B', 19], ['C', 20], ['D', 80], ['E', 100]] as [string, number][]) {
-      prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score) VALUES ('${co}', 'Dev', '2026-06-01', ${score})`)
+      prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, recommendation) VALUES ('${co}', 'Dev', '2026-06-01', ${score}, 'apply')`)
     }
     prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score) VALUES ('F', 'Dev', '2026-06-01', NULL)`)
     const data = await getStats()
@@ -169,13 +169,29 @@ describe('GET /api/stats - jobsByFitScore', () => {
   })
 
   test('honors period and archived filters', async () => {
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, archived) VALUES ('Old', 'Dev', '${daysAgoDate(60)}', 90, 0)`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, archived) VALUES ('New', 'Dev', '${daysAgoDate(1)}', 90, 0)`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, archived) VALUES ('Arch', 'Dev', '${daysAgoDate(1)}', 90, 1)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, archived, recommendation) VALUES ('Old', 'Dev', '${daysAgoDate(60)}', 90, 0, 'apply')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, archived, recommendation) VALUES ('New', 'Dev', '${daysAgoDate(1)}', 90, 0, 'apply')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, archived, recommendation) VALUES ('Arch', 'Dev', '${daysAgoDate(1)}', 90, 1, 'apply')`)
     const day = await getStats('?period=24h')
     expect(day.jobsByFitScore.find(b => b.fitRange === '90-100')?.count).toBe(1) // only New (active, recent)
     const all = await getStats('?period=all&archivedFilter=all')
     expect(all.jobsByFitScore.find(b => b.fitRange === '90-100')?.count).toBe(3)
+  })
+
+  test('active filter excludes jobs not in Matches or Applications', async () => {
+    // In Matches: recommendation apply/investigate, not applied
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, recommendation, applied) VALUES ('Match', 'Dev', '2026-06-01', 80, 'apply', 0)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, recommendation, applied) VALUES ('Inv', 'Dev', '2026-06-01', 70, 'investigate', 0)`)
+    // In Applications: applied = true
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, applied) VALUES ('Applied', 'Dev', '2026-06-01', 60, 1)`)
+    // Not in Matches or Applications: no recommendation, not applied
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score) VALUES ('Pending', 'Dev', '2026-06-01', 10)`)
+    const active = await getStats()
+    const total = active.jobsByFitScore.reduce((s, b) => s + b.count, 0)
+    expect(total).toBe(3) // Match + Inv + Applied only
+    expect(active.jobsByFitScore.find(b => b.fitRange === '0-10')?.count).toBe(0) // Pending excluded
+    const all = await getStats('?archivedFilter=all')
+    expect(all.jobsByFitScore.reduce((s, b) => s + b.count, 0)).toBe(4) // all filter shows all
   })
 })
 
