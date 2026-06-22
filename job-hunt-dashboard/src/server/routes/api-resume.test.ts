@@ -42,7 +42,7 @@ const CREATE_JOBS_TABLE = `
     location TEXT, external_job_id TEXT, relevance_score REAL, analysis_status TEXT, salary TEXT,
     benefits TEXT, contact_name TEXT, contact_email TEXT, contact_phone TEXT,
     applied INTEGER NOT NULL DEFAULT 0, status TEXT, status_override TEXT,
-    cover_letter_sent_at TEXT, date_applied TEXT, archived INTEGER NOT NULL DEFAULT 0,
+    cover_letter_sent_at TEXT, date_applied TEXT, applied_at TEXT, archived INTEGER NOT NULL DEFAULT 0,
     resume_generated_at TEXT, user_id INTEGER NOT NULL DEFAULT 1,
     UNIQUE(company, job_title, user_id)
   )

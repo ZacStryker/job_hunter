@@ -299,9 +299,12 @@ app.patch('/:id', async (c) => {
   if (patch.applied !== undefined) {
     updateFields.applied = patch.applied
     if (patch.applied && !existing.dateApplied) {
-      updateFields.dateApplied = new Date().toISOString().split('T')[0]
+      const now = new Date().toISOString()
+      updateFields.dateApplied = now.split('T')[0]
+      updateFields.appliedAt = now
     } else if (!patch.applied) {
       updateFields.dateApplied = null
+      updateFields.appliedAt = null
     }
   }
   if (patch.statusOverride !== undefined) updateFields.statusOverride = patch.statusOverride

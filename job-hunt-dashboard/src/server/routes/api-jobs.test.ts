@@ -45,6 +45,7 @@ const CREATE_JOBS_TABLE = `
     status_override TEXT,
     cover_letter_sent_at TEXT,
     date_applied TEXT,
+    applied_at TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
     resume_generated_at TEXT,
     user_id INTEGER NOT NULL DEFAULT 1,
@@ -117,6 +118,42 @@ describe('PATCH /api/jobs/:id', () => {
     expect(res.status).toBe(200)
     const data = await res.json() as { job: Record<string, unknown> }
     expect(data.job.applied).toBe(false)
+    expect(data.job.dateApplied).toBeNull()
+  })
+
+  test('applying sets appliedAt to a full ISO datetime (not midnight)', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Engineer', 0)`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Acme') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ applied: true }),
+    })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { job: Record<string, unknown> }
+    const appliedAt = data.job.appliedAt as string
+    expect(typeof appliedAt).toBe('string')
+    expect(appliedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+    // A real time-of-day, not the midnight value date-only dateApplied would produce
+    expect(appliedAt).not.toMatch(/T00:00:00/)
+    // dateApplied remains the date-only prefix of the same instant
+    expect(appliedAt.startsWith(data.job.dateApplied as string)).toBe(true)
+  })
+
+  test('un-applying clears appliedAt to null', async () => {
+    prodSqlite.run(
+      `INSERT INTO jobs (company, job_title, applied, date_applied, applied_at) VALUES ('Beta', 'Dev', 1, '2026-04-01', '2026-04-01T14:30:00.000Z')`
+    )
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Beta') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ applied: false }),
+    })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { job: Record<string, unknown> }
+    expect(data.job.applied).toBe(false)
+    expect(data.job.appliedAt).toBeNull()
     expect(data.job.dateApplied).toBeNull()
   })
 

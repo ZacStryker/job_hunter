@@ -90,7 +90,7 @@ app.get('/', (c) => {
 
   for (const j of feedJobs) {
     if (j.applied && j.dateApplied) {
-      events.push({ type: 'applied', timestamp: toIso(j.dateApplied), jobTitle: j.jobTitle, company: j.company, status: null })
+      events.push({ type: 'applied', timestamp: toIso(j.appliedAt ?? j.dateApplied), jobTitle: j.jobTitle, company: j.company, status: null })
     }
     if (j.resumeGeneratedAt) {
       events.push({ type: 'resume', timestamp: toIso(j.resumeGeneratedAt), jobTitle: j.jobTitle, company: j.company, status: null })

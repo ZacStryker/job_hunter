@@ -37,6 +37,7 @@ const CREATE_JOBS_TABLE = `
     status_override TEXT,
     cover_letter_sent_at TEXT,
     date_applied TEXT,
+    applied_at TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
     date_archived TEXT,
     resume_generated_at TEXT,

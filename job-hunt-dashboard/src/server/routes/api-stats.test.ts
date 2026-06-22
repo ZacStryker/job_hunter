@@ -45,6 +45,7 @@ const CREATE_JOBS_TABLE = `
     status_override TEXT,
     cover_letter_sent_at TEXT,
     date_applied TEXT,
+    applied_at TEXT,
     date_archived TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
     resume_generated_at TEXT,
@@ -204,6 +205,33 @@ describe('GET /api/stats - recentActivity feed', () => {
     const data = await getStats()
     expect(data.recentActivity[0].company).toBe('New')
     expect(data.recentActivity[1].company).toBe('Old')
+  })
+
+  test('applied event uses appliedAt time-of-day, sorting a same-day afternoon application after a morning status change', async () => {
+    const day = daysAgoDate(1)
+    const morning = `${day}T09:00:00.000Z`
+    const afternoon = `${day}T15:00:00.000Z`
+    // Job with a morning status change
+    const sc = prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('MorningCo', 'Dev', 0)`)
+    prodSqlite.run(`INSERT INTO status_events (job_id, status, timestamp) VALUES (${Number(sc.lastInsertRowid)}, 'Interview', '${morning}')`)
+    // Job applied the same afternoon — appliedAt carries the real time-of-day
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied, applied_at) VALUES ('AfternoonCo', 'Dev', 1, '${day}', '${afternoon}')`)
+
+    const data = await getStats()
+    const applied = data.recentActivity.find(e => e.type === 'applied')
+    const statusChange = data.recentActivity.find(e => e.type === 'status_change')
+    expect(applied?.timestamp).toBe(afternoon)            // full time-of-day, not midnight
+    expect(applied!.timestamp > statusChange!.timestamp).toBe(true)
+    // Descending feed: the afternoon application sorts ahead of the morning status change
+    expect(data.recentActivity[0].type).toBe('applied')
+    expect(data.recentActivity[1].type).toBe('status_change')
+  })
+
+  test('applied event falls back to midnight date_applied when appliedAt is null (legacy rows)', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied) VALUES ('Legacy', 'Dev', 1, '2026-06-01')`)
+    const data = await getStats()
+    const applied = data.recentActivity.find(e => e.type === 'applied')
+    expect(applied?.timestamp).toBe('2026-06-01T00:00:00Z')
   })
 
   test('normalizes bare YYYY-MM-DD timestamps to ISO', async () => {
