@@ -36,8 +36,8 @@ function median(nums: number[]): number {
 
 // Net minutes saved per task (NET model — manual baseline minus residual review effort)
 const NET_MIN = { source: 3, analyze: 4, coverLetter: 4.75, resume: 14.25 }
-const RESPONSE_STATUSES = ['Submitted', 'Screening', 'Interview', 'Offer', 'Rejected']
-const INTERVIEW_STATUSES = ['Interview', 'Offer']
+const RESPONSE_STATUSES = ['screening', 'interview', 'offer', 'rejected']
+const INTERVIEW_STATUSES = ['interview', 'offer']
 const FIT_RANGES = ['0-20', '20-40', '40-60', '60-80', '80-100']
 
 app.get('/', (c) => {
@@ -91,7 +91,7 @@ app.get('/', (c) => {
   const hasStatusData = appliedJobs.some(j => j.statusOverride !== null)
   const response = hasStatusData ? appliedJobs.filter(j => j.statusOverride !== null && RESPONSE_STATUSES.includes(j.statusOverride)).length : 0
   const interview = hasStatusData ? appliedJobs.filter(j => j.statusOverride !== null && INTERVIEW_STATUSES.includes(j.statusOverride)).length : 0
-  const offer = hasStatusData ? appliedJobs.filter(j => j.statusOverride === 'Offer').length : 0
+  const offer = hasStatusData ? appliedJobs.filter(j => j.statusOverride === 'offer').length : 0
   const funnel = { scraped, matched, applied, response, interview, offer, hasStatusData }
 
   // ── Value (time-saved — all-time cumulative) ──
@@ -115,7 +115,7 @@ app.get('/', (c) => {
       if (j.fitScore === null) continue
       const idx = Math.min(Math.floor(j.fitScore / 20), 4)
       fitBuckets[idx].applied++
-      if (j.statusOverride !== null && j.statusOverride !== 'No Response') fitBuckets[idx].responded++
+      if (j.statusOverride !== null && RESPONSE_STATUSES.includes(j.statusOverride)) fitBuckets[idx].responded++
     }
   }
   const fitVsOutcome = { hasData: fitHasData, buckets: fitBuckets }

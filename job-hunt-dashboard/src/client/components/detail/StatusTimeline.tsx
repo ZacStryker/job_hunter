@@ -8,13 +8,11 @@ function extractSenderName(fromAddress: string): string {
 
 const STATUS_LABELS: Record<string, string> = {
   // Manual override values
-  phone_screen: 'Phone Screen',
+  screening: 'Screening',
   interview: 'Interview',
-  technical: 'Technical Round',
-  offer: 'Offer Received',
+  offer: 'Offer',
   rejected: 'Rejected',
-  withdrawn: 'Withdrawn',
-  ghosted: 'Ghosted',
+  other: 'Other',
   // Message types
   Submitted: 'Submitted',
   Rejected: 'Rejected',

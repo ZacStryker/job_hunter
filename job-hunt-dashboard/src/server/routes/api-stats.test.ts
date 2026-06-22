@@ -185,12 +185,12 @@ describe('GET /api/stats - funnel', () => {
   })
 
   test('late funnel stages reflect statusOverride when present', async () => {
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied, status_override) VALUES ('A', 'Dev', 1, '2026-06-01', 'Submitted')`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied, status_override) VALUES ('B', 'Dev', 1, '2026-06-01', 'Interview')`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied, status_override) VALUES ('C', 'Dev', 1, '2026-06-01', 'Offer')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied, status_override) VALUES ('A', 'Dev', 1, '2026-06-01', 'screening')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied, status_override) VALUES ('B', 'Dev', 1, '2026-06-01', 'interview')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied, status_override) VALUES ('C', 'Dev', 1, '2026-06-01', 'offer')`)
     const data = await getStats()
     expect(data.funnel.hasStatusData).toBe(true)
-    expect(data.funnel.response).toBe(3)   // Submitted + Interview + Offer all count as response
+    expect(data.funnel.response).toBe(3)   // screening + interview + offer all count as response
     expect(data.funnel.interview).toBe(2)  // Interview + Offer
     expect(data.funnel.offer).toBe(1)
   })
@@ -355,7 +355,7 @@ describe('GET /api/stats - hero sentence', () => {
   })
 
   test('includes conversion clause only when status data present', async () => {
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied, status_override) VALUES ('A', 'Dev', 1, '${daysAgoDate(2)}', 'Interview')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied, status_override) VALUES ('A', 'Dev', 1, '${daysAgoDate(2)}', 'interview')`)
     const data = await getStats()
     expect(data.heroSentence).toContain('Pipeline converting at')
     expect(data.heroSentence).toContain('HITLobster saved you')

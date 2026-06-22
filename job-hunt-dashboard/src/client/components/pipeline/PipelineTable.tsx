@@ -71,13 +71,11 @@ const APPLIED = 'Applied'
 const STATUS_OPTIONS = [
   { value: NO_STATUS, label: 'No Status' },
   { value: APPLIED, label: 'Applied' },
-  { value: 'phone_screen', label: 'Phone Screen' },
+  { value: 'screening', label: 'Screening' },
   { value: 'interview', label: 'Interview' },
-  { value: 'technical', label: 'Technical Round' },
-  { value: 'offer', label: 'Offer Received' },
+  { value: 'offer', label: 'Offer' },
   { value: 'rejected', label: 'Rejected' },
-  { value: 'withdrawn', label: 'Withdrawn' },
-  { value: 'ghosted', label: 'Ghosted' },
+  { value: 'other', label: 'Other' },
 ]
 
 const PAGE_SIZE = 20

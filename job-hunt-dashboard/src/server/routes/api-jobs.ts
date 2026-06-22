@@ -33,7 +33,7 @@ const SONNET_4_6_OUTPUT = 15 / 1_000_000
 
 const app = new Hono<AppEnv>()
 
-const STATUS_OVERRIDE_VALUES = ['phone_screen', 'interview', 'technical', 'offer', 'rejected', 'withdrawn', 'ghosted'] as const
+const STATUS_OVERRIDE_VALUES = ['screening', 'interview', 'offer', 'rejected', 'other'] as const
 
 const jobPatchSchema = z.object({
   applied: z.boolean().optional(),

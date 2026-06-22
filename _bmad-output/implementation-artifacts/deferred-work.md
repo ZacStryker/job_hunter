@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: code review of manual-status-dropdown (2026-06-22)
+
+- **Status vocabulary duplicated across three sources of truth.** The seven-option `STATUS_OPTIONS` list (sentinels + lowercase override values) is hand-maintained in both `JobDrawer.tsx` and `PipelineTable.tsx`, and the lowercase subset is independently declared as `STATUS_OVERRIDE_VALUES` (`api-jobs.ts`) and as `RESPONSE_STATUSES`/`INTERVIEW_STATUSES` (`api-stats.ts`). They only stayed consistent in this change because all four were edited together; the next vocabulary change can silently drift. Extract a single shared constant (e.g. in `@shared`) that the client option lists and the server enum/funnel constants derive from. Beyond the frozen spec scope for this story (the spec's Code Map explicitly directed editing each file's list separately). [`JobDrawer.tsx`, `PipelineTable.tsx`, `api-jobs.ts`, `api-stats.ts`]
+
 ## Deferred from: code review of email-features-admin-toggle (2026-06-21)
 
 - **Gmail OAuth callback returns raw 403 mid-flow when email features are disabled during a live handshake.** `GET /api/onboarding/gmail/callback` is gated by `app.use('/api/onboarding/gmail/*', emailFeaturesMiddleware)`. If an admin disables the `emailFeatures` flag while a user is mid-OAuth (the ~30s window between Google consent and the callback), the callback returns `403 { error: 'Email features are disabled' }` (raw JSON) instead of redirecting to the originating surface with `?gmail=error`, and the refresh token is dropped. Extremely narrow race (requires admin toggle during one user's live handshake) and only degrades an already-being-disabled feature. Fix options: leave the callback ungated (it already validates `state`/`uid`), or have the middleware redirect (not JSON-403) for the callback path. [`job-hunt-dashboard/src/index.ts`, `job-hunt-dashboard/src/server/routes/api-onboarding.ts:203`]

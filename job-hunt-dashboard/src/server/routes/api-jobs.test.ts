@@ -302,7 +302,7 @@ describe('GET /api/jobs/:id/events', () => {
     await jobsApp.request(`/${row.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ statusOverride: 'phone_screen' }),
+      body: JSON.stringify({ statusOverride: 'screening' }),
     })
 
     // Small delay to ensure distinct timestamps
@@ -319,7 +319,7 @@ describe('GET /api/jobs/:id/events', () => {
     const data = await res.json() as { events: { status: string; timestamp: string }[] }
     expect(data.events).toHaveLength(2)
     expect(data.events[0].status).toBe('interview')
-    expect(data.events[1].status).toBe('phone_screen')
+    expect(data.events[1].status).toBe('screening')
     expect(data.events[0].timestamp >= data.events[1].timestamp).toBe(true)
   })
 
@@ -393,7 +393,7 @@ describe('GET /api/jobs/:id/events', () => {
     prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('Acme', 'Engineer', 0)`)
     const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Acme') as { id: number }
     prodSqlite.run(
-      `INSERT INTO status_events (job_id, status, timestamp, source) VALUES (?, 'phone_screen', '2026-04-07T09:00:00.000Z', 'manual')`,
+      `INSERT INTO status_events (job_id, status, timestamp, source) VALUES (?, 'screening', '2026-04-07T09:00:00.000Z', 'manual')`,
       [row.id]
     )
     prodSqlite.run(
@@ -406,7 +406,7 @@ describe('GET /api/jobs/:id/events', () => {
     expect(data.events).toHaveLength(2)
     expect(data.events[0].status).toBe('Interview')
     expect(data.events[0].source).toBe('email')
-    expect(data.events[1].status).toBe('phone_screen')
+    expect(data.events[1].status).toBe('screening')
     expect(data.events[1].source).toBe('manual')
   })
 })

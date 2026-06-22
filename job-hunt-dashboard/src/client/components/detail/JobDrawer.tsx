@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
-import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, CheckCircle, Circle, Pencil, Info, Ban } from 'lucide-react'
+import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, Pencil, Info, Ban } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import type { Job } from '@shared/schemas'
 import { ScoreBadge } from '../pipeline/ScoreBadge'
@@ -15,6 +16,18 @@ import { useJobMutation } from '../../hooks/useJobMutation'
 import { toast } from 'sonner'
 import { useBlacklistQuery } from '../../hooks/useBlacklistQuery'
 import { useAddToBlacklist, useRemoveFromBlacklist } from '../../hooks/useBlacklistMutations'
+
+const NO_STATUS = '__none__'
+const APPLIED = 'Applied'
+const STATUS_OPTIONS = [
+  { value: NO_STATUS, label: 'No Status' },
+  { value: APPLIED, label: 'Applied' },
+  { value: 'screening', label: 'Screening' },
+  { value: 'interview', label: 'Interview' },
+  { value: 'offer', label: 'Offer' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'other', label: 'Other' },
+]
 
 function JobDetailFields({ job }: { job: Job }) {
   const left = [
@@ -157,20 +170,24 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                   Visit
                 </a>
               )}
-              <button
-                onClick={() => patchJob({ id: job.id, patch: { applied: !job.applied, statusOverride: null } })}
+              <Select
+                value={job.statusOverride ?? (job.applied ? APPLIED : NO_STATUS)}
+                onValueChange={(value) => {
+                  if (value === NO_STATUS) patchJob({ id: job.id, patch: { applied: false, statusOverride: null } })
+                  else if (value === APPLIED) patchJob({ id: job.id, patch: { applied: true, statusOverride: null } })
+                  else patchJob({ id: job.id, patch: { applied: true, statusOverride: value } })
+                }}
                 disabled={isPatching}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  job.applied
-                    ? 'border-emerald-700/60 text-emerald-400 hover:border-zinc-600 hover:text-zinc-400'
-                    : 'border-zinc-700 text-zinc-400 hover:border-emerald-700/60 hover:text-emerald-400'
-                }`}
               >
-                {job.applied
-                  ? <><CheckCircle size={13} />Applied</>
-                  : <><Circle size={13} />Mark Applied</>
-                }
-              </button>
+                <SelectTrigger aria-label="Application status" className="h-auto w-[150px] gap-1.5 rounded-md border-zinc-700 bg-transparent px-3 py-1.5 text-sm text-zinc-300">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-zinc-800 bg-zinc-900 text-zinc-200">
+                  {STATUS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <button
                 onClick={() => patchJob({ id: job.id, patch: { archived: !job.archived } })}
                 disabled={isPatching}
