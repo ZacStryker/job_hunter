@@ -132,52 +132,21 @@ export type WebhookRun = z.infer<typeof webhookRunSchema>
 export const STATS_PERIODS = ['24h', '7d', '30d', 'all'] as const
 export type StatsPeriod = typeof STATS_PERIODS[number]
 
+export const ACTIVITY_EVENT_TYPES = ['applied', 'status_change', 'resume', 'cover_letter'] as const
+export type ActivityEventType = typeof ACTIVITY_EVENT_TYPES[number]
+
 export const statsSchema = z.object({
-  heroSentence: z.string(),
-  nextAction: z.object({
-    applyMatchesWaiting: z.number(),
-    staleApplications: z.number(),
-  }),
-  funnel: z.object({
-    scraped: z.number(),
-    matched: z.number(),
-    applied: z.number(),
-    response: z.number(),
-    interview: z.number(),
-    offer: z.number(),
-    hasStatusData: z.boolean(),
-  }),
-  value: z.object({
-    timeSavedHours: z.number(),
-    totalCostUsd: z.number(),
-    costPerApplication: z.number(),
-  }),
-  fitVsOutcome: z.object({
-    hasData: z.boolean(),
-    buckets: z.array(z.object({ fitRange: z.string(), applied: z.number(), responded: z.number() })),
-  }),
-  statCards: z.object({
-    daysSinceLastApplication: z.number().nullable(),
-    matchQualityRate: z.number(),
-  }),
-  sparklines: z.object({
-    matchQuality: z.array(z.object({ date: z.string(), rate: z.number() })),
-    costPerApp: z.array(z.object({ date: z.string(), costPerApp: z.number() })),
-  }),
-  detail: z.object({
-    applyResponseRate: z.object({ hasData: z.boolean(), applied: z.number(), responded: z.number() }),
-    sourceEffectiveness: z.array(z.object({ source: z.string(), scraped: z.number(), applied: z.number(), responded: z.number() })),
-    stageAging: z.array(z.object({ stage: z.string(), medianDays: z.number() })),
-    activityHeatmap: z.array(z.object({ date: z.string(), count: z.number() })),
-    cumulativeTimeSaved: z.array(z.object({ date: z.string(), totalHours: z.number() })),
-    timeSavedByWorkflow: z.array(z.object({ workflow: z.string(), hours: z.number() })),
-  }),
-  automation: z.object({
-    totalRuns: z.number(),
-    totalTokens: z.number(),
-    perDay: z.array(z.object({ date: z.string(), Discovery: z.number(), Analysis: z.number(), 'Cover Letter': z.number(), Resume: z.number() })),
-    costByWorkflow: z.array(z.object({ workflow: z.string(), cost: z.number() })),
-  }),
+  totalJobs: z.number(),
+  recentActivity: z.array(z.object({
+    type: z.enum(ACTIVITY_EVENT_TYPES),
+    timestamp: z.string(),
+    jobTitle: z.string(),
+    company: z.string(),
+    status: z.string().nullable(),
+  })),
+  jobsByFitScore: z.array(z.object({ fitRange: z.string(), count: z.number() })),
+  timeSavedByWorkflow: z.array(z.object({ workflow: z.string(), hours: z.number() })),
+  activityHeatmap: z.array(z.object({ date: z.string(), count: z.number() })),
 })
 export type Stats = z.infer<typeof statsSchema>
 
