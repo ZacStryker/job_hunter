@@ -52,14 +52,17 @@ app.get('/', (c) => {
   const scrapedWhere = and(baseWhere, matchesOrApplied, dateCutoff ? gte(jobs.dateScraped, dateCutoff) : undefined, eq(jobs.userId, userId))
   const viewJobs = db.select().from(jobs).where(scrapedWhere).all()
 
-  // All-time user data (time-saved is all-time cumulative; totalJobs is the unscoped empty-state gate)
+  // All user data. Time-saved is archive-agnostic (period-scoped only); the feed is archive-scoped.
   const allUserJobs = db.select().from(jobs).where(eq(jobs.userId, userId)).all()
   const userJobIds = new Set(allUserJobs.map(j => j.id))
-  const analyzedCount = allUserJobs.filter(j => j.dateAnalyzed !== null).length
-  const resumeCount = allUserJobs.filter(j => j.resumeGeneratedAt !== null).length
   const coverLetterRows = db.select().from(coverLetters).where(eq(coverLetters.userId, userId)).all()
-  const coverLetterCount = coverLetterRows.length
   const allStatusEvents = db.select().from(statusEvents).all().filter(e => userJobIds.has(e.jobId))
+
+  const inPeriod = (date: string | null) => date !== null && (dateCutoff === null || date >= dateCutoff)
+  const feedJobs = allUserJobs.filter(j =>
+    archivedFilter === 'active'   ? !j.archived :
+    archivedFilter === 'archived' ? j.archived  : true
+  )
 
   // ── totalJobs (unscoped empty-state gate) ──
   const totalJobs = allUserJobs.length
@@ -73,9 +76,13 @@ app.get('/', (c) => {
   }
   const jobsByFitScore = FIT_RANGES.map((fitRange, i) => ({ fitRange, count: fitCounts[i] }))
 
-  // ── Time saved by workflow (all-time) ──
+  // ── Time saved by workflow (period-scoped, archive-agnostic, per-workflow date column) ──
+  const discoveryCount = allUserJobs.filter(j => inPeriod(j.dateScraped)).length
+  const analyzedCount = allUserJobs.filter(j => inPeriod(j.dateAnalyzed)).length
+  const resumeCount = allUserJobs.filter(j => inPeriod(j.resumeGeneratedAt)).length
+  const coverLetterCount = coverLetterRows.filter(cl => inPeriod(cl.createdAt)).length
   const timeSavedByWorkflow = [
-    { workflow: 'Discovery', hours: allUserJobs.length * NET_MIN.source / 60 },
+    { workflow: 'Discovery', hours: discoveryCount * NET_MIN.source / 60 },
     { workflow: 'Analysis', hours: analyzedCount * NET_MIN.analyze / 60 },
     { workflow: 'Cover Letter', hours: coverLetterCount * NET_MIN.coverLetter / 60 },
     { workflow: 'Resume', hours: resumeCount * NET_MIN.resume / 60 },
@@ -83,10 +90,6 @@ app.get('/', (c) => {
 
   // ── Recent activity feed ──
   // Archive filter scopes the owning job; period cutoff scopes each event's own timestamp.
-  const feedJobs = allUserJobs.filter(j =>
-    archivedFilter === 'active'   ? !j.archived :
-    archivedFilter === 'archived' ? j.archived  : true
-  )
   const jobById = new Map(feedJobs.map(j => [j.id, j]))
 
   type ActivityEvent = { type: ActivityEventType; timestamp: string; jobTitle: string; company: string; status: string | null }

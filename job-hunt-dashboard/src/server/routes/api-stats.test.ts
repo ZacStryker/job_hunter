@@ -300,9 +300,9 @@ describe('GET /api/stats - recentActivity feed', () => {
 describe('GET /api/stats - timeSavedByWorkflow', () => {
   test('formula and order unchanged across all task types', async () => {
     // 2 scraped jobs (source), 1 analyzed, 1 with resume, 1 cover letter
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, date_analyzed) VALUES ('A', 'Dev', '2026-06-01', '2026-06-02')`)
+    const a = prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, date_analyzed) VALUES ('A', 'Dev', '2026-06-01', '2026-06-02')`)
     prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, resume_generated_at) VALUES ('B', 'Dev', '2026-06-01', '2026-06-03')`)
-    prodSqlite.run(`INSERT INTO cover_letters (job_id, user_id, content, created_at) VALUES (1, 1, 'x', '2026-06-02')`)
+    prodSqlite.run(`INSERT INTO cover_letters (job_id, user_id, content, created_at) VALUES (${Number(a.lastInsertRowid)}, 1, 'x', '2026-06-02')`)
     const data = await getStats()
     expect(data.timeSavedByWorkflow.map(w => w.workflow)).toEqual(['Discovery', 'Analysis', 'Cover Letter', 'Resume'])
     const byWf = Object.fromEntries(data.timeSavedByWorkflow.map(w => [w.workflow, w.hours]))
@@ -312,15 +312,50 @@ describe('GET /api/stats - timeSavedByWorkflow', () => {
     expect(byWf['Resume']).toBeCloseTo(1 * 14.25 / 60, 5)
   })
 
-  test('is all-time, not affected by period filter', async () => {
+  const hoursFor = (data: StatsResponse, wf: string) =>
+    data.timeSavedByWorkflow.find(w => w.workflow === wf)?.hours ?? 0
+
+  test('period filter scopes Discovery by date_scraped', async () => {
     prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped) VALUES ('Old', 'Dev', '${daysAgoDate(60)}')`)
     prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped) VALUES ('New', 'Dev', '${daysAgoDate(1)}')`)
-    const all = await getStats('?period=all')
+    expect(hoursFor(await getStats('?period=all'), 'Discovery')).toBeCloseTo(2 * 3 / 60, 5)
+    expect(hoursFor(await getStats('?period=24h'), 'Discovery')).toBeCloseTo(1 * 3 / 60, 5)
+  })
+
+  test('each workflow scopes by its own date column', async () => {
+    // Scraped 60d ago, analyzed today: excluded from Discovery@24h, included in Analysis@24h
+    const a = prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, date_analyzed) VALUES ('A', 'Dev', '${daysAgoDate(60)}', '${daysAgoIso(1)}')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, resume_generated_at) VALUES ('B', 'Dev', '${daysAgoDate(60)}', '${daysAgoIso(1)}')`)
+    prodSqlite.run(`INSERT INTO cover_letters (job_id, user_id, content, created_at) VALUES (${Number(a.lastInsertRowid)}, 1, 'x', '${daysAgoIso(1)}')`)
     const day = await getStats('?period=24h')
-    const allDiscovery = all.timeSavedByWorkflow.find(w => w.workflow === 'Discovery')?.hours
-    const dayDiscovery = day.timeSavedByWorkflow.find(w => w.workflow === 'Discovery')?.hours
-    expect(dayDiscovery).toBeCloseTo(allDiscovery as number, 5)
-    expect(dayDiscovery).toBeCloseTo(2 * 3 / 60, 5)
+    expect(hoursFor(day, 'Discovery')).toBe(0)
+    expect(hoursFor(day, 'Analysis')).toBeCloseTo(1 * 4 / 60, 5)
+    expect(hoursFor(day, 'Resume')).toBeCloseTo(1 * 14.25 / 60, 5)
+    expect(hoursFor(day, 'Cover Letter')).toBeCloseTo(1 * 4.75 / 60, 5)
+  })
+
+  test('null date columns are excluded', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped) VALUES ('A', 'Dev', '${daysAgoIso(1)}')`)
+    const data = await getStats('?period=24h')
+    expect(hoursFor(data, 'Analysis')).toBe(0)
+    expect(hoursFor(data, 'Resume')).toBe(0)
+  })
+
+  test('is agnostic to the archive filter (archived items still counted under active)', async () => {
+    // A single archived job with all four workflows in period, plus its cover letter.
+    const a = prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, date_analyzed, resume_generated_at, archived) VALUES ('Arch', 'Dev', '${daysAgoIso(1)}', '${daysAgoIso(1)}', '${daysAgoIso(1)}', 1)`)
+    prodSqlite.run(`INSERT INTO cover_letters (job_id, user_id, content, created_at) VALUES (${Number(a.lastInsertRowid)}, 1, 'x', '${daysAgoIso(1)}')`)
+    const active = await getStats('?archivedFilter=active')
+    const archived = await getStats('?archivedFilter=archived')
+    const all = await getStats('?archivedFilter=all')
+    for (const wf of ['Discovery', 'Analysis', 'Cover Letter', 'Resume']) {
+      expect(hoursFor(active, wf)).toBe(hoursFor(all, wf))
+      expect(hoursFor(archived, wf)).toBe(hoursFor(all, wf))
+    }
+    expect(hoursFor(all, 'Discovery')).toBeCloseTo(1 * 3 / 60, 5)
+    expect(hoursFor(all, 'Analysis')).toBeCloseTo(1 * 4 / 60, 5)
+    expect(hoursFor(all, 'Resume')).toBeCloseTo(1 * 14.25 / 60, 5)
+    expect(hoursFor(all, 'Cover Letter')).toBeCloseTo(1 * 4.75 / 60, 5)
   })
 })
 
