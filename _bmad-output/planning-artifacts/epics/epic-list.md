@@ -166,3 +166,13 @@ Unauthenticated visitors can navigate to `/tour` and experience a polished, scro
 **Architecture:** `/tour` registered as a direct child of `rootRoute` (no `beforeLoad`, no session fetch); static JSX feature sections with scroll animations; interactive Matches demo; FAQ + closing CTA
 
 ---
+
+## Epic 46: Global Activity Dropdown — Live Workflow Visibility
+From anywhere in the app, a user can see whether any background workflow (Discovery, Analysis, Cover Letter, Resume) is running and how far along it is, via a persistent top-bar "Activity" control that animates while work is in progress and opens a Plex-style dropdown of live, per-run progress, with a standing link to the full Logs history.
+**Source:** User request
+**Priority:** Medium — ambient progress visibility; no changes to workflow internals
+**FRs covered:** FR1–FR15 · **NFRs:** NFR1–NFR6 · **UX-DRs:** UX-DR1–UX-DR5
+**Out of scope:** Workflow internals (discovery/scoring/PDF/LLM generation); the Logs page itself (linked, not modified)
+**Architecture:** Per-user in-memory run registry as single source of truth; `GET /api/activity/stream` SSE endpoint (snapshot on connect + push on change, user-scoped via `authMiddleware`); the four workflows wired at the route-handler layer (`api-webhooks.ts`, `api-jobs.ts`); client `useActivityStream` EventSource hook drives the top-bar indicator + dropdown; no polling
+
+---
