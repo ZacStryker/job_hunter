@@ -13,3 +13,13 @@ resume_json_prompt
 resume_json_prompt_example
 resume_template_01
 template_variants.json
+
+# Secrets
+.env
+
+# Node
+node_modules/
+/package.json
+
+# Stray nested app dir
+job-hunt-dashboard/HITLOBSTER/
