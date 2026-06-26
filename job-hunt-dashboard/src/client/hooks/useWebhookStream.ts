@@ -20,8 +20,14 @@ export function useWebhookStream(url: string): WebhookStreamState {
   const [isError, setIsError] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const inFlightRef = useRef(false)
 
   const trigger = useCallback(async () => {
+    // Re-entrancy guard: a single user action must produce exactly one run. isPending
+    // (which disables the button) only takes effect on re-render, so a synchronous
+    // re-fire before that commit would otherwise start a second, duplicate run.
+    if (inFlightRef.current) return
+    inFlightRef.current = true
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
@@ -43,6 +49,13 @@ export function useWebhookStream(url: string): WebhookStreamState {
       console.log(`[discovery-stream] HTTP ${response.status} (${Date.now() - _streamStart}ms)`)
 
       if (!response.ok) {
+        // 409 = a run of this type is already in progress server-side. This is the
+        // de-duplication backstop, not a failure — swallow it so the in-flight run
+        // owns the UI and no spurious error alert appears.
+        if (response.status === 409) {
+          setIsPending(false)
+          return
+        }
         let message = `HTTP ${response.status}`
         try {
           const body = await response.json() as { error?: string }
@@ -150,6 +163,7 @@ export function useWebhookStream(url: string): WebhookStreamState {
       setError(err instanceof Error ? err.message : String(err))
       queryClient.invalidateQueries({ queryKey: ['webhook-runs'] })
     } finally {
+      inFlightRef.current = false
       reader?.cancel().catch(() => {})
     }
   }, [url, queryClient])

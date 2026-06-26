@@ -148,3 +148,28 @@ describe('user isolation during progress / finalize / prune', () => {
     expect(registry.snapshot(USER_B)).toHaveLength(0)
   })
 })
+
+describe('hasRunning', () => {
+  test('true only while a run of the matching type is running for that user', () => {
+    const id = registry.register({ userId: USER_A, type: 'discovery', progress: { count: 0, total: null } })
+
+    expect(registry.hasRunning(USER_A, 'discovery')).toBe(true)
+    // type must match
+    expect(registry.hasRunning(USER_A, 'analysis')).toBe(false)
+    // user must match
+    expect(registry.hasRunning(USER_B, 'discovery')).toBe(false)
+    // unknown user
+    expect(registry.hasRunning(999, 'discovery')).toBe(false)
+
+    // a finalized (done) run no longer counts as running — re-runs are allowed
+    registry.finalize(id, 'done', 1_000)
+    expect(registry.hasRunning(USER_A, 'discovery')).toBe(false)
+  })
+
+  test('failed runs also stop counting as running', () => {
+    const id = registry.register({ userId: USER_A, type: 'analysis', progress: { count: 0, total: null } })
+    expect(registry.hasRunning(USER_A, 'analysis')).toBe(true)
+    registry.finalize(id, 'failed', 1_000)
+    expect(registry.hasRunning(USER_A, 'analysis')).toBe(false)
+  })
+})

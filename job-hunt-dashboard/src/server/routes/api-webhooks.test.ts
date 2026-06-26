@@ -2,7 +2,9 @@ process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, beforeAll, beforeEach, afterEach, mock, spyOn } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { Hono } from 'hono'
 import { activityRegistry } from '../services/activity-registry'
+import type { AppEnv } from '../types'
 
 // Mock both services BEFORE dynamic import — bun:test hoisting requirement
 let mockRunDiscovery: (onProgress?: (msg: string) => void, onJobsInserted?: (count: number, source: string) => void) => Promise<{ inserted: number; bySource: Record<string, number>; errors?: Array<{ source: string; error: string }> }> =
@@ -55,6 +57,16 @@ async function parseNdjson(res: Response): Promise<Array<Record<string, unknown>
   return text.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as Record<string, unknown>)
 }
 
+// Auth middleware always sets a real userId in production. Inject one here so the
+// activity registry can own/finalize runs by user (the registry treats an undefined
+// owner as "unknown id" and skips finalize/progress, which would leak running runs).
+function asUser(userId: number) {
+  const wrap = new Hono<AppEnv>()
+  wrap.use('*', async (c, next) => { c.set('userId', userId); await next() })
+  wrap.route('/', webhooksApp)
+  return wrap
+}
+
 beforeAll(() => {
   prodSqlite.run(CREATE_WEBHOOK_RUNS_TABLE)
   prodSqlite.run(CREATE_USER_SECRETS_TABLE)
@@ -74,7 +86,7 @@ afterEach(() => {
 describe('POST /api/webhooks/discovery', () => {
   test('returns 503 when SCRAPER_URL is not set', async () => {
     delete process.env.SCRAPER_URL
-    const res = await webhooksApp.request('/discovery', { method: 'POST' })
+    const res = await asUser(1).request('/discovery', { method: 'POST' })
     expect(res.status).toBe(503)
     const body = await res.json() as { error: string }
     expect(body).toHaveProperty('error')
@@ -85,7 +97,7 @@ describe('POST /api/webhooks/discovery', () => {
     process.env.SCRAPER_URL = 'http://test-scraper.invalid'
     mockRunDiscovery = async () => ({ inserted: 5, bySource: {} })
 
-    const res = await webhooksApp.request('/discovery', { method: 'POST' })
+    const res = await asUser(1).request('/discovery', { method: 'POST' })
     expect(res.status).toBe(200)
 
     const events = await parseNdjson(res)
@@ -106,7 +118,7 @@ describe('POST /api/webhooks/discovery', () => {
     process.env.SCRAPER_URL = 'http://test-scraper.invalid'
     mockRunDiscovery = async () => { throw new Error('Scraper timeout') }
 
-    const res = await webhooksApp.request('/discovery', { method: 'POST' })
+    const res = await asUser(1).request('/discovery', { method: 'POST' })
     expect(res.status).toBe(200)
 
     const events = await parseNdjson(res)
@@ -130,7 +142,7 @@ describe('POST /api/webhooks/discovery', () => {
       return { inserted: 2, bySource: {} }
     }
 
-    const res = await webhooksApp.request('/discovery', { method: 'POST' })
+    const res = await asUser(1).request('/discovery', { method: 'POST' })
     expect(res.status).toBe(200)
 
     const events = await parseNdjson(res)
@@ -146,7 +158,7 @@ describe('POST /api/webhooks/discovery', () => {
 describe('POST /api/webhooks/analysis', () => {
   test('returns 503 when ANTHROPIC_API_KEY is not set', async () => {
     delete process.env.ANTHROPIC_API_KEY
-    const res = await webhooksApp.request('/analysis', { method: 'POST' })
+    const res = await asUser(1).request('/analysis', { method: 'POST' })
     expect(res.status).toBe(503)
     const body = await res.json() as { error: string }
     expect(body).toHaveProperty('error')
@@ -157,7 +169,7 @@ describe('POST /api/webhooks/analysis', () => {
     process.env.ANTHROPIC_API_KEY = 'test-key'
     mockRunAnalysis = async () => ({ processed: 7, failed: 1, matched: 7, archived: 0, inputTokens: 0, outputTokens: 0 })
 
-    const res = await webhooksApp.request('/analysis', { method: 'POST' })
+    const res = await asUser(1).request('/analysis', { method: 'POST' })
     expect(res.status).toBe(200)
 
     const events = await parseNdjson(res)
@@ -179,7 +191,7 @@ describe('POST /api/webhooks/analysis', () => {
     process.env.ANTHROPIC_API_KEY = 'test-key'
     mockRunAnalysis = async () => ({ processed: 2, failed: 0, matched: 2, archived: 0, inputTokens: 1000, outputTokens: 500 })
 
-    const res = await webhooksApp.request('/analysis', { method: 'POST' })
+    const res = await asUser(1).request('/analysis', { method: 'POST' })
     expect(res.status).toBe(200)
     await parseNdjson(res)
 
@@ -199,7 +211,7 @@ describe('POST /api/webhooks/analysis', () => {
     process.env.ANTHROPIC_API_KEY = 'test-key'
     mockRunAnalysis = async () => { throw new Error('Anthropic timeout') }
 
-    const res = await webhooksApp.request('/analysis', { method: 'POST' })
+    const res = await asUser(1).request('/analysis', { method: 'POST' })
     expect(res.status).toBe(200)
 
     const events = await parseNdjson(res)
@@ -223,7 +235,7 @@ describe('POST /api/webhooks/analysis', () => {
       return { processed: 3, failed: 0, matched: 3, archived: 0, inputTokens: 0, outputTokens: 0 }
     }
 
-    const res = await webhooksApp.request('/analysis', { method: 'POST' })
+    const res = await asUser(1).request('/analysis', { method: 'POST' })
     expect(res.status).toBe(200)
 
     const events = await parseNdjson(res)
@@ -243,7 +255,7 @@ describe('activity registry wiring — discovery', () => {
     const registerSpy = spyOn(activityRegistry, 'register')
     const finalizeSpy = spyOn(activityRegistry, 'finalize')
 
-    const res = await webhooksApp.request('/discovery', { method: 'POST' })
+    const res = await asUser(1).request('/discovery', { method: 'POST' })
     expect(res.status).toBe(200)
     const events = await parseNdjson(res)
 
@@ -271,7 +283,7 @@ describe('activity registry wiring — discovery', () => {
     const registerSpy = spyOn(activityRegistry, 'register')
     const progressSpy = spyOn(activityRegistry, 'progress')
 
-    const res = await webhooksApp.request('/discovery', { method: 'POST' })
+    const res = await asUser(1).request('/discovery', { method: 'POST' })
     expect(res.status).toBe(200)
     const events = await parseNdjson(res)
 
@@ -293,7 +305,7 @@ describe('activity registry wiring — discovery', () => {
     const registerSpy = spyOn(activityRegistry, 'register')
     const finalizeSpy = spyOn(activityRegistry, 'finalize')
 
-    const res = await webhooksApp.request('/discovery', { method: 'POST' })
+    const res = await asUser(1).request('/discovery', { method: 'POST' })
     expect(res.status).toBe(200)
     await parseNdjson(res)
 
@@ -314,7 +326,7 @@ describe('activity registry wiring — discovery', () => {
     const registerSpy = spyOn(activityRegistry, 'register')
     const finalizeSpy = spyOn(activityRegistry, 'finalize')
 
-    const res = await webhooksApp.request('/discovery', { method: 'POST' })
+    const res = await asUser(1).request('/discovery', { method: 'POST' })
     expect(res.status).toBe(200)
     const events = await parseNdjson(res)
 
@@ -344,7 +356,7 @@ describe('activity registry wiring — analysis', () => {
     const registerSpy = spyOn(activityRegistry, 'register')
     const progressSpy = spyOn(activityRegistry, 'progress')
 
-    const res = await webhooksApp.request('/analysis', { method: 'POST' })
+    const res = await asUser(1).request('/analysis', { method: 'POST' })
     expect(res.status).toBe(200)
     const events = await parseNdjson(res)
 
@@ -368,7 +380,7 @@ describe('activity registry wiring — analysis', () => {
     const registerSpy = spyOn(activityRegistry, 'register')
     const finalizeSpy = spyOn(activityRegistry, 'finalize')
 
-    const res = await webhooksApp.request('/analysis', { method: 'POST' })
+    const res = await asUser(1).request('/analysis', { method: 'POST' })
     expect(res.status).toBe(200)
     const events = await parseNdjson(res)
 
@@ -386,7 +398,7 @@ describe('activity registry wiring — analysis', () => {
     const registerSpy = spyOn(activityRegistry, 'register')
     const finalizeSpy = spyOn(activityRegistry, 'finalize')
 
-    const res = await webhooksApp.request('/analysis', { method: 'POST' })
+    const res = await asUser(1).request('/analysis', { method: 'POST' })
     expect(res.status).toBe(200)
     const events = await parseNdjson(res)
 
@@ -396,5 +408,78 @@ describe('activity registry wiring — analysis', () => {
     expect(events.find((e) => 'error' in e)?.error).toBe('Anthropic timeout')
 
     delete process.env.ANTHROPIC_API_KEY
+  })
+})
+
+describe('concurrency guard — one click, one run (1:1:1)', () => {
+  test('discovery: a second request while one is running returns 409, no extra register or log row', async () => {
+    process.env.SCRAPER_URL = 'http://test-scraper.invalid'
+    const USER = 4242
+    const seededId = activityRegistry.register({ userId: USER, type: 'discovery', progress: { count: 0, total: null } })
+    const registerSpy = spyOn(activityRegistry, 'register')
+
+    const res = await asUser(USER).request('/discovery', { method: 'POST' })
+
+    expect(res.status).toBe(409)
+    const body = await res.json() as { error: string }
+    expect(body).toHaveProperty('error')
+    expect(body).not.toHaveProperty('message')
+    expect(registerSpy).not.toHaveBeenCalled()
+    const count = prodSqlite.query('SELECT COUNT(*) AS n FROM webhook_runs').get() as { n: number }
+    expect(count.n).toBe(0)
+
+    activityRegistry.finalize(seededId, 'done', 0)
+    delete process.env.SCRAPER_URL
+  })
+
+  test('analysis: a second request while one is running returns 409, no extra register or log row', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    const USER = 4243
+    const seededId = activityRegistry.register({ userId: USER, type: 'analysis', progress: { count: 0, total: null } })
+    const registerSpy = spyOn(activityRegistry, 'register')
+
+    const res = await asUser(USER).request('/analysis', { method: 'POST' })
+
+    expect(res.status).toBe(409)
+    const body = await res.json() as { error: string }
+    expect(body).toHaveProperty('error')
+    expect(body).not.toHaveProperty('message')
+    expect(registerSpy).not.toHaveBeenCalled()
+    const count = prodSqlite.query('SELECT COUNT(*) AS n FROM webhook_runs').get() as { n: number }
+    expect(count.n).toBe(0)
+
+    activityRegistry.finalize(seededId, 'done', 0)
+    delete process.env.ANTHROPIC_API_KEY
+  })
+
+  test('a single discovery request still produces exactly one register + one log row', async () => {
+    process.env.SCRAPER_URL = 'http://test-scraper.invalid'
+    mockRunDiscovery = async () => ({ inserted: 3, bySource: { linkedin: 3 }, errors: [] })
+    const registerSpy = spyOn(activityRegistry, 'register')
+
+    const res = await asUser(7).request('/discovery', { method: 'POST' })
+    expect(res.status).toBe(200)
+    await parseNdjson(res)
+
+    expect(registerSpy).toHaveBeenCalledTimes(1)
+    const count = prodSqlite.query('SELECT COUNT(*) AS n FROM webhook_runs WHERE name = ?').get('Discovery') as { n: number }
+    expect(count.n).toBe(1)
+
+    delete process.env.SCRAPER_URL
+  })
+
+  test('a running analysis does not block a discovery run for the same user (type-scoped guard)', async () => {
+    process.env.SCRAPER_URL = 'http://test-scraper.invalid'
+    mockRunDiscovery = async () => ({ inserted: 1, bySource: { linkedin: 1 }, errors: [] })
+    const USER = 4244
+    const seededId = activityRegistry.register({ userId: USER, type: 'analysis', progress: { count: 0, total: null } })
+
+    const res = await asUser(USER).request('/discovery', { method: 'POST' })
+    expect(res.status).toBe(200)
+    const events = await parseNdjson(res)
+    expect(events.find((e) => 'done' in e)?.done).toBe(true)
+
+    activityRegistry.finalize(seededId, 'done', 0)
+    delete process.env.SCRAPER_URL
   })
 })

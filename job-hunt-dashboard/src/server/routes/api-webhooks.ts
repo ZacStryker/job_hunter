@@ -21,6 +21,9 @@ const app = new Hono<AppEnv>()
 app.post('/discovery', (c) => {
   if (!process.env.SCRAPER_URL) return c.json({ error: 'SCRAPER_URL not configured' }, 503)
   const userId = c.get('userId')
+  if (activityRegistry.hasRunning(userId, 'discovery')) {
+    return c.json({ error: 'A discovery run is already in progress' }, 409)
+  }
   return stream(c, async (s) => {
     const write = (ev: object) => s.writeln(JSON.stringify(ev))
     const startMs = Date.now()
@@ -59,6 +62,9 @@ app.post('/analysis', async (c) => {
       .where(and(eq(userSecrets.userId, userId), eq(userSecrets.keyName, 'anthropic_api_key')))
       .get()
     if (!row) return c.json({ error: 'ANTHROPIC_API_KEY not configured' }, 503)
+  }
+  if (activityRegistry.hasRunning(userId, 'analysis')) {
+    return c.json({ error: 'An analysis run is already in progress' }, 409)
   }
   return stream(c, async (s) => {
     const write = (ev: object) => s.writeln(JSON.stringify(ev))

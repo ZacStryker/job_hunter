@@ -65,6 +65,15 @@ export function createActivityRegistry() {
     }, retentionMs)
   }
 
+  function hasRunning(userId: number, type: ActivityRunType): boolean {
+    const userRuns = runsByUser.get(userId)
+    if (!userRuns) return false
+    for (const run of userRuns.values()) {
+      if (run.type === type && run.state === 'running') return true
+    }
+    return false
+  }
+
   function subscribe(userId: number, listener: ActivityListener): void {
     let set = listenersByUser.get(userId)
     if (!set) {
@@ -78,7 +87,7 @@ export function createActivityRegistry() {
     listenersByUser.get(userId)?.delete(listener)
   }
 
-  return { register, progress, finalize, snapshot, subscribe, unsubscribe }
+  return { register, progress, finalize, hasRunning, snapshot, subscribe, unsubscribe }
 }
 
 export const activityRegistry = createActivityRegistry()
