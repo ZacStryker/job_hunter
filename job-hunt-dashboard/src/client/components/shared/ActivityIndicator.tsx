@@ -42,10 +42,19 @@ export function ActivityIndicator() {
         <button
           type="button"
           aria-label="Activity"
+          aria-busy={isActive}
           title="Activity"
           className="shrink-0 text-zinc-500 hover:text-zinc-200 transition-colors"
         >
-          <Activity className={cn('h-5 w-5', isActive && 'animate-pulse text-zinc-200')} />
+          <span className="relative inline-flex items-center justify-center">
+            {isActive && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 -m-1 rounded-full border-2 border-zinc-700 border-t-zinc-200 animate-spin motion-reduce:animate-none"
+              />
+            )}
+            <Activity className={cn('h-5 w-5', isActive && 'animate-pulse text-zinc-200')} />
+          </span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="end">
