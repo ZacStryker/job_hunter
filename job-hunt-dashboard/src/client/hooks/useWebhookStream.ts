@@ -41,12 +41,9 @@ export function useWebhookStream(url: string): WebhookStreamState {
     let gotDone = false
     let encounteredError = false
     let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
-    const _streamStart = Date.now()
-    console.log(`[discovery-stream] trigger → POST ${url}`)
 
     try {
       const response = await apiFetch(url, { method: 'POST', signal: controller.signal })
-      console.log(`[discovery-stream] HTTP ${response.status} (${Date.now() - _streamStart}ms)`)
 
       if (!response.ok) {
         // 409 = a run of this type is already in progress server-side. This is the
@@ -96,7 +93,6 @@ export function useWebhookStream(url: string): WebhookStreamState {
           } catch {
             continue
           }
-          console.log(`[discovery-stream] event @${Date.now() - _streamStart}ms:`, ev)
           if (typeof ev.status === 'string') {
             setStatusMessage(ev.status)
           } else if (ev.jobsReady === true) {
@@ -147,17 +143,13 @@ export function useWebhookStream(url: string): WebhookStreamState {
       }
 
       if (!gotDone && !encounteredError) {
-        console.warn(`[discovery-stream] stream closed without done/error after ${Date.now() - _streamStart}ms`)
         setIsPending(false)
         setIsError(true)
         setError('Stream ended unexpectedly')
         queryClient.invalidateQueries({ queryKey: ['webhook-runs'] })
-      } else {
-        console.log(`[discovery-stream] stream complete — gotDone=${gotDone} encounteredError=${encounteredError} total=${Date.now() - _streamStart}ms`)
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
-      console.error(`[discovery-stream] caught error after ${Date.now() - _streamStart}ms:`, err)
       setIsPending(false)
       setIsError(true)
       setError(err instanceof Error ? err.message : String(err))
