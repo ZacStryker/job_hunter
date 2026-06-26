@@ -3,6 +3,7 @@ import { LogOut } from 'lucide-react'
 import { useSessionQuery } from '@/hooks/useSessionQuery'
 import { useFeatureSettingsQuery } from '@/hooks/useFeatureSettingsQuery'
 import { ImpersonationBanner } from '@/components/admin/ImpersonationBanner'
+import { ActivityIndicator } from '@/components/shared/ActivityIndicator'
 import { queryClient } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 
@@ -103,6 +104,9 @@ export function Layout() {
             </Link>
           )}
         </nav>
+
+        {/* Activity — right */}
+        <ActivityIndicator />
 
         {/* Logout — right */}
         <button
