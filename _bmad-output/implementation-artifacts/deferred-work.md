@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: verification of header-above-job-drawer (2026-06-26)
+
+- **JobDrawer's ✕ (close) button is occluded by the drawer's own sticky header.** The `SheetPrimitive.Close` button is `absolute right-4 top-4` (z auto), but the drawer's first child is `<div className="sticky top-0 z-10 …">` (the company/title bar); its explicit `z-10` paints over the ✕, so a click at the ✕'s location lands on the sticky header, not the close button. Confirmed at runtime (Playwright: a click at the ✕ position is intercepted by the `Acme` `<p>`). **Pre-existing** — the header-above-drawer change does not touch the sticky header or the close button's stacking; Escape and click-outside still close the drawer. Fix if revisited: give the `SheetPrimitive.Close` a `z-20` (or higher than the sticky header) in `JobDrawer`, or move it outside the scroll container. [`job-hunt-dashboard/src/client/components/detail/JobDrawer.tsx` sticky header ~line 150, `job-hunt-dashboard/src/client/components/ui/sheet.tsx` SheetPrimitive.Close]
+
 ## Deferred from: code review of fix-discovery-analysis-double-fire (2026-06-26)
 
 - **A hung discovery/analysis run blocks new runs of that type until server restart.** The new per-user/per-type concurrency guard (`activityRegistry.hasRunning`) returns 409 while a run is `running`. Finalize is reliably called on both success and error paths, but a genuinely hung `runDiscovery`/`runAnalysis` (never resolves/rejects) would leave the run `running` in the in-memory registry, permanently blocking that workflow for that user until the process restarts. Pre-existing hang risk; the guard makes it user-visible. Fix if revisited: add a max-run-age sweep in the registry, or have the activity dropdown offer a manual "clear stuck run". [`job-hunt-dashboard/src/server/services/activity-registry.ts`, `job-hunt-dashboard/src/server/routes/api-webhooks.ts`]

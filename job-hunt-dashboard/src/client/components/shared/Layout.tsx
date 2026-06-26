@@ -28,7 +28,7 @@ export function Layout() {
   return (
     <div className={cn('min-h-screen bg-zinc-950 text-zinc-100', isImpersonating && 'pt-10')}>
       <ImpersonationBanner />
-      <header className="h-14 bg-zinc-900 border-b border-zinc-800 flex items-center px-4 gap-4">
+      <header className="relative z-[60] h-14 bg-zinc-900 border-b border-zinc-800 flex items-center px-4 gap-4">
         {/* App name — left */}
         <span className="font-semibold text-zinc-100 shrink-0">HITLOBSTER</span>
 

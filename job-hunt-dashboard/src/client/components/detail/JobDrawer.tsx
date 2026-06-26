@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
+import { createPortal } from 'react-dom'
 import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, Pencil, Info, Ban } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
@@ -16,6 +17,8 @@ import { useJobMutation } from '../../hooks/useJobMutation'
 import { toast } from 'sonner'
 import { useBlacklistQuery } from '../../hooks/useBlacklistQuery'
 import { useAddToBlacklist, useRemoveFromBlacklist } from '../../hooks/useBlacklistMutations'
+import { useSessionQuery } from '../../hooks/useSessionQuery'
+import { cn } from '../../lib/utils'
 
 const NO_STATUS = '__none__'
 const APPLIED = 'Applied'
@@ -94,6 +97,10 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   const { data: blacklist = [] } = useBlacklistQuery()
   const addToBlacklist = useAddToBlacklist()
   const removeFromBlacklist = useRemoveFromBlacklist()
+  const { data: session } = useSessionQuery()
+  const isImpersonating = !!session?.impersonating
+  const panelOffset = isImpersonating ? 'top-24 h-[calc(100vh-96px)]' : 'top-14 h-[calc(100vh-56px)]'
+  const backdropOffset = isImpersonating ? 'top-24' : 'top-14'
 
   useEffect(() => {
     setShowFullDescription(false)
@@ -134,10 +141,19 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   const blacklistEntry = job ? blacklist.find(e => e.companyName === job.company.toLowerCase()) : undefined
 
   return (
-    <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
+    <>
+      {open && createPortal(
+        <div
+          aria-hidden
+          onClick={onClose}
+          className={cn('fixed inset-x-0 bottom-0 z-40 bg-black/80 animate-in fade-in-0 duration-300', backdropOffset)}
+        />,
+        document.body,
+      )}
+    <Sheet open={open} modal={false} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
       <SheetContent
         side="right"
-        className="w-[720px] max-w-none flex flex-col p-0 bg-zinc-900 border-zinc-800"
+        className={cn('w-[720px] max-w-none flex flex-col p-0 bg-zinc-900 border-zinc-800', panelOffset)}
       >
         <SheetDescription className="sr-only">AI analysis and job details</SheetDescription>
         <div className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 p-4 shrink-0">
@@ -470,5 +486,6 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
         </div>
       </SheetContent>
     </Sheet>
+    </>
   )
 }
