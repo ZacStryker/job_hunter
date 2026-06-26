@@ -1,13 +1,14 @@
 process.env.DB_PATH = ':memory:'
 
-import { describe, test, expect, beforeAll, beforeEach, afterEach, mock } from 'bun:test'
+import { describe, test, expect, beforeAll, beforeEach, afterEach, mock, spyOn } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { activityRegistry } from '../services/activity-registry'
 
 // Mock both services BEFORE dynamic import — bun:test hoisting requirement
-let mockRunDiscovery: (onProgress?: (msg: string) => void) => Promise<{ inserted: number; bySource: Record<string, number> }> =
-  async () => ({ inserted: 0, bySource: {} })
+let mockRunDiscovery: (onProgress?: (msg: string) => void, onJobsInserted?: (count: number, source: string) => void) => Promise<{ inserted: number; bySource: Record<string, number>; errors?: Array<{ source: string; error: string }> }> =
+  async () => ({ inserted: 0, bySource: {}, errors: [] })
 mock.module('../services/discovery-service', () => ({
-  runDiscovery: (onProgress?: (msg: string) => void, _userId?: number) => mockRunDiscovery(onProgress),
+  runDiscovery: (onProgress?: (msg: string) => void, _userId?: number, onJobsInserted?: (count: number, source: string) => void) => mockRunDiscovery(onProgress, onJobsInserted),
 }))
 
 let mockRunAnalysis: (onProgress?: (msg: string) => void) => Promise<{ processed: number; failed: number; matched: number; archived: number; inputTokens: number; outputTokens: number }> =
@@ -65,8 +66,9 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  mockRunDiscovery = async () => ({ inserted: 0, bySource: {} })
+  mockRunDiscovery = async () => ({ inserted: 0, bySource: {}, errors: [] })
   mockRunAnalysis = async () => ({ processed: 0, failed: 0, matched: 0, archived: 0, inputTokens: 0, outputTokens: 0 })
+  mock.restore()
 })
 
 describe('POST /api/webhooks/discovery', () => {
@@ -229,6 +231,169 @@ describe('POST /api/webhooks/analysis', () => {
     expect(statusEvents).toHaveLength(2)
     expect(statusEvents[0].status).toBe('Found 3 jobs to analyze')
     expect(statusEvents[1].status).toBe('Analyzing 1 / 3: Acme Corp — Senior Engineer')
+
+    delete process.env.ANTHROPIC_API_KEY
+  })
+})
+
+describe('activity registry wiring — discovery', () => {
+  test('registers a discovery run and finalizes done on success (AC1, AC4)', async () => {
+    process.env.SCRAPER_URL = 'http://test-scraper.invalid'
+    mockRunDiscovery = async () => ({ inserted: 5, bySource: { linkedin: 5 }, errors: [] })
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    const res = await webhooksApp.request('/discovery', { method: 'POST' })
+    expect(res.status).toBe(200)
+    const events = await parseNdjson(res)
+
+    expect(registerSpy).toHaveBeenCalledTimes(1)
+    expect(registerSpy.mock.calls[0][0]).toMatchObject({ type: 'discovery', progress: { count: 0, total: null } })
+    const runId = registerSpy.mock.results[0].value as string
+    expect(finalizeSpy).toHaveBeenCalledTimes(1)
+    expect(finalizeSpy).toHaveBeenCalledWith(runId, 'done')
+
+    // AC1 regression: existing NDJSON contract still produced
+    const doneEvent = events.find((e) => 'done' in e)
+    expect(doneEvent?.done).toBe(true)
+    expect(doneEvent?.inserted).toBe(5)
+
+    delete process.env.SCRAPER_URL
+  })
+
+  test('advances progress as the running total across sources (AC2)', async () => {
+    process.env.SCRAPER_URL = 'http://test-scraper.invalid'
+    mockRunDiscovery = async (_onProgress, onJobsInserted) => {
+      onJobsInserted?.(3, 'linkedin')
+      onJobsInserted?.(2, 'indeed')
+      return { inserted: 5, bySource: { linkedin: 3, indeed: 2 }, errors: [] }
+    }
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const progressSpy = spyOn(activityRegistry, 'progress')
+
+    const res = await webhooksApp.request('/discovery', { method: 'POST' })
+    expect(res.status).toBe(200)
+    const events = await parseNdjson(res)
+
+    const runId = registerSpy.mock.results[0].value as string
+    expect(progressSpy).toHaveBeenCalledTimes(2)
+    expect(progressSpy.mock.calls[0]).toEqual([runId, { count: 3, total: null }])
+    expect(progressSpy.mock.calls[1]).toEqual([runId, { count: 5, total: null }])
+
+    // AC2 regression: jobsReady events still carry the per-source count
+    const jobsReady = events.filter((e) => 'jobsReady' in e)
+    expect(jobsReady.map((e) => e.count)).toEqual([3, 2])
+
+    delete process.env.SCRAPER_URL
+  })
+
+  test('finalizes failed when all sources error and nothing is inserted (AC4 mirror)', async () => {
+    process.env.SCRAPER_URL = 'http://test-scraper.invalid'
+    mockRunDiscovery = async () => ({ inserted: 0, bySource: {}, errors: [{ source: 'linkedin', error: 'x' }] })
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    const res = await webhooksApp.request('/discovery', { method: 'POST' })
+    expect(res.status).toBe(200)
+    await parseNdjson(res)
+
+    const runId = registerSpy.mock.results[0].value as string
+    expect(finalizeSpy).toHaveBeenCalledTimes(1)
+    expect(finalizeSpy).toHaveBeenCalledWith(runId, 'failed')
+
+    // regression: the soft-failure is still recorded as success = 0
+    const row = prodSqlite.query('SELECT * FROM webhook_runs WHERE name = ?').get('Discovery') as { success: number }
+    expect(row.success).toBe(0)
+
+    delete process.env.SCRAPER_URL
+  })
+
+  test('finalizes failed when runDiscovery throws (AC5)', async () => {
+    process.env.SCRAPER_URL = 'http://test-scraper.invalid'
+    mockRunDiscovery = async () => { throw new Error('Scraper timeout') }
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    const res = await webhooksApp.request('/discovery', { method: 'POST' })
+    expect(res.status).toBe(200)
+    const events = await parseNdjson(res)
+
+    const runId = registerSpy.mock.results[0].value as string
+    expect(finalizeSpy).toHaveBeenCalledTimes(1)
+    expect(finalizeSpy).toHaveBeenCalledWith(runId, 'failed')
+
+    // regression: existing error event + failed row preserved
+    const errorEvent = events.find((e) => 'error' in e)
+    expect(errorEvent?.error).toBe('Scraper timeout')
+    const row = prodSqlite.query('SELECT * FROM webhook_runs WHERE name = ?').get('Discovery') as { success: number }
+    expect(row.success).toBe(0)
+
+    delete process.env.SCRAPER_URL
+  })
+})
+
+describe('activity registry wiring — analysis', () => {
+  test('registers an analysis run and derives count/total from Analyzing messages (AC3)', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockRunAnalysis = async (onProgress) => {
+      onProgress?.('Found 3 jobs to analyze')
+      onProgress?.('Analyzing 1 / 3: Acme — Eng')
+      onProgress?.('Analyzing 2 / 3: Beta — Eng')
+      return { processed: 3, failed: 0, matched: 3, archived: 0, inputTokens: 0, outputTokens: 0 }
+    }
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const progressSpy = spyOn(activityRegistry, 'progress')
+
+    const res = await webhooksApp.request('/analysis', { method: 'POST' })
+    expect(res.status).toBe(200)
+    const events = await parseNdjson(res)
+
+    expect(registerSpy).toHaveBeenCalledTimes(1)
+    expect(registerSpy.mock.calls[0][0]).toMatchObject({ type: 'analysis', progress: { count: 0, total: null } })
+    const runId = registerSpy.mock.results[0].value as string
+    expect(progressSpy).toHaveBeenCalledTimes(2)
+    expect(progressSpy.mock.calls[0]).toEqual([runId, { count: 1, total: 3 }])
+    expect(progressSpy.mock.calls[1]).toEqual([runId, { count: 2, total: 3 }])
+
+    // AC3 regression: every status message still streams (including the ignored "Found …" line)
+    const statusEvents = events.filter((e) => 'status' in e)
+    expect(statusEvents).toHaveLength(3)
+
+    delete process.env.ANTHROPIC_API_KEY
+  })
+
+  test('finalizes done on success (AC4)', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockRunAnalysis = async () => ({ processed: 2, failed: 0, matched: 2, archived: 0, inputTokens: 0, outputTokens: 0 })
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    const res = await webhooksApp.request('/analysis', { method: 'POST' })
+    expect(res.status).toBe(200)
+    const events = await parseNdjson(res)
+
+    const runId = registerSpy.mock.results[0].value as string
+    expect(finalizeSpy).toHaveBeenCalledTimes(1)
+    expect(finalizeSpy).toHaveBeenCalledWith(runId, 'done')
+    expect(events.find((e) => 'done' in e)?.done).toBe(true)
+
+    delete process.env.ANTHROPIC_API_KEY
+  })
+
+  test('finalizes failed when runAnalysis throws (AC5)', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockRunAnalysis = async () => { throw new Error('Anthropic timeout') }
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    const res = await webhooksApp.request('/analysis', { method: 'POST' })
+    expect(res.status).toBe(200)
+    const events = await parseNdjson(res)
+
+    const runId = registerSpy.mock.results[0].value as string
+    expect(finalizeSpy).toHaveBeenCalledTimes(1)
+    expect(finalizeSpy).toHaveBeenCalledWith(runId, 'failed')
+    expect(events.find((e) => 'error' in e)?.error).toBe('Anthropic timeout')
 
     delete process.env.ANTHROPIC_API_KEY
   })

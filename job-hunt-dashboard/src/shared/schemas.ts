@@ -130,6 +130,30 @@ export const webhookRunSchema = z.object({
 })
 export type WebhookRun = z.infer<typeof webhookRunSchema>
 
+export const activityRunTypeSchema = z.enum(['discovery', 'analysis', 'cover_letter', 'resume'])
+export const activityRunStateSchema = z.enum(['running', 'done', 'failed'])
+export const activityCountProgressSchema = z.object({
+  count: z.number().int(),
+  total: z.number().int().nullable(),
+})
+export const activityDocProgressSchema = z.object({
+  company: z.string(),
+  role: z.string(),
+})
+export const activityProgressSchema = z.union([activityCountProgressSchema, activityDocProgressSchema])
+export const activityRunSchema = z.object({
+  id: z.string(),
+  type: activityRunTypeSchema,
+  state: activityRunStateSchema,
+  startedAt: z.string(),
+  updatedAt: z.string(),
+  progress: activityProgressSchema,
+})
+export type ActivityRunType = z.infer<typeof activityRunTypeSchema>
+export type ActivityRunState = z.infer<typeof activityRunStateSchema>
+export type ActivityProgress = z.infer<typeof activityProgressSchema>
+export type ActivityRun = z.infer<typeof activityRunSchema>
+
 export const STATS_PERIODS = ['24h', '7d', '30d', 'all'] as const
 export type StatsPeriod = typeof STATS_PERIODS[number]
 

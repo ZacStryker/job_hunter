@@ -8,6 +8,7 @@ import { jobs, statusEvents, coverLetters, messages, profile } from '../../db/sc
 import { generateCoverLetter } from '../services/cover-letter-service'
 import { generateResume } from '../services/resume-service'
 import { recordRun } from './api-webhook-runs'
+import { activityRegistry } from '../services/activity-registry'
 import { profileDataSchema } from '../../shared/schemas'
 import type { Job, ProfileData } from '../../shared/schemas'
 import type { AppEnv } from '../types'
@@ -355,62 +356,69 @@ app.post('/:id/generate-cover-letter', async (c) => {
     return c.json({ error: 'Job has no job description' }, 400)
   }
 
-  const startMs = Date.now()
-  let coverLetterResult: { content: string; pdf: Buffer; inputTokens: number; outputTokens: number }
+  const runId = activityRegistry.register({ userId, type: 'cover_letter', progress: { company: job.company, role: job.jobTitle } })
+  let outcome: 'done' | 'failed' = 'failed'
   try {
-    coverLetterResult = await generateCoverLetter(job as unknown as Job, userId)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    if (message === 'ANTHROPIC_API_KEY not configured') {
-      return c.json({ error: 'Cover letter generation is not configured' }, 503)
+    const startMs = Date.now()
+    let coverLetterResult: { content: string; pdf: Buffer; inputTokens: number; outputTokens: number }
+    try {
+      coverLetterResult = await generateCoverLetter(job as unknown as Job, userId)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (message === 'ANTHROPIC_API_KEY not configured') {
+        return c.json({ error: 'Cover letter generation is not configured' }, 503)
+      }
+      recordRun({ userId, name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - startMs })
+      return c.json({ error: 'Cover letter generation failed' }, 502)
     }
-    recordRun({ userId, name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - startMs })
-    return c.json({ error: 'Cover letter generation failed' }, 502)
+
+    const { content: coverLetterText, pdf: coverLetterPdf, inputTokens: clInputTokens, outputTokens: clOutputTokens } = coverLetterResult
+    const clCostUsd = clInputTokens * SONNET_4_6_INPUT + clOutputTokens * SONNET_4_6_OUTPUT
+    const now = new Date().toISOString()
+
+    const clDir = join(DATA_DIR, 'cover-letters')
+    const finalPath = join(clDir, `${rawId}.pdf`)
+    const tmpPath = join(clDir, `${rawId}.pdf.tmp`)
+    try {
+      mkdirSync(clDir, { recursive: true })
+      await Bun.write(tmpPath, coverLetterPdf)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      recordRun({ userId, name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - startMs })
+      return c.json({ error: 'Cover letter generation failed' }, 502)
+    }
+
+    try {
+      db.transaction((tx) => {
+        tx.insert(coverLetters).values({
+          jobId: rawId,
+          userId,
+          content: coverLetterText,
+          createdAt: now,
+        }).run()
+        tx.update(jobs).set({ coverLetterSentAt: now }).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
+      })
+    } catch {
+      return c.json({ error: 'Failed to store cover letter' }, 500)
+    }
+
+    try {
+      renameSync(tmpPath, finalPath)
+    } catch (err) {
+      console.error('Failed to finalize cover letter PDF:', err)
+    }
+
+    const inserted = db.select().from(coverLetters)
+      .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.createdAt, now), eq(coverLetters.userId, userId)))
+      .get()
+
+    recordRun({ userId, name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
+      durationMs: Date.now() - startMs, inputTokens: clInputTokens, outputTokens: clOutputTokens, costUsd: clCostUsd })
+    outcome = 'done'
+    return c.json({ coverLetter: inserted })
+  } finally {
+    activityRegistry.finalize(runId, outcome)
   }
-
-  const { content: coverLetterText, pdf: coverLetterPdf, inputTokens: clInputTokens, outputTokens: clOutputTokens } = coverLetterResult
-  const clCostUsd = clInputTokens * SONNET_4_6_INPUT + clOutputTokens * SONNET_4_6_OUTPUT
-  const now = new Date().toISOString()
-
-  const clDir = join(DATA_DIR, 'cover-letters')
-  const finalPath = join(clDir, `${rawId}.pdf`)
-  const tmpPath = join(clDir, `${rawId}.pdf.tmp`)
-  try {
-    mkdirSync(clDir, { recursive: true })
-    await Bun.write(tmpPath, coverLetterPdf)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    recordRun({ userId, name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - startMs })
-    return c.json({ error: 'Cover letter generation failed' }, 502)
-  }
-
-  try {
-    db.transaction((tx) => {
-      tx.insert(coverLetters).values({
-        jobId: rawId,
-        userId,
-        content: coverLetterText,
-        createdAt: now,
-      }).run()
-      tx.update(jobs).set({ coverLetterSentAt: now }).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
-    })
-  } catch {
-    return c.json({ error: 'Failed to store cover letter' }, 500)
-  }
-
-  try {
-    renameSync(tmpPath, finalPath)
-  } catch (err) {
-    console.error('Failed to finalize cover letter PDF:', err)
-  }
-
-  const inserted = db.select().from(coverLetters)
-    .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.createdAt, now), eq(coverLetters.userId, userId)))
-    .get()
-
-  recordRun({ userId, name: `Cover Letter - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
-    durationMs: Date.now() - startMs, inputTokens: clInputTokens, outputTokens: clOutputTokens, costUsd: clCostUsd })
-  return c.json({ coverLetter: inserted })
 })
 
 app.post('/:id/generate-resume', async (c) => {
@@ -432,49 +440,56 @@ app.post('/:id/generate-resume', async (c) => {
     return c.json({ error: 'Job has no job description' }, 400)
   }
 
-  const resumeStartMs = Date.now()
-  let resumeResult: { pdf: Buffer; inputTokens: number; outputTokens: number }
+  const runId = activityRegistry.register({ userId, type: 'resume', progress: { company: job.company, role: job.jobTitle } })
+  let outcome: 'done' | 'failed' = 'failed'
   try {
-    resumeResult = await generateResume(job as unknown as Job, userId)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    if (message === 'ANTHROPIC_API_KEY not configured') {
-      return c.json({ error: 'Resume generation is not configured' }, 503)
+    const resumeStartMs = Date.now()
+    let resumeResult: { pdf: Buffer; inputTokens: number; outputTokens: number }
+    try {
+      resumeResult = await generateResume(job as unknown as Job, userId)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (message === 'ANTHROPIC_API_KEY not configured') {
+        return c.json({ error: 'Resume generation is not configured' }, 503)
+      }
+      recordRun({ userId, name: `Resume - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - resumeStartMs })
+      return c.json({ error: message }, 502)
     }
-    recordRun({ userId, name: `Resume - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: message, durationMs: Date.now() - resumeStartMs })
-    return c.json({ error: message }, 502)
+
+    const { pdf: pdfBuffer, inputTokens: resumeInputTokens, outputTokens: resumeOutputTokens } = resumeResult
+    const resumeCostUsd = resumeInputTokens * SONNET_4_6_INPUT + resumeOutputTokens * SONNET_4_6_OUTPUT
+
+    const profileRow = db.select({ profileData: profile.profileData }).from(profile).where(eq(profile.userId, userId)).get()
+    const candidateName = parseProfileData(profileRow?.profileData).personal.fullName || 'Resume'
+    const fileName = `${candidateName} - Resume - ${job.company} - ${job.jobTitle}.pdf`
+      .replace(/[–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/"/g, "'")
+
+    // Persist PDF to disk (atomic: write to temp then rename)
+    try {
+      const resumesDir = join(DATA_DIR, 'resumes')
+      mkdirSync(resumesDir, { recursive: true })
+      const finalPath = join(resumesDir, `${rawId}.pdf`)
+      const tmpPath = join(resumesDir, `${rawId}.pdf.tmp`)
+      await Bun.write(tmpPath, pdfBuffer)
+      renameSync(tmpPath, finalPath)
+      db.update(jobs).set({ resumeGeneratedAt: new Date().toISOString() }).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
+    } catch (err) {
+      console.error('Failed to persist resume PDF:', err)
+      // Non-fatal — user still gets their download
+    }
+
+    recordRun({ userId, name: `Resume - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
+      durationMs: Date.now() - resumeStartMs, inputTokens: resumeInputTokens, outputTokens: resumeOutputTokens, costUsd: resumeCostUsd })
+    outcome = 'done'
+    return new Response(pdfBuffer, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${fileName}"`,
+      },
+    })
+  } finally {
+    activityRegistry.finalize(runId, outcome)
   }
-
-  const { pdf: pdfBuffer, inputTokens: resumeInputTokens, outputTokens: resumeOutputTokens } = resumeResult
-  const resumeCostUsd = resumeInputTokens * SONNET_4_6_INPUT + resumeOutputTokens * SONNET_4_6_OUTPUT
-
-  const profileRow = db.select({ profileData: profile.profileData }).from(profile).where(eq(profile.userId, userId)).get()
-  const candidateName = parseProfileData(profileRow?.profileData).personal.fullName || 'Resume'
-  const fileName = `${candidateName} - Resume - ${job.company} - ${job.jobTitle}.pdf`
-    .replace(/[–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/"/g, "'")
-
-  // Persist PDF to disk (atomic: write to temp then rename)
-  try {
-    const resumesDir = join(DATA_DIR, 'resumes')
-    mkdirSync(resumesDir, { recursive: true })
-    const finalPath = join(resumesDir, `${rawId}.pdf`)
-    const tmpPath = join(resumesDir, `${rawId}.pdf.tmp`)
-    await Bun.write(tmpPath, pdfBuffer)
-    renameSync(tmpPath, finalPath)
-    db.update(jobs).set({ resumeGeneratedAt: new Date().toISOString() }).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
-  } catch (err) {
-    console.error('Failed to persist resume PDF:', err)
-    // Non-fatal — user still gets their download
-  }
-
-  recordRun({ userId, name: `Resume - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
-    durationMs: Date.now() - resumeStartMs, inputTokens: resumeInputTokens, outputTokens: resumeOutputTokens, costUsd: resumeCostUsd })
-  return new Response(pdfBuffer, {
-    headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${fileName}"`,
-    },
-  })
 })
 
 app.get('/:id/resume', async (c) => {

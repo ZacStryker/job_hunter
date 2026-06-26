@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { userSecrets } from '../../db/schema'
 import { recordRun } from './api-webhook-runs'
+import { activityRegistry } from '../services/activity-registry'
 import { runDiscovery } from '../services/discovery-service'
 import { runAnalysis } from '../services/analysis-service'
 import type { AppEnv } from '../types'
@@ -23,20 +24,28 @@ app.post('/discovery', (c) => {
   return stream(c, async (s) => {
     const write = (ev: object) => s.writeln(JSON.stringify(ev))
     const startMs = Date.now()
+    const runId = activityRegistry.register({ userId, type: 'discovery', progress: { count: 0, total: null } })
     try {
+      let discovered = 0
       const { inserted, bySource, errors } = await runDiscovery(
         (msg) => write({ status: msg }),
         userId,
-        (count, source) => write({ jobsReady: true, count, source }),
+        (count, source) => {
+          discovered += count
+          write({ jobsReady: true, count, source })
+          activityRegistry.progress(runId, { count: discovered, total: null })
+        },
       )
       const success = !(inserted === 0 && errors.length > 0)
       const errorMessage = success ? null : (errors[0]?.error ?? null)
       recordRun({ userId, name: 'Discovery', success, itemCount: inserted, errorMessage, durationMs: Date.now() - startMs, sourceBreakdown: Object.keys(bySource).length > 0 ? bySource : null })
+      activityRegistry.finalize(runId, success ? 'done' : 'failed')
       write({ done: true, inserted })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       console.error('[discovery] run failed:', message)
       recordRun({ userId, name: 'Discovery', success: false, itemCount: null, errorMessage: message, durationMs: Date.now() - startMs })
+      activityRegistry.finalize(runId, 'failed')
       write({ error: message })
     }
   })
@@ -54,8 +63,14 @@ app.post('/analysis', async (c) => {
   return stream(c, async (s) => {
     const write = (ev: object) => s.writeln(JSON.stringify(ev))
     const startMs = Date.now()
+    const runId = activityRegistry.register({ userId, type: 'analysis', progress: { count: 0, total: null } })
+    const ANALYZING_RE = /^Analyzing (\d+) \/ (\d+):/
     try {
-      const result = await runAnalysis((msg) => write({ status: msg }), userId)
+      const result = await runAnalysis((msg) => {
+        write({ status: msg })
+        const m = ANALYZING_RE.exec(msg)
+        if (m) activityRegistry.progress(runId, { count: Number(m[1]), total: Number(m[2]) })
+      }, userId)
       const { processed, failed, matched, archived, inputTokens, outputTokens } = result
       // inputTokens is the folded total (uncached + cache writes + cache reads). Bill each tier at its
       // real rate so prompt-cache savings (reads at 0.1x) actually show up in the recorded cost.
@@ -67,12 +82,14 @@ app.post('/analysis', async (c) => {
         outputTokens * SONNET_OUTPUT
       recordRun({ userId, name: 'Analysis', success: true, itemCount: processed, errorMessage: null,
         durationMs: Date.now() - startMs, inputTokens, outputTokens, costUsd, matchedCount: matched, archivedCount: archived })
+      activityRegistry.finalize(runId, 'done')
       write({ done: true, processed, failed, matched, archived })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       console.error('[analysis] run failed:', message)
       recordRun({ userId, name: 'Analysis', success: false, itemCount: null, errorMessage: message,
         durationMs: Date.now() - startMs, inputTokens: 0, outputTokens: 0, costUsd: 0 })
+      activityRegistry.finalize(runId, 'failed')
       write({ error: message })
     }
   })

@@ -1,8 +1,18 @@
 process.env.DB_PATH = ':memory:'
 
-import { describe, test, expect, beforeAll, beforeEach, afterEach } from 'bun:test'
+import { describe, test, expect, beforeAll, beforeEach, afterEach, mock, spyOn } from 'bun:test'
 import { Hono } from 'hono'
 import { Database } from 'bun:sqlite'
+import { activityRegistry } from '../services/activity-registry'
+
+// Mock both doc-generation services BEFORE dynamic import — bun:test hoisting requirement.
+// The real services require an Anthropic key + network; these stubs are driven per-test.
+let coverLetterImpl: () => Promise<{ content: string; pdf: Buffer; inputTokens: number; outputTokens: number }> =
+  async () => ({ content: 'cover', pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 0, outputTokens: 0 })
+let resumeImpl: () => Promise<{ pdf: Buffer; inputTokens: number; outputTokens: number }> =
+  async () => ({ pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 0, outputTokens: 0 })
+mock.module('../services/cover-letter-service', () => ({ generateCoverLetter: () => coverLetterImpl() }))
+mock.module('../services/resume-service', () => ({ generateResume: () => resumeImpl() }))
 
 const { default: jobsRoute } = await import('./api-jobs')
 const { db: prodDb } = await import('../../db/client')
@@ -78,16 +88,63 @@ const CREATE_MESSAGES_TABLE = `
   )
 `
 
+const CREATE_COVER_LETTERS_TABLE = `
+  CREATE TABLE IF NOT EXISTS cover_letters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )
+`
+
+const CREATE_PROFILE_TABLE = `
+  CREATE TABLE IF NOT EXISTS profile (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    profile_data TEXT
+  )
+`
+
+const CREATE_WEBHOOK_RUNS_TABLE = `
+  CREATE TABLE IF NOT EXISTS webhook_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    run_at TEXT NOT NULL,
+    success INTEGER NOT NULL,
+    item_count INTEGER,
+    error_message TEXT,
+    duration_ms INTEGER,
+    input_tokens INTEGER,
+    output_tokens INTEGER,
+    cost_usd REAL,
+    matched_count INTEGER,
+    archived_count INTEGER,
+    source_breakdown TEXT,
+    user_id INTEGER NOT NULL DEFAULT 1
+  )
+`
+
 beforeAll(() => {
   prodSqlite.run(CREATE_JOBS_TABLE)
   prodSqlite.run(CREATE_STATUS_EVENTS_TABLE)
   prodSqlite.run(CREATE_MESSAGES_TABLE)
+  prodSqlite.run(CREATE_COVER_LETTERS_TABLE)
+  prodSqlite.run(CREATE_PROFILE_TABLE)
+  prodSqlite.run(CREATE_WEBHOOK_RUNS_TABLE)
 })
 
 beforeEach(() => {
   prodSqlite.run('DELETE FROM status_events')
   prodSqlite.run('DELETE FROM messages')
   prodSqlite.run('DELETE FROM jobs')
+  prodSqlite.run('DELETE FROM cover_letters')
+  prodSqlite.run('DELETE FROM profile')
+  prodSqlite.run('DELETE FROM webhook_runs')
+})
+
+afterEach(() => {
+  mock.restore()
 })
 
 describe('PATCH /api/jobs/:id', () => {
@@ -845,5 +902,255 @@ describe('POST /api/jobs/bulk-archive', () => {
     expect(res.status).toBe(200)
     const data = await res.json() as { archived: number }
     expect(data.archived).toBe(0)
+  })
+})
+
+function seedJob(company: string, jobTitle: string): number {
+  prodSqlite.run(
+    `INSERT INTO jobs (company, job_title, job_description, applied) VALUES (?, ?, 'A real job description', 0)`,
+    [company, jobTitle]
+  )
+  const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ? AND job_title = ?').get(company, jobTitle) as { id: number }
+  return row.id
+}
+
+describe('POST /api/jobs/:id/generate-cover-letter', () => {
+  test('registers a cover_letter run with {company, role} and userId before generating (AC1)', async () => {
+    const id = seedJob('Acme', 'Engineer')
+    coverLetterImpl = async () => ({ content: 'cover', pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 })
+    const registerSpy = spyOn(activityRegistry, 'register')
+
+    await jobsApp.request(`/${id}/generate-cover-letter`, { method: 'POST' })
+
+    expect(registerSpy).toHaveBeenCalledTimes(1)
+    expect(registerSpy.mock.calls[0][0]).toMatchObject({
+      userId: 1,
+      type: 'cover_letter',
+      progress: { company: 'Acme', role: 'Engineer' },
+    })
+  })
+
+  test('success finalizes done and returns 200 with { coverLetter } (AC3)', async () => {
+    const id = seedJob('Acme', 'Engineer')
+    coverLetterImpl = async () => ({ content: 'cover', pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 })
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    const res = await jobsApp.request(`/${id}/generate-cover-letter`, { method: 'POST' })
+
+    expect(res.status).toBe(200)
+    const data = await res.json() as { coverLetter: Record<string, unknown> }
+    expect(data).toHaveProperty('coverLetter')
+    const runId = registerSpy.mock.results[0].value as string
+    expect(finalizeSpy).toHaveBeenCalledTimes(1)
+    expect(finalizeSpy).toHaveBeenCalledWith(runId, 'done')
+  })
+
+  test('service throw (non-config) finalizes failed and returns 502 with recordRun row (AC4)', async () => {
+    const id = seedJob('Acme', 'Engineer')
+    coverLetterImpl = async () => { throw new Error('LLM exploded') }
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    const res = await jobsApp.request(`/${id}/generate-cover-letter`, { method: 'POST' })
+
+    expect(res.status).toBe(502)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    expect(data).not.toHaveProperty('message')
+    const runs = prodSqlite.query('SELECT COUNT(*) as n FROM webhook_runs WHERE success = 0').get() as { n: number }
+    expect(runs.n).toBe(1)
+    const runId = registerSpy.mock.results[0].value as string
+    expect(finalizeSpy).toHaveBeenCalledTimes(1)
+    expect(finalizeSpy).toHaveBeenCalledWith(runId, 'failed')
+  })
+
+  test('ANTHROPIC_API_KEY not configured: 503 still finalizes failed with no recordRun row (AC4 leak guard)', async () => {
+    const id = seedJob('Acme', 'Engineer')
+    coverLetterImpl = async () => { throw new Error('ANTHROPIC_API_KEY not configured') }
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    const res = await jobsApp.request(`/${id}/generate-cover-letter`, { method: 'POST' })
+
+    expect(res.status).toBe(503)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    const runs = prodSqlite.query('SELECT COUNT(*) as n FROM webhook_runs').get() as { n: number }
+    expect(runs.n).toBe(0)
+    const runId = registerSpy.mock.results[0].value as string
+    expect(finalizeSpy).toHaveBeenCalledTimes(1)
+    expect(finalizeSpy).toHaveBeenCalledWith(runId, 'failed')
+  })
+
+  test('DB store failure: 500 still finalizes failed with no recordRun row (AC4 leak guard)', async () => {
+    const id = seedJob('Acme', 'Engineer')
+    coverLetterImpl = async () => ({ content: 'cover', pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 })
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    // Force the coverLetters insert (inside db.transaction) to throw → the 500 'Failed to store
+    // cover letter' return, which (like 503) never calls recordRun. The run must still finalize.
+    prodSqlite.run('DROP TABLE cover_letters')
+    try {
+      const res = await jobsApp.request(`/${id}/generate-cover-letter`, { method: 'POST' })
+
+      expect(res.status).toBe(500)
+      const data = await res.json() as Record<string, unknown>
+      expect(data).toHaveProperty('error')
+      expect(data).not.toHaveProperty('message')
+      const runs = prodSqlite.query('SELECT COUNT(*) as n FROM webhook_runs').get() as { n: number }
+      expect(runs.n).toBe(0)
+      const runId = registerSpy.mock.results[0].value as string
+      expect(finalizeSpy).toHaveBeenCalledTimes(1)
+      expect(finalizeSpy).toHaveBeenCalledWith(runId, 'failed')
+    } finally {
+      prodSqlite.run(CREATE_COVER_LETTERS_TABLE)
+    }
+  })
+
+  test('no run registered when guards reject (404 / no description / invalid id) (AC1)', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('NoDesc', 'Dev', 0)`)
+    const noDesc = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('NoDesc') as { id: number }
+    const registerSpy = spyOn(activityRegistry, 'register')
+
+    expect((await jobsApp.request('/abc/generate-cover-letter', { method: 'POST' })).status).toBe(400)
+    expect((await jobsApp.request('/99999/generate-cover-letter', { method: 'POST' })).status).toBe(404)
+    expect((await jobsApp.request(`/${noDesc.id}/generate-cover-letter`, { method: 'POST' })).status).toBe(400)
+
+    expect(registerSpy).not.toHaveBeenCalled()
+  })
+
+  test('concurrent generations register and finalize independently (AC5)', async () => {
+    const idA = seedJob('Acme', 'Engineer')
+    const idB = seedJob('Beta', 'Designer')
+    let callCount = 0
+    coverLetterImpl = async () => {
+      callCount++
+      if (callCount === 2) throw new Error('LLM exploded')
+      return { content: 'cover', pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 }
+    }
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    await Promise.all([
+      jobsApp.request(`/${idA}/generate-cover-letter`, { method: 'POST' }),
+      jobsApp.request(`/${idB}/generate-cover-letter`, { method: 'POST' }),
+    ])
+
+    expect(registerSpy).toHaveBeenCalledTimes(2)
+    const progresses = registerSpy.mock.calls.map((c) => c[0].progress)
+    expect(progresses).toContainEqual({ company: 'Acme', role: 'Engineer' })
+    expect(progresses).toContainEqual({ company: 'Beta', role: 'Designer' })
+
+    const registeredIds = registerSpy.mock.results.map((r) => r.value as string)
+    expect(finalizeSpy).toHaveBeenCalledTimes(2)
+    const finalizeCalls = finalizeSpy.mock.calls
+    const finalizedIds = finalizeCalls.map((c) => c[0])
+    const states = finalizeCalls.map((c) => c[1])
+    expect(new Set(finalizedIds).size).toBe(2)
+    expect(finalizedIds.every((fid) => registeredIds.includes(fid))).toBe(true)
+    expect(new Set(states)).toEqual(new Set(['done', 'failed']))
+  })
+})
+
+describe('POST /api/jobs/:id/generate-resume', () => {
+  test('registers a resume run with {company, role} and userId before generating (AC2)', async () => {
+    const id = seedJob('Acme', 'Engineer')
+    resumeImpl = async () => ({ pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 })
+    const registerSpy = spyOn(activityRegistry, 'register')
+
+    await jobsApp.request(`/${id}/generate-resume`, { method: 'POST' })
+
+    expect(registerSpy).toHaveBeenCalledTimes(1)
+    expect(registerSpy.mock.calls[0][0]).toMatchObject({
+      userId: 1,
+      type: 'resume',
+      progress: { company: 'Acme', role: 'Engineer' },
+    })
+  })
+
+  test('success finalizes done and returns 200 application/pdf (AC3)', async () => {
+    const id = seedJob('Acme', 'Engineer')
+    resumeImpl = async () => ({ pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 })
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    const res = await jobsApp.request(`/${id}/generate-resume`, { method: 'POST' })
+
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toBe('application/pdf')
+    const runId = registerSpy.mock.results[0].value as string
+    expect(finalizeSpy).toHaveBeenCalledTimes(1)
+    expect(finalizeSpy).toHaveBeenCalledWith(runId, 'done')
+  })
+
+  test('service throw (non-config) finalizes failed and returns 502 with recordRun row (AC4)', async () => {
+    const id = seedJob('Acme', 'Engineer')
+    resumeImpl = async () => { throw new Error('LLM exploded') }
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    const res = await jobsApp.request(`/${id}/generate-resume`, { method: 'POST' })
+
+    expect(res.status).toBe(502)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    expect(data).not.toHaveProperty('message')
+    const runs = prodSqlite.query('SELECT COUNT(*) as n FROM webhook_runs WHERE success = 0').get() as { n: number }
+    expect(runs.n).toBe(1)
+    const runId = registerSpy.mock.results[0].value as string
+    expect(finalizeSpy).toHaveBeenCalledTimes(1)
+    expect(finalizeSpy).toHaveBeenCalledWith(runId, 'failed')
+  })
+
+  test('ANTHROPIC_API_KEY not configured: 503 still finalizes failed with no recordRun row (AC4 leak guard)', async () => {
+    const id = seedJob('Acme', 'Engineer')
+    resumeImpl = async () => { throw new Error('ANTHROPIC_API_KEY not configured') }
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    const res = await jobsApp.request(`/${id}/generate-resume`, { method: 'POST' })
+
+    expect(res.status).toBe(503)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    const runs = prodSqlite.query('SELECT COUNT(*) as n FROM webhook_runs').get() as { n: number }
+    expect(runs.n).toBe(0)
+    const runId = registerSpy.mock.results[0].value as string
+    expect(finalizeSpy).toHaveBeenCalledTimes(1)
+    expect(finalizeSpy).toHaveBeenCalledWith(runId, 'failed')
+  })
+
+  test('concurrent generations register and finalize independently (AC5)', async () => {
+    const idA = seedJob('Acme', 'Engineer')
+    const idB = seedJob('Beta', 'Designer')
+    let callCount = 0
+    resumeImpl = async () => {
+      callCount++
+      if (callCount === 2) throw new Error('LLM exploded')
+      return { pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 }
+    }
+    const registerSpy = spyOn(activityRegistry, 'register')
+    const finalizeSpy = spyOn(activityRegistry, 'finalize')
+
+    await Promise.all([
+      jobsApp.request(`/${idA}/generate-resume`, { method: 'POST' }),
+      jobsApp.request(`/${idB}/generate-resume`, { method: 'POST' }),
+    ])
+
+    expect(registerSpy).toHaveBeenCalledTimes(2)
+    const progresses = registerSpy.mock.calls.map((c) => c[0].progress)
+    expect(progresses).toContainEqual({ company: 'Acme', role: 'Engineer' })
+    expect(progresses).toContainEqual({ company: 'Beta', role: 'Designer' })
+
+    const registeredIds = registerSpy.mock.results.map((r) => r.value as string)
+    expect(finalizeSpy).toHaveBeenCalledTimes(2)
+    const finalizeCalls = finalizeSpy.mock.calls
+    const finalizedIds = finalizeCalls.map((c) => c[0])
+    const states = finalizeCalls.map((c) => c[1])
+    expect(new Set(finalizedIds).size).toBe(2)
+    expect(finalizedIds.every((fid) => registeredIds.includes(fid))).toBe(true)
+    expect(new Set(states)).toEqual(new Set(['done', 'failed']))
   })
 })
