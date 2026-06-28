@@ -162,6 +162,12 @@ export type ActivityEventType = typeof ACTIVITY_EVENT_TYPES[number]
 
 export const statsSchema = z.object({
   totalJobs: z.number(),
+  kpis: z.object({
+    hoursSaved: z.number(),
+    strongMatches: z.number(),
+    applicationsSent: z.number(),
+    inPlay: z.number(),
+  }),
   recentActivity: z.array(z.object({
     type: z.enum(ACTIVITY_EVENT_TYPES),
     timestamp: z.string(),

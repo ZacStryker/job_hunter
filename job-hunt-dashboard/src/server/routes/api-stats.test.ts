@@ -118,8 +118,11 @@ type ActivityEvent = { type: string; timestamp: string; jobTitle: string; compan
 
 type CostRow = { date: string; Discovery: number; Analysis: number; 'Cover Letter': number; Resume: number }
 
+type Kpis = { hoursSaved: number; strongMatches: number; applicationsSent: number; inPlay: number }
+
 type StatsResponse = {
   totalJobs: number
+  kpis: Kpis
   recentActivity: ActivityEvent[]
   jobsByFitScore: { fitRange: string; count: number }[]
   timeSavedByWorkflow: { workflow: string; hours: number }[]
@@ -135,7 +138,7 @@ async function getStats(query = ''): Promise<StatsResponse> {
 describe('GET /api/stats - response shape', () => {
   test('returns exactly the new top-level keys, none of the old ones', async () => {
     const data = await getStats() as unknown as Record<string, unknown>
-    for (const key of ['totalJobs', 'recentActivity', 'jobsByFitScore', 'timeSavedByWorkflow', 'workflowCostOverTime']) {
+    for (const key of ['totalJobs', 'kpis', 'recentActivity', 'jobsByFitScore', 'timeSavedByWorkflow', 'workflowCostOverTime']) {
       expect(data).toHaveProperty(key)
     }
     for (const old of ['activityHeatmap', 'heroSentence', 'nextAction', 'funnel', 'value', 'fitVsOutcome', 'statCards', 'sparklines', 'detail', 'automation', 'error']) {
@@ -150,6 +153,7 @@ describe('GET /api/stats - response shape', () => {
     expect(data.workflowCostOverTime).toEqual([])
     expect(data.jobsByFitScore.map(b => b.count)).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     expect(data.timeSavedByWorkflow.every(w => w.hours === 0)).toBe(true)
+    expect(data.kpis).toEqual({ hoursSaved: 0, strongMatches: 0, applicationsSent: 0, inPlay: 0 })
   })
 })
 
@@ -476,5 +480,60 @@ describe('GET /api/stats - appliedFilter', () => {
     const activeApplied = await getStats('?archivedFilter=active&appliedFilter=applied')
     expect(activeApplied.jobsByFitScore.reduce((s, b) => s + b.count, 0)).toBe(1) // Applied only
     expect(activeApplied.jobsByFitScore.find(b => b.fitRange === '60-70')?.count).toBe(1)
+  })
+})
+
+describe('GET /api/stats - kpis', () => {
+  test('hoursSaved equals timeSavedByWorkflow summed and rounded to one decimal', async () => {
+    // 2 scraped (Discovery), 1 analyzed, 1 resume, 1 cover letter
+    const a = prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, date_analyzed) VALUES ('A', 'Dev', '2026-06-01', '2026-06-02')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, resume_generated_at) VALUES ('B', 'Dev', '2026-06-01', '2026-06-03')`)
+    prodSqlite.run(`INSERT INTO cover_letters (job_id, user_id, content, created_at) VALUES (${Number(a.lastInsertRowid)}, 1, 'x', '2026-06-02')`)
+    const data = await getStats()
+    const expected = Math.round(data.timeSavedByWorkflow.reduce((s, w) => s + w.hours, 0) * 10) / 10
+    expect(data.kpis.hoursSaved).toBe(expected)
+    expect(Number.isInteger(data.kpis.hoursSaved * 10)).toBe(true) // at most one decimal
+  })
+
+  test('strongMatches counts fitScore >= 80 within the active filter set', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, recommendation) VALUES ('Strong', 'Dev', '2026-06-01', 80, 'apply')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, recommendation) VALUES ('Top', 'Dev', '2026-06-01', 95, 'apply')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, recommendation) VALUES ('Mid', 'Dev', '2026-06-01', 79, 'apply')`)
+    // High score but not in Matches/Applications → excluded by the active branch
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score) VALUES ('Pending', 'Dev', '2026-06-01', 90)`)
+    const data = await getStats()
+    expect(data.kpis.strongMatches).toBe(2)
+    const all = await getStats('?archivedFilter=all')
+    expect(all.kpis.strongMatches).toBe(3) // Pending now included
+  })
+
+  test('applicationsSent counts applied jobs within the selected period', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied) VALUES ('Recent', 'Dev', 1, '${daysAgoDate(1)}')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied) VALUES ('Old', 'Dev', 1, '${daysAgoDate(60)}')`)
+    expect((await getStats('?period=all')).kpis.applicationsSent).toBe(2)
+    expect((await getStats('?period=24h')).kpis.applicationsSent).toBe(1)
+  })
+
+  test('inPlay counts applied, non-archived, non-terminal jobs (period-independent)', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, date_applied) VALUES ('Live', 'Dev', 1, '${daysAgoDate(90)}')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, status_override) VALUES ('Interviewing', 'Dev', 1, 'interview')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, status_override) VALUES ('Won', 'Dev', 1, 'offer')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, status_override) VALUES ('Lost', 'Dev', 1, 'rejected')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied, archived) VALUES ('Shelved', 'Dev', 1, 1)`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, applied) VALUES ('NotApplied', 'Dev', 0)`)
+    // Period filter does not shrink the live snapshot
+    expect((await getStats('?period=24h')).kpis.inPlay).toBe(2) // Live + Interviewing
+    expect((await getStats('?period=all')).kpis.inPlay).toBe(2)
+  })
+
+  test('totalJobs has no bearing on kpis scoping; kpis honor applied filter', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, recommendation, applied, date_applied) VALUES ('AppliedCo', 'Dev', '${daysAgoDate(1)}', 85, 'apply', 1, '${daysAgoDate(1)}')`)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, recommendation, applied) VALUES ('MatchCo', 'Dev', '${daysAgoDate(1)}', 90, 'apply', 0)`)
+    const applied = await getStats('?appliedFilter=applied')
+    expect(applied.kpis.strongMatches).toBe(1) // only AppliedCo
+    expect(applied.kpis.applicationsSent).toBe(1)
+    const unapplied = await getStats('?appliedFilter=unapplied')
+    expect(unapplied.kpis.strongMatches).toBe(1) // only MatchCo
+    expect(unapplied.kpis.applicationsSent).toBe(0)
   })
 })

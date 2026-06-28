@@ -41,6 +41,10 @@ function toIso(value: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value
 }
 
+// Terminal statuses (closed opportunities) — the only terminal values in STATUS_OVERRIDE_VALUES.
+const TERMINAL_STATUSES = new Set(['offer', 'rejected'])
+const isTerminal = (status: string | null) => status !== null && TERMINAL_STATUSES.has(status.toLowerCase())
+
 // Net minutes saved per task (NET model — manual baseline minus residual review effort)
 const NET_MIN = { source: 3, analyze: 4, coverLetter: 4.75, resume: 14.25 }
 const FIT_RANGES = ['0-10', '10-20', '20-30', '30-40', '40-50', '50-60', '60-70', '70-80', '80-90', '90-100']
@@ -115,6 +119,17 @@ app.get('/', (c) => {
     { workflow: 'Resume', hours: resumeCount * NET_MIN.resume / 60 },
   ]
 
+  // ── KPI tiles ──
+  // Hours saved: headline trust number — sum of the time-saved chart, archive-agnostic + period/applied-scoped.
+  const hoursSaved = Math.round(timeSavedByWorkflow.reduce((sum, w) => sum + w.hours, 0) * 10) / 10
+  // Strong matches: same active filter set as jobsByFitScore.
+  const strongMatches = viewJobs.filter(j => j.fitScore !== null && j.fitScore >= 80).length
+  // Applications sent: applied jobs whose application date falls in the period (archive/applied-scoped).
+  const applicationsSent = feedJobs.filter(j => j.applied && inPeriod(j.dateApplied)).length
+  // In play right now: live snapshot — applied, not archived, not in a terminal status (period-independent).
+  const inPlay = allUserJobs.filter(j => j.applied && !j.archived && !isTerminal(j.statusOverride)).length
+  const kpis = { hoursSaved, strongMatches, applicationsSent, inPlay }
+
   // ── Recent activity feed ──
   // Archive filter scopes the owning job; period cutoff scopes each event's own timestamp.
   const jobById = new Map(feedJobs.map(j => [j.id, j]))
@@ -165,6 +180,7 @@ app.get('/', (c) => {
 
   return c.json({
     totalJobs,
+    kpis,
     recentActivity,
     jobsByFitScore,
     timeSavedByWorkflow,

@@ -105,6 +105,45 @@ function activityLabel(event: ActivityEvent): string {
   }
 }
 
+function KpiTile({ icon, label, value, subtext }: { icon: string; label: string; value: string; subtext?: string }) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <div className="flex items-center gap-2 text-xs font-medium text-zinc-400">
+        <span aria-hidden>{icon}</span>
+        <span>{label}</span>
+      </div>
+      <div className="mt-2 text-3xl font-semibold text-zinc-100 tabular-nums">{value}</div>
+      {subtext && <div className="mt-1 text-xs text-zinc-500">{subtext}</div>}
+    </div>
+  )
+}
+
+function KpiRow({ kpis }: { kpis: Stats['kpis'] }) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <KpiTile
+        icon="⏱"
+        label="Hours saved"
+        value={kpis.hoursSaved.toFixed(1)}
+        subtext={kpis.hoursSaved === 0 ? 'Automation starts saving on your first run' : undefined}
+      />
+      <KpiTile icon="🎯" label="Strong matches" value={String(kpis.strongMatches)} subtext="fit score ≥ 80" />
+      <KpiTile
+        icon="🚀"
+        label="Applications sent"
+        value={String(kpis.applicationsSent)}
+        subtext={kpis.applicationsSent === 0 ? 'Your next application starts here' : undefined}
+      />
+      <KpiTile
+        icon="🔥"
+        label="In play right now"
+        value={String(kpis.inPlay)}
+        subtext={kpis.inPlay === 0 ? 'Apply to get the ball rolling' : undefined}
+      />
+    </div>
+  )
+}
+
 function RecentActivityFeed({ events }: { events: Stats['recentActivity'] }) {
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? events : events.slice(0, ACTIVITY_PREVIEW_COUNT)
@@ -270,6 +309,7 @@ export function DashboardRoute() {
 
       {data && data.totalJobs > 0 && (
         <div className="space-y-4">
+          <KpiRow kpis={data.kpis} />
           <RecentActivityFeed events={data.recentActivity} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <JobsByFitScore data={data.jobsByFitScore} />
