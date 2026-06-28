@@ -4,6 +4,8 @@ import {
   Cell,
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   LabelList,
   XAxis,
   YAxis,
@@ -12,7 +14,7 @@ import {
 } from 'recharts'
 import type { Stats, StatsPeriod } from '@shared/schemas'
 import { STATS_PERIODS } from '@shared/schemas'
-import { useStatsQuery, type ArchivedFilter } from '../hooks/useStatsQuery'
+import { useStatsQuery, type ArchivedFilter, type AppliedFilter } from '../hooks/useStatsQuery'
 import { SCORE_COLORS } from '../utils/scoreColors'
 
 const PERIOD_LABELS: Record<StatsPeriod, string> = {
@@ -180,32 +182,26 @@ function TimeSavedByWorkflow({ data }: { data: Stats['timeSavedByWorkflow'] }) {
   )
 }
 
-function ActivityHeatmap({ data }: { data: Stats['activityHeatmap'] }) {
-  const countByDate = new Map(data.map(d => [d.date, d.count]))
-  const cells: { date: string; count: number }[] = []
-  for (let i = 89; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10)
-    cells.push({ date: d, count: countByDate.get(d) ?? 0 })
-  }
-  const cellColor = (c: number) => c === 0 ? '#27272a' : c === 1 ? '#14532d' : c <= 3 ? '#15803d' : '#22c55e'
-  const cols = Math.ceil(cells.length / 7)
+const COST_WORKFLOWS = ['Discovery', 'Analysis', 'Cover Letter', 'Resume'] as const
+
+function WorkflowCostOverTime({ data }: { data: Stats['workflowCostOverTime'] }) {
+  const empty = data.every(d => d.Discovery === 0 && d.Analysis === 0 && d['Cover Letter'] === 0 && d.Resume === 0)
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-2">
-      <div className="text-sm font-medium text-zinc-400 mb-1.5">Activity (last 90 days)</div>
-      <div className="flex gap-[3px] py-2">
-        {Array.from({ length: cols }, (_, col) => (
-          <div key={col} className="flex flex-1 flex-col gap-[3px]">
-            {cells.slice(col * 7, col * 7 + 7).map(cell => (
-              <div
-                key={cell.date}
-                title={`${cell.date}: ${cell.count} ${cell.count === 1 ? 'activity' : 'activities'}`}
-                className="h-3 rounded-sm"
-                style={{ background: cellColor(cell.count) }}
-              />
+      <div className="text-sm font-medium text-zinc-400 mb-1.5">Workflow Cost Over Time</div>
+      {empty ? <NoData /> : (
+        <ResponsiveContainer width="100%" height={160}>
+          <AreaChart data={data} margin={{ top: 18, right: 8, bottom: 0, left: -16 }}>
+            <CartesianGrid stroke={DARK_GRID} strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="date" {...AXIS_PROPS} fontSize={11} tickFormatter={formatShortDate} />
+            <YAxis {...AXIS_PROPS} unit="$" allowDecimals />
+            <Tooltip content={<FilteredTooltip />} />
+            {COST_WORKFLOWS.map(wf => (
+              <Area key={wf} type="monotone" dataKey={wf} stackId="1" stroke={WORKFLOW_FILL[wf]} fill={WORKFLOW_FILL[wf]} />
             ))}
-          </div>
-        ))}
-      </div>
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
     </div>
   )
 }
@@ -213,7 +209,8 @@ function ActivityHeatmap({ data }: { data: Stats['activityHeatmap'] }) {
 export function DashboardRoute() {
   const [period, setPeriod] = useState<StatsPeriod>('all')
   const [archivedFilter, setArchivedFilter] = useState<ArchivedFilter>('active')
-  const { data, isPending, isError, error } = useStatsQuery(period, archivedFilter)
+  const [appliedFilter, setAppliedFilter] = useState<AppliedFilter>('all')
+  const { data, isPending, isError, error } = useStatsQuery(period, archivedFilter, appliedFilter)
 
   const filterBar = (
     <div className="flex items-center gap-1">
@@ -242,6 +239,19 @@ export function DashboardRoute() {
           {f.charAt(0).toUpperCase() + f.slice(1)}
         </button>
       ))}
+      <div className="w-px h-4 bg-zinc-700 mx-1.5" />
+      {(['unapplied', 'applied', 'all'] as AppliedFilter[]).map((f) => (
+        <button
+          key={f}
+          onClick={() => setAppliedFilter(f)}
+          className={[
+            'px-2.5 py-1 text-xs rounded transition-colors',
+            appliedFilter === f ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800',
+          ].join(' ')}
+        >
+          {f.charAt(0).toUpperCase() + f.slice(1)}
+        </button>
+      ))}
     </div>
   )
 
@@ -265,7 +275,7 @@ export function DashboardRoute() {
             <JobsByFitScore data={data.jobsByFitScore} />
             <TimeSavedByWorkflow data={data.timeSavedByWorkflow} />
           </div>
-          <ActivityHeatmap data={data.activityHeatmap} />
+          <WorkflowCostOverTime data={data.workflowCostOverTime} />
         </div>
       )}
     </div>

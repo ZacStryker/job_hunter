@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { db } from '../../db/client'
-import { jobs, coverLetters, statusEvents } from '../../db/schema'
+import { jobs, coverLetters, statusEvents, webhookRuns } from '../../db/schema'
 import { and, eq, gte, inArray, or } from 'drizzle-orm'
 import { STATS_PERIODS, type ActivityEventType } from '../../shared/schemas'
 import type { AppEnv } from '../types'
@@ -15,12 +15,16 @@ function getPeriodCutoffs(period: string) {
 }
 
 type ArchivedFilter = 'active' | 'archived' | 'all'
+type AppliedFilter = 'unapplied' | 'applied' | 'all'
 
 function buildBaseWhere(archivedFilter: ArchivedFilter) {
   if (archivedFilter === 'active') return eq(jobs.archived, false)
   if (archivedFilter === 'archived') return eq(jobs.archived, true)
   return undefined
 }
+
+const WORKFLOW_NAMES = ['Discovery', 'Analysis', 'Cover Letter', 'Resume'] as const
+type WorkflowName = typeof WORKFLOW_NAMES[number]
 
 // Normalize bare YYYY-MM-DD date-only strings to a UTC ISO datetime.
 function toIso(value: string): string {
@@ -41,15 +45,22 @@ app.get('/', (c) => {
   const archivedFilter: ArchivedFilter =
     rawArchivedFilter === 'archived' ? 'archived' :
     rawArchivedFilter === 'all'      ? 'all'       : 'active'
+  const rawAppliedFilter = c.req.query('appliedFilter')
+  const appliedFilter: AppliedFilter =
+    rawAppliedFilter === 'applied'   ? 'applied'   :
+    rawAppliedFilter === 'unapplied' ? 'unapplied' : 'all'
 
   const baseWhere = buildBaseWhere(archivedFilter)
+  const appliedWhere = appliedFilter === 'all' ? undefined : eq(jobs.applied, appliedFilter === 'applied')
+  const matchesApplied = (j: { applied: boolean }) =>
+    appliedFilter === 'all' ? true : appliedFilter === 'applied' ? j.applied : !j.applied
 
   // viewJobs — archivedFilter + dateScraped cutoff + userId (period+archive-scoped: fit-score buckets)
   // For active filter, restrict to Matches (apply/investigate, not yet applied) + Applications (applied).
   const matchesOrApplied = archivedFilter === 'active'
     ? or(eq(jobs.applied, true), inArray(jobs.recommendation, ['apply', 'investigate']))
     : undefined
-  const scrapedWhere = and(baseWhere, matchesOrApplied, dateCutoff ? gte(jobs.dateScraped, dateCutoff) : undefined, eq(jobs.userId, userId))
+  const scrapedWhere = and(baseWhere, matchesOrApplied, appliedWhere, dateCutoff ? gte(jobs.dateScraped, dateCutoff) : undefined, eq(jobs.userId, userId))
   const viewJobs = db.select().from(jobs).where(scrapedWhere).all()
 
   // All user data. Time-saved is archive-agnostic (period-scoped only); the feed is archive-scoped.
@@ -60,8 +71,10 @@ app.get('/', (c) => {
 
   const inPeriod = (date: string | null) => date !== null && (dateCutoff === null || date >= dateCutoff)
   const feedJobs = allUserJobs.filter(j =>
-    archivedFilter === 'active'   ? !j.archived :
-    archivedFilter === 'archived' ? j.archived  : true
+    matchesApplied(j) && (
+      archivedFilter === 'active'   ? !j.archived :
+      archivedFilter === 'archived' ? j.archived  : true
+    )
   )
 
   // ── totalJobs (unscoped empty-state gate) ──
@@ -76,11 +89,15 @@ app.get('/', (c) => {
   }
   const jobsByFitScore = FIT_RANGES.map((fitRange, i) => ({ fitRange, count: fitCounts[i] }))
 
-  // ── Time saved by workflow (period-scoped, archive-agnostic, per-workflow date column) ──
-  const discoveryCount = allUserJobs.filter(j => inPeriod(j.dateScraped)).length
-  const analyzedCount = allUserJobs.filter(j => inPeriod(j.dateAnalyzed)).length
-  const resumeCount = allUserJobs.filter(j => inPeriod(j.resumeGeneratedAt)).length
-  const coverLetterCount = coverLetterRows.filter(cl => inPeriod(cl.createdAt)).length
+  // ── Time saved by workflow (period-scoped, archive-agnostic, applied-scoped, per-workflow date column) ──
+  const appliedJobById = new Map(allUserJobs.map(j => [j.id, j]))
+  const discoveryCount = allUserJobs.filter(j => matchesApplied(j) && inPeriod(j.dateScraped)).length
+  const analyzedCount = allUserJobs.filter(j => matchesApplied(j) && inPeriod(j.dateAnalyzed)).length
+  const resumeCount = allUserJobs.filter(j => matchesApplied(j) && inPeriod(j.resumeGeneratedAt)).length
+  const coverLetterCount = coverLetterRows.filter(cl => {
+    const j = appliedJobById.get(cl.jobId)
+    return j !== undefined && matchesApplied(j) && inPeriod(cl.createdAt)
+  }).length
   const timeSavedByWorkflow = [
     { workflow: 'Discovery', hours: discoveryCount * NET_MIN.source / 60 },
     { workflow: 'Analysis', hours: analyzedCount * NET_MIN.analyze / 60 },
@@ -119,30 +136,27 @@ app.get('/', (c) => {
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
     .slice(0, ACTIVITY_CAP)
 
-  // ── Activity heatmap (last 90 days) ──
-  const now = Date.now()
-  const ninetyDaysAgo = new Date(now - 90 * 86_400_000).toISOString().slice(0, 10)
-  const heatmapMap: Record<string, number> = {}
-  for (const j of allUserJobs) {
-    if (j.dateScraped) {
-      const d = j.dateScraped.slice(0, 10)
-      if (d >= ninetyDaysAgo) heatmapMap[d] = (heatmapMap[d] ?? 0) + 1
-    }
-    if (j.dateAnalyzed) {
-      const d = j.dateAnalyzed.slice(0, 10)
-      if (d >= ninetyDaysAgo) heatmapMap[d] = (heatmapMap[d] ?? 0) + 1
-    }
+  // ── Workflow cost over time (period-scoped, userId-only — one row per day with any run) ──
+  const costRuns = db.select().from(webhookRuns)
+    .where(and(eq(webhookRuns.userId, userId), datetimeCutoff ? gte(webhookRuns.runAt, datetimeCutoff) : undefined))
+    .all()
+  const costByDate = new Map<string, Record<WorkflowName, number>>()
+  for (const r of costRuns) {
+    const date = r.runAt.slice(0, 10)
+    const row = costByDate.get(date) ?? { Discovery: 0, Analysis: 0, 'Cover Letter': 0, Resume: 0 }
+    if ((WORKFLOW_NAMES as readonly string[]).includes(r.name)) row[r.name as WorkflowName] += r.costUsd ?? 0
+    costByDate.set(date, row)
   }
-  const activityHeatmap = Object.entries(heatmapMap)
+  const workflowCostOverTime = [...costByDate.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, count]) => ({ date, count }))
+    .map(([date, row]) => ({ date, ...row }))
 
   return c.json({
     totalJobs,
     recentActivity,
     jobsByFitScore,
     timeSavedByWorkflow,
-    activityHeatmap,
+    workflowCostOverTime,
   })
 })
 

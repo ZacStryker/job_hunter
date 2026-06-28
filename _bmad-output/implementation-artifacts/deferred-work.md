@@ -1022,3 +1022,10 @@ later: detect-and-reset stale analysis prompts on deploy, version the prompt sch
 
 - No `aria-live`/`role="status"` on the live-updating runs list (`ActivityIndicator.tsx:55-65`) — SSE-driven progress/completion changes are not announced to assistive tech while the popover is open. Out of AC scope; no aria-live precedent in repo. (low)
 - No `max-height`/scroll on `PopoverContent` for many concurrent runs (`ActivityIndicator.tsx:51,55`) — unbounded `<ul>` in a fixed `w-72` panel can overflow the viewport with a large batch of simultaneous runs. Trivial fix (`max-h-* overflow-y-auto`); unlikely in practice. (low)
+
+## Stats dashboard cost chart — UX enhancements (deferred 2026-06-28)
+
+From the `spec-stats-dashboard-cost-chart-applied-filter` review. Both are out-of-scope of that spec's frozen intent ("one row per day with any run"), but flagged by multiple reviewers as real visual concerns:
+
+- **Non-contiguous date axis.** `workflowCostOverTime` emits a row only for days that have a webhook run; the recharts category XAxis then renders sparse days as evenly spaced, so a 1-day gap and a 10-day gap look identical. Consider zero-filling a contiguous date range across the selected period before returning.
+- **Single-point area invisibility.** With `period=24h` (or any period with one run-day), a stacked `AreaChart` with one datum draws no visible band. Consider `dot` rendering or a fallback for `data.length <= 1`.

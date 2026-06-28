@@ -116,12 +116,14 @@ function daysAgoDate(days: number): string {
 
 type ActivityEvent = { type: string; timestamp: string; jobTitle: string; company: string; status: string | null }
 
+type CostRow = { date: string; Discovery: number; Analysis: number; 'Cover Letter': number; Resume: number }
+
 type StatsResponse = {
   totalJobs: number
   recentActivity: ActivityEvent[]
   jobsByFitScore: { fitRange: string; count: number }[]
   timeSavedByWorkflow: { workflow: string; hours: number }[]
-  activityHeatmap: { date: string; count: number }[]
+  workflowCostOverTime: CostRow[]
 }
 
 async function getStats(query = ''): Promise<StatsResponse> {
@@ -133,10 +135,10 @@ async function getStats(query = ''): Promise<StatsResponse> {
 describe('GET /api/stats - response shape', () => {
   test('returns exactly the new top-level keys, none of the old ones', async () => {
     const data = await getStats() as unknown as Record<string, unknown>
-    for (const key of ['totalJobs', 'recentActivity', 'jobsByFitScore', 'timeSavedByWorkflow', 'activityHeatmap']) {
+    for (const key of ['totalJobs', 'recentActivity', 'jobsByFitScore', 'timeSavedByWorkflow', 'workflowCostOverTime']) {
       expect(data).toHaveProperty(key)
     }
-    for (const old of ['heroSentence', 'nextAction', 'funnel', 'value', 'fitVsOutcome', 'statCards', 'sparklines', 'detail', 'automation', 'error']) {
+    for (const old of ['activityHeatmap', 'heroSentence', 'nextAction', 'funnel', 'value', 'fitVsOutcome', 'statCards', 'sparklines', 'detail', 'automation', 'error']) {
       expect(data).not.toHaveProperty(old)
     }
   })
@@ -145,7 +147,7 @@ describe('GET /api/stats - response shape', () => {
     const data = await getStats()
     expect(data.totalJobs).toBe(0)
     expect(data.recentActivity).toEqual([])
-    expect(data.activityHeatmap).toEqual([])
+    expect(data.workflowCostOverTime).toEqual([])
     expect(data.jobsByFitScore.map(b => b.count)).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     expect(data.timeSavedByWorkflow.every(w => w.hours === 0)).toBe(true)
   })
@@ -359,20 +361,101 @@ describe('GET /api/stats - timeSavedByWorkflow', () => {
   })
 })
 
-describe('GET /api/stats - totalJobs & heatmap', () => {
+describe('GET /api/stats - totalJobs', () => {
   test('totalJobs is unscoped (ignores period and archived filters)', async () => {
     prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, archived) VALUES ('Active', 'Dev', '${daysAgoDate(60)}', 0)`)
     prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, archived) VALUES ('Archived', 'Dev', '${daysAgoDate(60)}', 1)`)
     const data = await getStats('?period=24h')
     expect(data.totalJobs).toBe(2)
   })
+})
 
-  test('activityHeatmap counts scrape and analysis within last 90 days', async () => {
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, date_analyzed) VALUES ('A', 'Dev', '${daysAgoDate(1)}', '${daysAgoDate(1)}')`)
-    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped) VALUES ('B', 'Dev', '${daysAgoDate(120)}')`)
+describe('GET /api/stats - workflowCostOverTime', () => {
+  const costFor = (data: StatsResponse, date: string) => data.workflowCostOverTime.find(r => r.date === date)
+
+  test('sums costUsd by day and workflow name; one ascending row per day with any run; missing workflows default 0', async () => {
+    const d1 = daysAgoDate(2)
+    const d2 = daysAgoDate(1)
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Discovery', '${daysAgoIso(2)}', 1, 0.10)`)
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Discovery', '${daysAgoIso(2)}', 1, 0.05)`)
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Analysis', '${daysAgoIso(1)}', 0, 0.20)`)
     const data = await getStats()
-    const today = data.activityHeatmap.find(d => d.date === daysAgoDate(1))
-    expect(today?.count).toBe(2) // one scrape + one analysis on the same day
-    expect(data.activityHeatmap.some(d => d.date === daysAgoDate(120))).toBe(false)
+    expect(data.workflowCostOverTime.map(r => r.date)).toEqual([d1, d2]) // ascending, one per day
+    const r1 = costFor(data, d1)!
+    expect(r1.Discovery).toBeCloseTo(0.15, 5)
+    expect([r1.Analysis, r1['Cover Letter'], r1.Resume]).toEqual([0, 0, 0])
+    const r2 = costFor(data, d2)!
+    expect(r2.Analysis).toBeCloseTo(0.20, 5)
+    expect([r2.Discovery, r2['Cover Letter'], r2.Resume]).toEqual([0, 0, 0])
+  })
+
+  test('treats null costUsd as 0', async () => {
+    const d = daysAgoDate(1)
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Discovery', '${daysAgoIso(1)}', 1, NULL)`)
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Discovery', '${daysAgoIso(1)}', 1, 0.30)`)
+    const data = await getStats()
+    expect(costFor(data, d)?.Discovery).toBeCloseTo(0.30, 5)
+  })
+
+  test('scopes by period cutoff (runAt)', async () => {
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Discovery', '${daysAgoIso(60)}', 1, 0.10)`)
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Discovery', '${daysAgoIso(1)}', 1, 0.40)`)
+    const week = await getStats('?period=7d')
+    expect(week.workflowCostOverTime).toHaveLength(1)
+    expect(week.workflowCostOverTime[0].Discovery).toBeCloseTo(0.40, 5)
+  })
+
+  test('is not affected by the applied filter (webhook runs are not jobs)', async () => {
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Discovery', '${daysAgoIso(1)}', 1, 0.25)`)
+    const unapplied = await getStats('?appliedFilter=unapplied')
+    const applied = await getStats('?appliedFilter=applied')
+    expect(unapplied.workflowCostOverTime).toEqual(applied.workflowCostOverTime)
+    expect(applied.workflowCostOverTime[0].Discovery).toBeCloseTo(0.25, 5)
+  })
+})
+
+describe('GET /api/stats - appliedFilter', () => {
+  test('scopes jobsByFitScore, recentActivity and timeSaved while totalJobs stays unscoped', async () => {
+    // applied job (counts under applied)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, recommendation, applied, date_applied) VALUES ('AppliedCo', 'Dev', '${daysAgoDate(1)}', 85, 'apply', 1, '${daysAgoDate(1)}')`)
+    // unapplied match (counts under unapplied)
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, recommendation, applied) VALUES ('MatchCo', 'Dev', '${daysAgoDate(1)}', 75, 'apply', 0)`)
+
+    const applied = await getStats('?appliedFilter=applied')
+    expect(applied.jobsByFitScore.reduce((s, b) => s + b.count, 0)).toBe(1)
+    expect(applied.jobsByFitScore.find(b => b.fitRange === '80-90')?.count).toBe(1)
+    expect(applied.recentActivity.every(e => e.company === 'AppliedCo')).toBe(true)
+    expect(applied.timeSavedByWorkflow.find(w => w.workflow === 'Discovery')?.hours).toBeCloseTo(1 * 3 / 60, 5)
+    expect(applied.totalJobs).toBe(2) // unscoped
+
+    const unapplied = await getStats('?appliedFilter=unapplied')
+    expect(unapplied.jobsByFitScore.reduce((s, b) => s + b.count, 0)).toBe(1)
+    expect(unapplied.jobsByFitScore.find(b => b.fitRange === '70-80')?.count).toBe(1)
+    expect(unapplied.recentActivity.every(e => e.type !== 'applied')).toBe(true)
+
+    const all = await getStats('?appliedFilter=all')
+    expect(all.jobsByFitScore.reduce((s, b) => s + b.count, 0)).toBe(2)
+
+    // invalid value falls back to 'all'
+    const bogus = await getStats('?appliedFilter=nonsense')
+    expect(bogus.jobsByFitScore.reduce((s, b) => s + b.count, 0)).toBe(2)
+  })
+
+  test('layers on top of the active archived branch without breaking matches/applications restriction', async () => {
+    // applied job: in Applications
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, applied) VALUES ('Applied', 'Dev', '${daysAgoDate(1)}', 60, 1)`)
+    // unapplied match: in Matches
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, recommendation, applied) VALUES ('Match', 'Dev', '${daysAgoDate(1)}', 50, 'apply', 0)`)
+    // unapplied non-match: excluded by active branch regardless of applied filter
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, date_scraped, fit_score, applied) VALUES ('Pending', 'Dev', '${daysAgoDate(1)}', 10, 0)`)
+
+    const activeUnapplied = await getStats('?archivedFilter=active&appliedFilter=unapplied')
+    expect(activeUnapplied.jobsByFitScore.reduce((s, b) => s + b.count, 0)).toBe(1) // Match only — Pending still excluded
+    expect(activeUnapplied.jobsByFitScore.find(b => b.fitRange === '50-60')?.count).toBe(1)
+    expect(activeUnapplied.jobsByFitScore.find(b => b.fitRange === '0-10')?.count).toBe(0)
+
+    const activeApplied = await getStats('?archivedFilter=active&appliedFilter=applied')
+    expect(activeApplied.jobsByFitScore.reduce((s, b) => s + b.count, 0)).toBe(1) // Applied only
+    expect(activeApplied.jobsByFitScore.find(b => b.fitRange === '60-70')?.count).toBe(1)
   })
 })

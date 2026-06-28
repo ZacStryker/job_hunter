@@ -171,7 +171,13 @@ export const statsSchema = z.object({
   })),
   jobsByFitScore: z.array(z.object({ fitRange: z.string(), count: z.number() })),
   timeSavedByWorkflow: z.array(z.object({ workflow: z.string(), hours: z.number() })),
-  activityHeatmap: z.array(z.object({ date: z.string(), count: z.number() })),
+  workflowCostOverTime: z.array(z.object({
+    date: z.string(),
+    Discovery: z.number(),
+    Analysis: z.number(),
+    'Cover Letter': z.number(),
+    Resume: z.number(),
+  })),
 })
 export type Stats = z.infer<typeof statsSchema>
 
