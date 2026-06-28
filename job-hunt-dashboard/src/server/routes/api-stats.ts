@@ -26,6 +26,16 @@ function buildBaseWhere(archivedFilter: ArchivedFilter) {
 const WORKFLOW_NAMES = ['Discovery', 'Analysis', 'Cover Letter', 'Resume'] as const
 type WorkflowName = typeof WORKFLOW_NAMES[number]
 
+// Cover Letter / Resume runs are recorded with a per-job suffix
+// (e.g. "Cover Letter - Acme - Engineer"), so bucket by name prefix.
+function workflowBucket(name: string): WorkflowName | null {
+  if (name === 'Discovery') return 'Discovery'
+  if (name === 'Analysis') return 'Analysis'
+  if (name.startsWith('Cover Letter')) return 'Cover Letter'
+  if (name.startsWith('Resume')) return 'Resume'
+  return null
+}
+
 // Normalize bare YYYY-MM-DD date-only strings to a UTC ISO datetime.
 function toIso(value: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value
@@ -142,9 +152,11 @@ app.get('/', (c) => {
     .all()
   const costByDate = new Map<string, Record<WorkflowName, number>>()
   for (const r of costRuns) {
+    const bucket = workflowBucket(r.name)
+    if (!bucket) continue
     const date = r.runAt.slice(0, 10)
     const row = costByDate.get(date) ?? { Discovery: 0, Analysis: 0, 'Cover Letter': 0, Resume: 0 }
-    if ((WORKFLOW_NAMES as readonly string[]).includes(r.name)) row[r.name as WorkflowName] += r.costUsd ?? 0
+    row[bucket] += r.costUsd ?? 0
     costByDate.set(date, row)
   }
   const workflowCostOverTime = [...costByDate.entries()]

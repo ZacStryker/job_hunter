@@ -389,6 +389,25 @@ describe('GET /api/stats - workflowCostOverTime', () => {
     expect([r2.Discovery, r2['Cover Letter'], r2.Resume]).toEqual([0, 0, 0])
   })
 
+  test('buckets per-job Cover Letter / Resume run names (with company/title suffix) into their workflow', async () => {
+    const d = daysAgoDate(1)
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Cover Letter - Acme - Engineer', '${daysAgoIso(1)}', 1, 0.012)`)
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Cover Letter - Globex - Dev', '${daysAgoIso(1)}', 1, 0.008)`)
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Resume - Acme - Engineer', '${daysAgoIso(1)}', 1, 0.05)`)
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Analysis', '${daysAgoIso(1)}', 1, 0.20)`)
+    const data = await getStats()
+    const row = costFor(data, d)!
+    expect(row['Cover Letter']).toBeCloseTo(0.020, 5) // both letters summed
+    expect(row.Resume).toBeCloseTo(0.05, 5)
+    expect(row.Analysis).toBeCloseTo(0.20, 5)
+  })
+
+  test('ignores runs whose name maps to no workflow (no spurious all-zero row)', async () => {
+    prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Mystery Job', '${daysAgoIso(1)}', 1, 9.99)`)
+    const data = await getStats()
+    expect(data.workflowCostOverTime).toEqual([])
+  })
+
   test('treats null costUsd as 0', async () => {
     const d = daysAgoDate(1)
     prodSqlite.run(`INSERT INTO webhook_runs (name, run_at, success, cost_usd) VALUES ('Discovery', '${daysAgoIso(1)}', 1, NULL)`)
