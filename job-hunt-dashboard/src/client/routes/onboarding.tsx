@@ -107,7 +107,11 @@ export function OnboardingRoute() {
     } else if (result === 'error') {
       toast.error('Could not connect Gmail — please try again')
     }
-    if (result) window.history.replaceState({}, '', window.location.pathname)
+    // Intentionally do NOT strip the ?gmail param here. A native history.replaceState is
+    // observed by TanStack Router and re-runs this route's beforeLoad; with the param gone
+    // and onboarding already "complete" (Anthropic key set), the guard would redirect to '/'
+    // mid-flow. Keeping the param keeps `returningFromGmail` true; it clears when the user
+    // leaves onboarding for the dashboard.
   }, [])
 
   async function handleTestAnthropicKey() {
