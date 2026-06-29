@@ -1029,3 +1029,12 @@ From the `spec-stats-dashboard-cost-chart-applied-filter` review. Both are out-o
 
 - **Non-contiguous date axis.** `workflowCostOverTime` emits a row only for days that have a webhook run; the recharts category XAxis then renders sparse days as evenly spaced, so a 1-day gap and a 10-day gap look identical. Consider zero-filling a contiguous date range across the selected period before returning.
 - **Single-point area invisibility.** With `period=24h` (or any period with one run-day), a stacked `AreaChart` with one datum draws no visible band. Consider `dot` rendering or a fallback for `data.length <= 1`.
+
+## Pre-existing issues in `profile-inbox-mapping.tsx` (Gmail label-mapping section)
+
+Surfaced incidentally while reviewing `spec-gmail-label-mappings-onboarding-step` (the onboarding step ports this logic verbatim). These also exist in the original Config inbox-mapping page and were left untouched there to keep the two in sync; fix both files together if addressed:
+
+- **Duplicate React keys when the same Gmail label is mapped twice.** Row key is `row.label || \`new-${i}\``; two rows with the same label collide. (Patched in the onboarding copy by keying on `\`${row.label}-${i}\``.) The label `<select>` also does not exclude already-mapped labels.
+- **Unlabeled `<select>` controls (a11y).** Label/status selects lack `aria-label`. (Patched in the onboarding copy.)
+- **"Add mapping" usable when no labels are available.** When labels fail to load / are empty, an added row can never set a label and Save stays disabled. (Patched in the onboarding copy by disabling Add when `gmailLabels.length === 0`.)
+- **Server state mirrored into `useState`.** `gmailRows` duplicates the `['gmail-mappings']` query into local state (with an `exhaustive-deps`-disabled sync effect). Established editable-table pattern; benign, but technically against the "server state in TanStack Query only" rule. Refactor both files together if ever tightened.

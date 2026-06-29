@@ -12,7 +12,15 @@ import { toast } from 'sonner'
 import { queryClient } from '@/lib/query-client'
 import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
 import { useGmailConnection } from '@/hooks/useGmailConnection'
+import { useGmailLabelsQuery } from '@/hooks/useGmailLabelsQuery'
+import { useGmailMappingsQuery } from '@/hooks/useGmailMappingsQuery'
+import { useGmailMappingsMutation } from '@/hooks/useGmailMappingsMutation'
 import { useFeatureSettingsQuery } from '@/hooks/useFeatureSettingsQuery'
+import { MESSAGE_TYPES } from '@shared/schemas'
+import type { GmailLabelMappingInput } from '@shared/schemas'
+
+type MessageType = typeof MESSAGE_TYPES[number]
+type GmailMappingRow = { label: string; jobStatus: MessageType }
 
 export function OnboardingRoute() {
   const navigate = useNavigate()
@@ -20,11 +28,34 @@ export function OnboardingRoute() {
   const { connect } = useGmailConnection()
   const { data: featureSettings } = useFeatureSettingsQuery()
   const emailEnabled = !!featureSettings?.emailFeatures
-  const readyStep = emailEnabled ? 3 : 2
-  const [step, setStep] = useState(() =>
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('gmail') ? 2 : 0
-  )
+  const hasGmail = status?.hasGmail ?? false
+  const showLabelStep = emailEnabled && hasGmail
+  const labelStep = 3
+  const readyStep = emailEnabled ? (hasGmail ? 4 : 3) : 2
+  const totalSteps = emailEnabled ? (hasGmail ? 5 : 4) : 3
+  const [step, setStep] = useState(() => {
+    if (typeof window === 'undefined') return 0
+    const g = new URLSearchParams(window.location.search).get('gmail')
+    if (g === 'connected') return labelStep
+    if (g === 'error') return 2
+    return 0
+  })
   const callbackHandled = useRef(false)
+  const arrivedFromGmail = useRef(
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('gmail') === 'connected'
+  )
+  // On the OAuth return we synchronously land on labelStep before status/featureSettings
+  // resolve. Hold a loader until they do, so we never flash the Ready screen or a step that
+  // renders nothing while hasGmail is still false.
+  const awaitingGmailReturn = arrivedFromGmail.current && (status === undefined || featureSettings === undefined)
+
+  const { data: gmailLabels = [], isError: gmailLabelsError } = useGmailLabelsQuery({ enabled: hasGmail })
+  const { data: gmailMappings = [] } = useGmailMappingsQuery()
+  const gmailMutation = useGmailMappingsMutation()
+
+  const [gmailRows, setGmailRows] = useState<GmailMappingRow[]>([])
+  const [gmailEditingIndex, setGmailEditingIndex] = useState<number | null>(null)
+  const [gmailDraft, setGmailDraft] = useState<GmailMappingRow>({ label: '', jobStatus: 'Other' })
 
   const [apiKey, setApiKey] = useState('')
   const [apiKeyTestState, setApiKeyTestState] = useState<'idle' | 'loading' | 'pass' | 'fail'>('idle')
@@ -41,13 +72,30 @@ export function OnboardingRoute() {
 
   const step1Ref = useRef<HTMLHeadingElement>(null)
   const step2Ref = useRef<HTMLHeadingElement>(null)
-  const step3Ref = useRef<HTMLHeadingElement>(null)
+  const labelStepRef = useRef<HTMLHeadingElement>(null)
+  const readyRef = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
     if (step === 1) step1Ref.current?.focus()
     else if (emailEnabled && step === 2) step2Ref.current?.focus()
-    else if (step === readyStep) step3Ref.current?.focus()
-  }, [step, emailEnabled, readyStep])
+    else if (showLabelStep && step === labelStep) labelStepRef.current?.focus()
+    else if (step === readyStep) readyRef.current?.focus()
+  }, [step, emailEnabled, showLabelStep, readyStep])
+
+  useEffect(() => {
+    if (gmailEditingIndex === null) {
+      setGmailRows(gmailMappings.map(m => ({ label: m.label, jobStatus: m.jobStatus as MessageType })))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gmailMappings])
+
+  // Once status/featureSettings have resolved, never leave the user stranded on the label
+  // step when it isn't actually available (e.g. Gmail not connected) — advance to Ready.
+  useEffect(() => {
+    if (status !== undefined && featureSettings !== undefined && step === labelStep && !showLabelStep) {
+      setStep(readyStep)
+    }
+  }, [status, featureSettings, step, showLabelStep, readyStep])
 
   useEffect(() => {
     if (callbackHandled.current) return
@@ -114,10 +162,46 @@ export function OnboardingRoute() {
     }
   }
 
+  function saveAllGmail(updated: GmailMappingRow[]) {
+    const payload: GmailLabelMappingInput = updated.map(r => ({ label: r.label, jobStatus: r.jobStatus }))
+    gmailMutation.mutate(payload)
+  }
+
+  function handleGmailEdit(i: number) { setGmailDraft(gmailRows[i]); setGmailEditingIndex(i) }
+  function handleGmailCancel() {
+    if (gmailEditingIndex !== null && gmailRows[gmailEditingIndex]?.label === '') {
+      setGmailRows(gmailRows.filter((_, idx) => idx !== gmailEditingIndex))
+    }
+    setGmailEditingIndex(null)
+  }
+  function handleGmailSaveRow(i: number) {
+    const updated = gmailRows.map((r, idx) => idx === i ? gmailDraft : r)
+    setGmailRows(updated); setGmailEditingIndex(null); saveAllGmail(updated)
+  }
+  function handleGmailDelete(i: number) {
+    const updated = gmailRows.filter((_, idx) => idx !== i)
+    setGmailRows(updated); saveAllGmail(updated)
+  }
+  function handleGmailAddRow() {
+    const newRow: GmailMappingRow = { label: '', jobStatus: 'Other' }
+    const updated = [...gmailRows, newRow]
+    setGmailRows(updated); setGmailDraft(newRow); setGmailEditingIndex(updated.length - 1)
+  }
+
+  if (awaitingGmailReturn) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4">
+        <div className="w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center">
+          <p className="text-zinc-400">Finishing Gmail setup…</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4">
       <div className="w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900 p-8">
-        <StepIndicator currentStep={step} totalSteps={emailEnabled ? 4 : 3} />
+        <StepIndicator currentStep={step} totalSteps={totalSteps} />
         <div aria-live="polite" className="sr-only">{liveMsg}</div>
 
         {step === 0 && (
@@ -181,7 +265,7 @@ export function OnboardingRoute() {
             {status?.hasGmail ? (
               <Alert className="mt-4">
                 <AlertDescription>
-                  Gmail connected — {status.gmailAddress}. You can manage label mappings later in Config.
+                  Gmail connected — {status.gmailAddress}. Continue to map your labels.
                 </AlertDescription>
               </Alert>
             ) : (
@@ -237,15 +321,113 @@ export function OnboardingRoute() {
             )}
             <div className="flex gap-3 mt-6">
               <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={() => setStep(3)}>Skip for now</Button>
-              <Button disabled={imapTestState !== 'pass'} onClick={() => setStep(3)}>Continue</Button>
+              <Button onClick={() => setStep(showLabelStep ? labelStep : readyStep)}>Skip for now</Button>
+              <Button disabled={imapTestState !== 'pass'} onClick={() => setStep(showLabelStep ? labelStep : readyStep)}>Continue</Button>
             </div>
+          </div>
+        )}
+
+        {showLabelStep && step === labelStep && (
+          <div>
+            <h2 ref={labelStepRef} tabIndex={-1} className="text-xl font-semibold mt-6">Gmail Label Mappings</h2>
+            <p className="text-zinc-400 mt-2 text-sm">
+              Map your Gmail labels to job statuses so labelled emails sync to the right place.
+              This is optional — you can change these anytime in Config.
+            </p>
+
+            {gmailLabelsError && (
+              <p className="text-sm text-amber-400 mt-3">Couldn&apos;t load Gmail labels — try reconnecting.</p>
+            )}
+
+            <div className="flex items-center justify-between mt-5 mb-3">
+              <h3 className="text-sm font-medium text-zinc-300">Label Mappings</h3>
+              <Button variant="outline" size="sm" onClick={handleGmailAddRow} disabled={gmailEditingIndex !== null || gmailLabels.length === 0}>
+                Add mapping
+              </Button>
+            </div>
+
+            {gmailRows.length === 0 && gmailEditingIndex === null ? (
+              <div className="text-sm text-zinc-400 py-4 flex items-center gap-4">
+                No label mappings configured.
+                <Button variant="outline" size="sm" onClick={handleGmailAddRow} disabled={gmailLabels.length === 0}>
+                  Add mapping
+                </Button>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-zinc-800 text-zinc-400 text-left">
+                    <th className="pb-2 font-medium">Label</th>
+                    <th className="pb-2 font-medium">Job Status</th>
+                    <th className="pb-2 font-medium w-32">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gmailRows.map((row, i) => (
+                    <tr key={`${row.label}-${i}`} className="border-b border-zinc-800/50">
+                      {gmailEditingIndex === i ? (
+                        <>
+                          <td className="py-2 pr-2">
+                            <select
+                              aria-label="Gmail label"
+                              value={gmailDraft.label}
+                              onChange={(e) => setGmailDraft(d => ({ ...d, label: e.target.value }))}
+                              className="h-8 rounded-md border border-zinc-700 bg-zinc-900 px-2 text-sm text-zinc-100"
+                            >
+                              <option value="" disabled>Select a label…</option>
+                              {gmailLabels.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+                            </select>
+                          </td>
+                          <td className="py-2 pr-2">
+                            <select
+                              aria-label="Job status"
+                              value={gmailDraft.jobStatus}
+                              onChange={(e) => setGmailDraft(d => ({ ...d, jobStatus: e.target.value as MessageType }))}
+                              className="h-8 rounded-md border border-zinc-700 bg-zinc-900 px-2 text-sm text-zinc-100"
+                            >
+                              {MESSAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          </td>
+                          <td className="py-2">
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="outline" onClick={() => handleGmailSaveRow(i)} disabled={!gmailDraft.label.trim()}>
+                                Save
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={handleGmailCancel}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="py-2 pr-2 text-zinc-200">{row.label}</td>
+                          <td className="py-2 pr-2 text-zinc-400">{row.jobStatus}</td>
+                          <td className="py-2">
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => handleGmailEdit(i)} disabled={gmailEditingIndex !== null}>
+                                Edit
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => handleGmailDelete(i)} disabled={gmailEditingIndex !== null}>
+                                Delete
+                              </Button>
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            <Button className="w-full mt-6" onClick={() => setStep(readyStep)} disabled={gmailEditingIndex !== null}>Continue</Button>
           </div>
         )}
 
         {step === readyStep && (
           <div className="text-center">
-            <h2 ref={step3Ref} tabIndex={-1} className="text-xl font-semibold mt-6">Your account is ready</h2>
+            <h2 ref={readyRef} tabIndex={-1} className="text-xl font-semibold mt-6">Your account is ready</h2>
             <p className="text-zinc-400 mt-2">You&apos;re all set. Head to your dashboard to start tracking jobs.</p>
             <Button className="w-full mt-6" onClick={() => navigate({ to: '/' })}>Go to Dashboard</Button>
           </div>
