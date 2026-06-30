@@ -176,3 +176,23 @@ From anywhere in the app, a user can see whether any background workflow (Discov
 **Architecture:** Per-user in-memory run registry as single source of truth; `GET /api/activity/stream` SSE endpoint (snapshot on connect + push on change, user-scoped via `authMiddleware`); the four workflows wired at the route-handler layer (`api-webhooks.ts`, `api-jobs.ts`); client `useActivityStream` EventSource hook drives the top-bar indicator + dropdown; no polling
 
 ---
+
+## Epic 47: Config IA Restructure — Frequency-Ordered, Cohesive Navigation
+A user navigating the Config section finds a calm, frequency-ordered structure (Profile → Sources → Connections → Prompts → System) replacing the scattered feature-area grouping. LinkedIn auth, Inbox connect/mapping, and the Anthropic API key consolidate into one **Connections** home; "Job Sources" becomes **Sources**; Logs + Privacy move under **System**; Profile becomes a pure settings page. All moved pages keep working via redirects.
+**Source:** Brainstorming session 2026-06-29 (config rework)
+**Priority:** Medium — low-risk UX cohesion; no API/DB changes; leads the build sequence
+**FRs covered:** FR47.1–FR47.6 · **UX-DRs:** UX-DR47.1–UX-DR47.2
+**Out of scope:** Page content/behavior (only location + path change); badge removal (deferred to Epic 48); top-nav icon cluster / Notifications (Epic 48)
+**Architecture:** Builds on Epic 35's `_config` pathless layout; reorder/group in `ConfigLayout` sidenav; relocate route component files + `beforeLoad` redirects from old paths; reuse all existing loaders/hooks — UI-only
+
+---
+
+## Epic 48: Notifications Dropdown & Top-Nav Cluster — One "What Needs My Attention" Signal
+From anywhere, a user sees a single dot on a new **Notifications** icon opening a Plex-style dropdown that walks prioritized setup tasks (LinkedIn → API key → Profile → Inbox connect → Inbox mapping), re-surfaces **broken** connections as proactively-detected alerts, and flips to a **"Start hunting →"** launchpad when ready. A new **User** menu (jump-list + logout) and the existing **Activity** icon complete a three-icon cluster; status echoes into the Config sidenav. Retires the Configured/Incomplete badges.
+**Source:** Brainstorming session 2026-06-29 (config rework)
+**Priority:** Medium — depends on Epic 47 (paths) and Epic 46 (SSE stream)
+**FRs covered:** FR48.1–FR48.17, FR47.7 (badge retirement) · **NFRs:** NFR48.1–NFR48.3 · **UX-DRs:** UX-DR48.1–UX-DR48.3
+**Out of scope:** Announcements (later); run/error/match notifications (stay in Activity); changes to how setup pages save data
+**Architecture:** Per-user server-computed setup-status source of truth (`GET /api/setup-status`, reactively invalidated) + `broken`-transition pushes over Epic 46's existing SSE stream/registry; `useSetupStatus` hook mirrors `useActivityStream`; top-bar work in `Layout.tsx`; per-user isolation, credentials never returned
+
+---

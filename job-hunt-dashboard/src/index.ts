@@ -34,6 +34,7 @@ import gmailMappingsRoute from './server/routes/api-config-gmail-mappings'
 import adminRoute from './server/routes/api-admin'
 import blacklistRoute from './server/routes/api-blacklist'
 import activityRoute from './server/routes/api-activity'
+import setupStatusRoute from './server/routes/api-setup-status'
 import type { AppEnv } from './server/types'
 
 interface WsData {
@@ -126,6 +127,7 @@ app.route('/api/config/gmail-mappings', gmailMappingsRoute)
 app.route('/api/admin', adminRoute)
 app.route('/api/blacklist', blacklistRoute)
 app.route('/api/activity', activityRoute)
+app.route('/api/setup-status', setupStatusRoute)
 app.route('/auth', authRoute)
 app.onError(errorHandler)
 

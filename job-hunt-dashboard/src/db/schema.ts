@@ -178,6 +178,14 @@ export const gmailLabelMappings = sqliteTable('gmail_label_mappings', {
   uniqueIndex('gmail_label_mappings_user_label_unique_idx').on(table.userId, table.label),
 ])
 
+export const setupDismissals = sqliteTable('setup_dismissals', {
+  userId: integer('user_id').notNull().references(() => users.id),
+  taskId: text('task_id').notNull(),
+  dismissedAt: text('dismissed_at').notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.taskId] }),
+])
+
 export const sourceSettings = sqliteTable('source_settings', {
   source: text('source').primaryKey(),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),

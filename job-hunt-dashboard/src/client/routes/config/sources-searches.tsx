@@ -19,7 +19,7 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   return <span aria-hidden="true" className="ml-1 text-zinc-300">{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
-export function JobSourcesSearchesRoute() {
+export function SourcesSearchesRoute() {
   const { data: configs = [], isPending } = useSearchConfigsQuery()
   const { data: sourceSettingsList = [], isLoading: sourceSettingsLoading } = useSourceSettingsQuery()
   const addMutation = useAddSearchConfigMutation()

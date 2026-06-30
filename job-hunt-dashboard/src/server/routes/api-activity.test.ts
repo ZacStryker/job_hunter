@@ -1,9 +1,48 @@
-import { describe, test, expect, spyOn } from 'bun:test'
+process.env.DB_PATH = ':memory:'
+process.env.ENCRYPTION_KEY = 'a'.repeat(64)
+
+import { describe, test, expect, spyOn, beforeAll, beforeEach } from 'bun:test'
 import { Hono } from 'hono'
-import activityRoute, { KEEPALIVE_MS } from './api-activity'
-import { activityRegistry } from '../services/activity-registry'
-import { activityRunSchema } from '../../shared/schemas'
+import { Database } from 'bun:sqlite'
 import type { AppEnv } from '../types'
+
+const { default: activityRoute, KEEPALIVE_MS } = await import('./api-activity')
+const { activityRegistry } = await import('../services/activity-registry')
+const { setupHealth } = await import('../services/setup-health')
+const { activityRunSchema, setupStatusSchema } = await import('../../shared/schemas')
+const { db: prodDb } = await import('../../db/client')
+const sqlite = (prodDb as unknown as { $client: Database }).$client
+
+const DDL = [
+  `CREATE TABLE IF NOT EXISTS user_secrets (
+    user_id INTEGER NOT NULL, key_name TEXT NOT NULL, ciphertext TEXT NOT NULL, updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, key_name))`,
+  `CREATE TABLE IF NOT EXISTS profile (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL DEFAULT 1, profile_data TEXT, UNIQUE(user_id))`,
+  `CREATE TABLE IF NOT EXISTS inbox_folder_mappings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, folder_path TEXT NOT NULL, job_status TEXT NOT NULL, created_at TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS gmail_label_mappings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, label TEXT NOT NULL, job_status TEXT NOT NULL, created_at TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS setup_dismissals (
+    user_id INTEGER NOT NULL, task_id TEXT NOT NULL, dismissed_at TEXT NOT NULL, PRIMARY KEY (user_id, task_id))`,
+]
+
+beforeAll(() => {
+  for (const stmt of DDL) sqlite.run(stmt)
+})
+
+beforeEach(() => {
+  // Clear everything the per-user health auto-check reads on stream open, so a
+  // prior test file's leftover rows in the shared :memory: DB can't trigger a
+  // stray setup-status emit that races our explicit markBroken below.
+  sqlite.run('DELETE FROM user_secrets')
+  sqlite.run('DELETE FROM inbox_folder_mappings')
+  sqlite.run('DELETE FROM gmail_label_mappings')
+  for (const id of ['apiKey', 'inboxConnect', 'inboxMapping', 'linkedin'] as const) {
+    setupHealth.clear(1, id)
+    setupHealth.clear(2, id)
+  }
+})
 
 const makeApp = (userId: number) => {
   const w = new Hono<AppEnv>()
@@ -141,6 +180,71 @@ describe('GET /api/activity/stream', () => {
     } finally {
       setSpy.mockRestore()
       clearSpy.mockRestore()
+    }
+  })
+})
+
+describe('GET /api/activity/stream — setup-status channel', () => {
+  test('delivers a schema-valid setup-status event on a health transition, with no secret leaked', async () => {
+    const userId = 1
+    const res = await makeApp(userId).request('/api/activity/stream')
+    const reader = res.body!.getReader()
+
+    const snap = await readUntil(reader, (b) => b.includes('event: snapshot'))
+    expect(snap).not.toBeNull()
+
+    // Present (complete) Anthropic credential for this user.
+    const SECRET = 'sk-ant-do-not-leak-9f8e7d'
+    sqlite.run(
+      'INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, ?, ?, ?)',
+      ['anthropic_api_key', SECRET, '2026-01-01T00:00:00.000Z'],
+    )
+
+    setupHealth.markBroken(userId, 'apiKey')
+
+    const buf = await readUntil(reader, (b) => b.includes('event: setup-status'))
+    expect(buf).not.toBeNull()
+    const status = setupStatusSchema.parse(dataFor(buf!, 'setup-status'))
+    expect(status.tasks.find((t) => t.id === 'apiKey')!.state).toBe('broken')
+    expect(status.ready).toBe(false)
+    expect(buf!).not.toContain(SECRET)
+
+    await reader.cancel()
+  })
+
+  test('does not deliver another user\'s setup-status event', async () => {
+    const res = await makeApp(2).request('/api/activity/stream')
+    const reader = res.body!.getReader()
+
+    const snap = await readUntil(reader, (b) => b.includes('event: snapshot'))
+    expect(snap).not.toBeNull()
+
+    setupHealth.markBroken(1, 'apiKey')
+
+    const leaked = await readUntil(reader, (b) => b.includes('event: setup-status'), 250)
+    expect(leaked).toBeNull()
+
+    await reader.cancel()
+  })
+
+  test('starts and stops the per-user health interval on subscribe/disconnect', async () => {
+    const userId = 1
+    const startSpy = spyOn(setupHealth, 'startForUser')
+    const stopSpy = spyOn(setupHealth, 'stopForUser')
+    try {
+      const res = await makeApp(userId).request('/api/activity/stream')
+      const reader = res.body!.getReader()
+      const snap = await readUntil(reader, (b) => b.includes('event: snapshot'))
+      expect(snap).not.toBeNull()
+      expect(startSpy.mock.calls.some(([uid]) => uid === userId)).toBe(true)
+
+      await reader.cancel()
+      await new Promise((r) => setTimeout(r, 50))
+
+      expect(stopSpy.mock.calls.some(([uid]) => uid === userId)).toBe(true)
+    } finally {
+      startSpy.mockRestore()
+      stopSpy.mockRestore()
     }
   })
 })

@@ -25,6 +25,7 @@ export function useGmailConnection() {
       return
     }
     await queryClient.invalidateQueries({ queryKey: ['onboarding-status'] })
+    await queryClient.invalidateQueries({ queryKey: ['setup-status'] })
     await queryClient.invalidateQueries({ queryKey: ['gmail-mappings'] })
     await queryClient.invalidateQueries({ queryKey: ['gmail-labels'] })
     toast.success('Gmail disconnected')

@@ -47,10 +47,13 @@ export async function scrapeRoutes(fastify) {
 
     const { source, query, location, maxResults, storageStateContent } = body.data;
     const scrapers = { indeed: searchIndeed, indeed_nl: searchIndeedNl, linkedin: searchLinkedIn, arc: searchArc };
-    const { result: results, updatedContent } = await withStorageState(storageStateContent, (storageStatePath) =>
+    const { result, updatedContent } = await withStorageState(storageStateContent, (storageStatePath) =>
       scrapers[source]({ query, location, maxResults, storageStatePath })
     );
-    return { source, query, results, updatedStorageStateContent: updatedContent, scrapedAt: new Date().toISOString() };
+    // LinkedIn returns { results, sessionInvalid }; other sources return a plain array.
+    const results = Array.isArray(result) ? result : result.results;
+    const sessionInvalid = Array.isArray(result) ? false : Boolean(result.sessionInvalid);
+    return { source, query, results, sessionInvalid, updatedStorageStateContent: updatedContent, scrapedAt: new Date().toISOString() };
   });
 
   fastify.post('/scrape/listing', async (request, reply) => {

@@ -9,7 +9,7 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   // Google's top-level OAuth redirect lands here; if the session cookie is gone
   // (expired during consent, or dropped), redirect gracefully instead of a raw 401.
   const unauthorized = c.req.path === '/api/onboarding/gmail/callback'
-    ? c.redirect('/config/profile/inbox-mapping?gmail=error')
+    ? c.redirect('/config/connections/inbox?gmail=error')
     : c.json({ error: 'Unauthorized' }, 401)
 
   const sessionId = getCookie(c, 'session')

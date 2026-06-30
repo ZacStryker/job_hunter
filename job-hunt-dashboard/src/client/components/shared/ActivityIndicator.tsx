@@ -75,7 +75,7 @@ export function ActivityIndicator() {
         )}
         <div className="mt-3 border-t border-zinc-800 pt-2">
           <Link
-            to="/config/logs"
+            to="/config/system/logs"
             onClick={() => setOpen(false)}
             className="block text-zinc-400 hover:text-zinc-200 text-xs transition-colors"
           >

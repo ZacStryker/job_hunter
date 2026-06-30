@@ -6,6 +6,7 @@ import { db } from '../../db/client'
 import { userSecrets, gmailLabelMappings } from '../../db/schema'
 import { encrypt, decrypt } from '../lib/crypto'
 import { GMAIL_SCOPES, isGmailConfigured, getOAuthClient, getAccessToken, encodeState, decodeState } from '../lib/gmail-oauth'
+import { setupHealth } from '../services/setup-health'
 import type { AppEnv } from '../types'
 
 const app = new Hono<AppEnv>()
@@ -88,6 +89,8 @@ app.put('/anthropic', async (c) => {
     })
     .run()
 
+  setupHealth.markHealthy(userId, 'apiKey')
+
   return c.json({ ok: true })
 })
 
@@ -158,6 +161,8 @@ app.put('/imap', async (c) => {
       .run()
   }
 
+  setupHealth.markHealthy(userId, 'inboxConnect')
+
   return c.json({ ok: true })
 })
 
@@ -203,7 +208,7 @@ app.get('/gmail/connect', (c) => {
 app.get('/gmail/callback', async (c) => {
   const rawState = c.req.query('state')
   const parsed = rawState ? decodeState(rawState) : null
-  const surface = parsed?.ret === 'onboarding' ? '/onboarding' : '/config/profile/inbox-mapping'
+  const surface = parsed?.ret === 'onboarding' ? '/onboarding' : '/config/connections/inbox'
 
   if (c.req.query('error')) return c.redirect(`${surface}?gmail=error`)
 
@@ -245,6 +250,7 @@ app.get('/gmail/callback', async (c) => {
           .run()
       }
     })
+    setupHealth.markHealthy(userId, 'inboxConnect')
   } catch {
     return c.redirect(`${surface}?gmail=error`)
   }
@@ -298,6 +304,8 @@ app.delete('/gmail', async (c) => {
       .run()
     tx.delete(gmailLabelMappings).where(eq(gmailLabelMappings.userId, userId)).run()
   })
+
+  setupHealth.clear(userId, 'inboxConnect')
 
   return c.json({ ok: true })
 })

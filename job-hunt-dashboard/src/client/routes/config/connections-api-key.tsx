@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { queryClient } from '@/lib/query-client'
 import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
 
-export function ProfileApiKeysRoute() {
+export function ConnectionsApiKeyRoute() {
   const { data: status } = useOnboardingStatusQuery()
   const [apiKey, setApiKey] = useState('')
   const [testState, setTestState] = useState<'idle' | 'loading' | 'pass' | 'fail'>('idle')
@@ -39,6 +39,7 @@ export function ProfileApiKeysRoute() {
       })
       if (res.ok) {
         await queryClient.invalidateQueries({ queryKey: ['onboarding-status'] })
+        await queryClient.invalidateQueries({ queryKey: ['setup-status'] })
         toast.success('API key saved')
         setApiKey(''); setTestState('idle'); setTestMsg('')
       } else {
@@ -52,7 +53,7 @@ export function ProfileApiKeysRoute() {
   return (
     <div className="p-6 max-w-md">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-zinc-100">API Keys</h1>
+        <h1 className="text-xl font-semibold text-zinc-100">API Key</h1>
         {status?.hasAnthropicKey
           ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400">Configured</span>
           : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>

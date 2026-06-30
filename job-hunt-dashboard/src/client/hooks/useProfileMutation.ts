@@ -20,6 +20,7 @@ export function useProfileMutation() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] })
+      queryClient.invalidateQueries({ queryKey: ['setup-status'] })
     },
   })
 }

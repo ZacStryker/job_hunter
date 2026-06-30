@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { useBlacklistQuery } from '@/hooks/useBlacklistQuery'
 import { useAddToBlacklist, useRemoveFromBlacklist } from '@/hooks/useBlacklistMutations'
 
-export function ConfigJobSourcesBlacklistRoute() {
+export function SourcesBlacklistRoute() {
   const { data: entries = [], isPending, isError } = useBlacklistQuery()
   const addMutation = useAddToBlacklist()
   const removeMutation = useRemoveFromBlacklist()

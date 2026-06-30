@@ -7,7 +7,7 @@ import { useLinkedinBrowserSession } from '@/hooks/useLinkedinBrowserSession'
 import { LinkedInBrowserModal } from '@/components/linkedin/LinkedInBrowserModal'
 import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
 
-export function JobSourcesAuthSetupRoute() {
+export function ConnectionsLinkedinRoute() {
   const { data: status } = useOnboardingStatusQuery()
   const queryClient = useQueryClient()
 
@@ -21,6 +21,7 @@ export function JobSourcesAuthSetupRoute() {
       setModalOpen(false)
       toast.success('LinkedIn connected')
       queryClient.invalidateQueries({ queryKey: ['onboarding-status'] })
+      queryClient.invalidateQueries({ queryKey: ['setup-status'] })
     } else if ((sessionStatus === 'timeout' || sessionStatus === 'error') && modalOpen) {
       setModalOpen(false)
     }
@@ -37,7 +38,7 @@ export function JobSourcesAuthSetupRoute() {
 
   return (
     <div className="p-6">
-      <h1 className="text-xl font-semibold text-zinc-100 mb-6">Auth Setup</h1>
+      <h1 className="text-xl font-semibold text-zinc-100 mb-6">LinkedIn</h1>
       <ul className="space-y-3">
         <li className="flex items-center justify-between">
           <div className="flex items-center gap-3">

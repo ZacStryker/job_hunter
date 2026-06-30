@@ -188,7 +188,7 @@ const columns = [
   }),
 ]
 
-export function ConfigLogsRoute() {
+export function SystemLogsRoute() {
   const { data: runs = [], isPending, isError, error } = useWebhookRunsQuery()
   const [sorting, setSorting] = useState<SortingState>(() => loadSorting() ?? [{ id: 'runAt', desc: true }])
   const [keyword, setKeyword] = useState('')

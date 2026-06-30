@@ -20,6 +20,7 @@ export function useInboxMappingsMutation() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inbox-mappings'] })
+      queryClient.invalidateQueries({ queryKey: ['setup-status'] })
     },
     onError: (err: Error) => {
       toast.error(err.message)

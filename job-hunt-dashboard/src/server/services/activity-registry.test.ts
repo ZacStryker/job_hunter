@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from 'bun:test'
-import { createActivityRegistry, type ActivityListener } from './activity-registry'
-import type { ActivityRun } from '../../shared/schemas'
+import { createActivityRegistry, type ActivityListener, type SetupStatusListener } from './activity-registry'
+import type { ActivityRun, SetupStatus } from '../../shared/schemas'
 
 const USER_A = 1
 const USER_B = 2
@@ -171,5 +171,52 @@ describe('hasRunning', () => {
     expect(registry.hasRunning(USER_A, 'analysis')).toBe(true)
     registry.finalize(id, 'failed', 1_000)
     expect(registry.hasRunning(USER_A, 'analysis')).toBe(false)
+  })
+})
+
+const STATUS_A: SetupStatus = { tasks: [], ready: true }
+const STATUS_B: SetupStatus = { tasks: [], ready: false }
+
+describe('setup-status channel', () => {
+  test('emitSetupStatus notifies only the right user\'s listeners', () => {
+    const seenA: SetupStatus[] = []
+    const seenB: SetupStatus[] = []
+    registry.subscribeSetupStatus(USER_A, (s) => seenA.push(s))
+    registry.subscribeSetupStatus(USER_B, (s) => seenB.push(s))
+
+    registry.emitSetupStatus(USER_A, STATUS_A)
+
+    expect(seenA).toEqual([STATUS_A])
+    expect(seenB).toHaveLength(0)
+  })
+
+  test('unsubscribeSetupStatus stops delivery', () => {
+    const seen: SetupStatus[] = []
+    const listener: SetupStatusListener = (s) => seen.push(s)
+    registry.subscribeSetupStatus(USER_A, listener)
+    registry.emitSetupStatus(USER_A, STATUS_A)
+    registry.unsubscribeSetupStatus(USER_A, listener)
+    registry.emitSetupStatus(USER_A, STATUS_B)
+
+    expect(seen).toEqual([STATUS_A])
+  })
+
+  test('activity (runs) listeners are unaffected by setup-status emits and vice-versa', () => {
+    const seenRuns: ActivityRun[][] = []
+    const seenStatus: SetupStatus[] = []
+    registry.subscribe(USER_A, (runs) => seenRuns.push(runs))
+    registry.subscribeSetupStatus(USER_A, (s) => seenStatus.push(s))
+
+    registry.emitSetupStatus(USER_A, STATUS_A)
+    expect(seenRuns).toHaveLength(0)
+    expect(seenStatus).toHaveLength(1)
+
+    registry.register({ userId: USER_A, type: 'discovery', progress: { count: 0, total: null } })
+    expect(seenRuns).toHaveLength(1)
+    expect(seenStatus).toHaveLength(1)
+  })
+
+  test('emitSetupStatus to a user with no listeners is a silent no-op', () => {
+    expect(() => registry.emitSetupStatus(999, STATUS_A)).not.toThrow()
   })
 })

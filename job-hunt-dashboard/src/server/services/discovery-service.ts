@@ -6,6 +6,7 @@ import { profileDataSchema } from '../../shared/schemas'
 import type { ScraperSource, ProfileData } from '../../shared/schemas'
 import { getOrComputeResumeEmbedding } from './resume-embedding-cache'
 import { embed, cosineSimilarity } from './embedding-service'
+import { setupHealth } from './setup-health'
 
 const EMPTY_PROFILE_DATA: ProfileData = {
   personal: { fullName: '', email: '', phone: null, location: null, summary: null, skills: null, websites: [] },
@@ -217,8 +218,13 @@ export async function runDiscovery(
       return
     }
 
-    const data = await res.json() as { results?: ScraperResult[]; updatedStorageStateContent?: string }
+    const data = await res.json() as { results?: ScraperResult[]; updatedStorageStateContent?: string; sessionInvalid?: boolean }
     console.log(`[DISCOVERY] ← ${s.source} results: ${data.results?.length ?? 0} jobs`)
+
+    if (s.source === 'linkedin' && userId !== undefined) {
+      if (data.sessionInvalid === true) setupHealth.markBroken(userId, 'linkedin')
+      else setupHealth.markHealthy(userId, 'linkedin')
+    }
 
     if (userId !== undefined && data.updatedStorageStateContent) {
       const keyName = s.source === 'linkedin'

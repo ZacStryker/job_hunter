@@ -1,7 +1,7 @@
 process.env.ENCRYPTION_KEY = 'a'.repeat(64)
 process.env.DB_PATH = ':memory:'
 
-import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach, mock } from 'bun:test'
+import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach, mock, spyOn } from 'bun:test'
 import { Database } from 'bun:sqlite'
 
 // ---- MOCK SETUP: must precede any dynamic import that depends on these modules ----
@@ -34,6 +34,7 @@ mock.module('./resume-embedding-cache', () => ({
 const originalFetch = globalThis.fetch
 
 const { runDiscovery } = await import('./discovery-service')
+const { setupHealth } = await import('./setup-health')
 const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
 
@@ -823,6 +824,67 @@ describe('runDiscovery()', () => {
 
       expect(existingRow.relevance_score).toBeNull() // Pre-existing job untouched
       expect(newRow.relevance_score).not.toBeNull()  // New job scored
+    })
+  })
+
+  describe('passive LinkedIn health mapping (Story 48.2 AC7)', () => {
+    const linkedinSecret = () => prodSqlite.run(
+      `INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (1, 'linkedin_storage_state', '${VALID_LINKEDIN_CIPHERTEXT}', '2026-01-01T00:00:00.000Z')`
+    )
+
+    test('sessionInvalid:true ⇒ markBroken(userId, linkedin)', async () => {
+      linkedinSecret()
+      const brokenSpy = spyOn(setupHealth, 'markBroken').mockImplementation(() => {})
+      const healthySpy = spyOn(setupHealth, 'markHealthy').mockImplementation(() => {})
+      try {
+        globalThis.fetch = mock(() =>
+          Promise.resolve(new Response(
+            JSON.stringify({ results: [], sessionInvalid: true }),
+            { status: 200, headers: { 'content-type': 'application/json' } }
+          ))
+        ) as unknown as typeof fetch
+        await runDiscovery(undefined, 1)
+        expect(brokenSpy.mock.calls.some(([uid, task]) => uid === 1 && task === 'linkedin')).toBe(true)
+        expect(healthySpy.mock.calls.some(([, task]) => task === 'linkedin')).toBe(false)
+      } finally {
+        brokenSpy.mockRestore()
+        healthySpy.mockRestore()
+      }
+    })
+
+    test('normal LinkedIn result ⇒ markHealthy(userId, linkedin)', async () => {
+      linkedinSecret()
+      const brokenSpy = spyOn(setupHealth, 'markBroken').mockImplementation(() => {})
+      const healthySpy = spyOn(setupHealth, 'markHealthy').mockImplementation(() => {})
+      try {
+        globalThis.fetch = mock(() =>
+          Promise.resolve(new Response(
+            JSON.stringify({ results: [{ id: 'li-1', title: 'SWE', company: 'Acme', location: null, url: null }] }),
+            { status: 200, headers: { 'content-type': 'application/json' } }
+          ))
+        ) as unknown as typeof fetch
+        await runDiscovery(undefined, 1)
+        expect(healthySpy.mock.calls.some(([uid, task]) => uid === 1 && task === 'linkedin')).toBe(true)
+        expect(brokenSpy.mock.calls.some(([, task]) => task === 'linkedin')).toBe(false)
+      } finally {
+        brokenSpy.mockRestore()
+        healthySpy.mockRestore()
+      }
+    })
+
+    test('a generic scraper error (HTTP 500) is inconclusive — neither broken nor healthy', async () => {
+      linkedinSecret()
+      const brokenSpy = spyOn(setupHealth, 'markBroken').mockImplementation(() => {})
+      const healthySpy = spyOn(setupHealth, 'markHealthy').mockImplementation(() => {})
+      try {
+        globalThis.fetch = mock(() => Promise.resolve(new Response(null, { status: 500 }))) as unknown as typeof fetch
+        await runDiscovery(undefined, 1)
+        expect(brokenSpy.mock.calls.some(([, task]) => task === 'linkedin')).toBe(false)
+        expect(healthySpy.mock.calls.some(([, task]) => task === 'linkedin')).toBe(false)
+      } finally {
+        brokenSpy.mockRestore()
+        healthySpy.mockRestore()
+      }
     })
   })
 })

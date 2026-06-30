@@ -20,6 +20,7 @@ export function useGmailMappingsMutation() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gmail-mappings'] })
+      queryClient.invalidateQueries({ queryKey: ['setup-status'] })
     },
     onError: (err: Error) => {
       toast.error(err.message)

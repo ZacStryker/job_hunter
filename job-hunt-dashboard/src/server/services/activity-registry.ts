@@ -1,12 +1,14 @@
-import type { ActivityRun, ActivityRunType, ActivityRunState, ActivityProgress } from '../../shared/schemas'
+import type { ActivityRun, ActivityRunType, ActivityRunState, ActivityProgress, SetupStatus } from '../../shared/schemas'
 
 export type ActivityListener = (runs: ActivityRun[]) => void
+export type SetupStatusListener = (status: SetupStatus) => void
 export const RETENTION_MS = 5_000
 
 export function createActivityRegistry() {
   const runsByUser = new Map<number, Map<string, ActivityRun>>()
   const ownerById = new Map<string, number>()
   const listenersByUser = new Map<number, Set<ActivityListener>>()
+  const setupListenersByUser = new Map<number, Set<SetupStatusListener>>()
 
   function snapshot(userId: number): ActivityRun[] {
     return [...(runsByUser.get(userId)?.values() ?? [])]
@@ -87,7 +89,35 @@ export function createActivityRegistry() {
     listenersByUser.get(userId)?.delete(listener)
   }
 
-  return { register, progress, finalize, hasRunning, snapshot, subscribe, unsubscribe }
+  function subscribeSetupStatus(userId: number, listener: SetupStatusListener): void {
+    let set = setupListenersByUser.get(userId)
+    if (!set) {
+      set = new Set()
+      setupListenersByUser.set(userId, set)
+    }
+    set.add(listener)
+  }
+
+  function unsubscribeSetupStatus(userId: number, listener: SetupStatusListener): void {
+    setupListenersByUser.get(userId)?.delete(listener)
+  }
+
+  function emitSetupStatus(userId: number, status: SetupStatus): void {
+    const listeners = setupListenersByUser.get(userId)
+    if (!listeners) return
+    for (const listener of [...listeners]) {
+      try {
+        listener(status)
+      } catch (err) {
+        console.error('activity-registry setup-status listener threw', err)
+      }
+    }
+  }
+
+  return {
+    register, progress, finalize, hasRunning, snapshot, subscribe, unsubscribe,
+    subscribeSetupStatus, unsubscribeSetupStatus, emitSetupStatus,
+  }
 }
 
 export const activityRegistry = createActivityRegistry()

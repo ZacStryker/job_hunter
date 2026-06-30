@@ -409,7 +409,7 @@ describe('GET /api/onboarding/gmail/callback', () => {
     const state = encodeState({ uid: 1, ret: 'config' })
     const res = await onboardingApp.request(`/gmail/callback?code=abc&state=${encodeURIComponent(state)}`, { method: 'GET' })
     expect(res.status).toBe(302)
-    expect(res.headers.get('location')).toBe('/config/profile/inbox-mapping?gmail=connected')
+    expect(res.headers.get('location')).toBe('/config/connections/inbox?gmail=connected')
 
     const rows = prodSqlite.prepare(
       `SELECT key_name, ciphertext FROM user_secrets WHERE user_id = 1 ORDER BY key_name`
@@ -431,7 +431,7 @@ describe('GET /api/onboarding/gmail/callback', () => {
     const state = encodeState({ uid: 1, ret: 'config' })
     const res = await onboardingApp.request(`/gmail/callback?error=access_denied&state=${encodeURIComponent(state)}`, { method: 'GET' })
     expect(res.status).toBe(302)
-    expect(res.headers.get('location')).toBe('/config/profile/inbox-mapping?gmail=error')
+    expect(res.headers.get('location')).toBe('/config/connections/inbox?gmail=error')
   })
 })
 

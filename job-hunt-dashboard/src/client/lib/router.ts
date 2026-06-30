@@ -27,18 +27,20 @@ import { fetchInviteKeys } from '../hooks/useInviteKeysQuery'
 import { ConfigLayout } from '../routes/config/layout'
 import { ConfigOverviewRoute } from '../routes/config/overview'
 import { ConfigProfileIndexRoute } from '../routes/config/profile-index'
-import { ConfigJobSourcesIndexRoute } from '../routes/config/job-sources-index'
+import { ConfigSourcesIndexRoute } from '../routes/config/sources-index'
 import { ConfigPromptsIndexRoute } from '../routes/config/prompts-index'
-import { ConfigLogsRoute } from '../routes/config/logs'
+import { SystemLogsRoute } from '../routes/config/system-logs'
+import { ConfigSystemIndexRoute } from '../routes/config/system-index'
 import { fetchWebhookRuns } from '../hooks/useWebhookRunsQuery'
 import { ProfileResumeRoute } from '../routes/config/profile-resume'
-import { ProfileApiKeysRoute } from '../routes/config/profile-api-keys'
-import { ProfileInboxMappingRoute } from '../routes/config/profile-inbox-mapping'
+import { ConfigConnectionsIndexRoute } from '../routes/config/connections-index'
+import { ConnectionsApiKeyRoute } from '../routes/config/connections-api-key'
+import { ConnectionsInboxRoute } from '../routes/config/connections-inbox'
 import { fetchInboxMappings } from '../hooks/useInboxMappingsQuery'
 import { fetchGmailMappings } from '../hooks/useGmailMappingsQuery'
-import { JobSourcesAuthSetupRoute } from '../routes/config/job-sources-auth-setup'
-import { JobSourcesSearchesRoute } from '../routes/config/job-sources-searches'
-import { ConfigJobSourcesBlacklistRoute } from '../routes/config/job-sources-blacklist'
+import { ConnectionsLinkedinRoute } from '../routes/config/connections-linkedin'
+import { SourcesSearchesRoute } from '../routes/config/sources-searches'
+import { SourcesBlacklistRoute } from '../routes/config/sources-blacklist'
 import { fetchBlacklist } from '../hooks/useBlacklistQuery'
 import { PromptsAnalysisRoute } from '../routes/config/prompts-analysis'
 import { PromptsCoverLetterRoute } from '../routes/config/prompts-cover-letter'
@@ -233,17 +235,24 @@ const configProfileResumeRoute = createRoute({
   loader: () => queryClient.ensureQueryData({ queryKey: ['profile'], queryFn: fetchProfile }),
 })
 
-const configProfileApiKeysRoute = createRoute({
+const configConnectionsRoute = createRoute({
   getParentRoute: () => configLayoutRoute,
-  path: '/config/profile/api-keys',
-  component: ProfileApiKeysRoute,
+  path: '/config/connections',
+  component: ConfigConnectionsIndexRoute,
   loader: () => queryClient.ensureQueryData({ queryKey: ['onboarding-status'], queryFn: fetchOnboardingStatus }),
 })
 
-const configProfileInboxMappingRoute = createRoute({
+const configConnectionsLinkedinRoute = createRoute({
   getParentRoute: () => configLayoutRoute,
-  path: '/config/profile/inbox-mapping',
-  component: ProfileInboxMappingRoute,
+  path: '/config/connections/linkedin',
+  component: ConnectionsLinkedinRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['onboarding-status'], queryFn: fetchOnboardingStatus }),
+})
+
+const configConnectionsInboxRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/connections/inbox',
+  component: ConnectionsInboxRoute,
   beforeLoad: () => {
     const flags = queryClient.getQueryData<FeatureSettings>(['feature-settings'])
     if (!flags?.emailFeatures) throw redirect({ to: '/' })
@@ -255,38 +264,71 @@ const configProfileInboxMappingRoute = createRoute({
   ]),
 })
 
-const configJobSourcesRoute = createRoute({
+const configConnectionsApiKeyRoute = createRoute({
   getParentRoute: () => configLayoutRoute,
-  path: '/config/job-sources',
-  component: ConfigJobSourcesIndexRoute,
-  loader: () => Promise.all([
-    queryClient.ensureQueryData({ queryKey: ['onboarding-status'], queryFn: fetchOnboardingStatus }),
-    queryClient.ensureQueryData({ queryKey: ['search-configs'], queryFn: fetchSearchConfigs }),
-  ]),
-})
-
-const configJobSourcesAuthSetupRoute = createRoute({
-  getParentRoute: () => configLayoutRoute,
-  path: '/config/job-sources/auth-setup',
-  component: JobSourcesAuthSetupRoute,
+  path: '/config/connections/api-key',
+  component: ConnectionsApiKeyRoute,
   loader: () => queryClient.ensureQueryData({ queryKey: ['onboarding-status'], queryFn: fetchOnboardingStatus }),
 })
 
-const configJobSourcesSearchesRoute = createRoute({
+const configProfileApiKeysRedirectRoute = createRoute({
   getParentRoute: () => configLayoutRoute,
-  path: '/config/job-sources/searches',
-  component: JobSourcesSearchesRoute,
+  path: '/config/profile/api-keys',
+  beforeLoad: () => { throw redirect({ to: '/config/connections/api-key' }) },
+})
+
+const configProfileInboxMappingRedirectRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/profile/inbox-mapping',
+  beforeLoad: () => { throw redirect({ to: '/config/connections/inbox' }) },
+})
+
+const configSourcesRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/sources',
+  component: ConfigSourcesIndexRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['search-configs'], queryFn: fetchSearchConfigs }),
+})
+
+const configSourcesSearchesRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/sources/searches',
+  component: SourcesSearchesRoute,
   loader: () => Promise.all([
     queryClient.ensureQueryData({ queryKey: ['search-configs'], queryFn: fetchSearchConfigs }),
     queryClient.ensureQueryData({ queryKey: ['source-settings'], queryFn: fetchSourceSettings }),
   ]),
 })
 
-const configJobSourcesBlacklistRoute = createRoute({
+const configSourcesBlacklistRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/sources/blacklist',
+  component: SourcesBlacklistRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['blacklist'], queryFn: fetchBlacklist }),
+})
+
+const configJobSourcesRedirectRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/job-sources',
+  beforeLoad: () => { throw redirect({ to: '/config/sources' }) },
+})
+
+const configJobSourcesSearchesRedirectRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/job-sources/searches',
+  beforeLoad: () => { throw redirect({ to: '/config/sources/searches' }) },
+})
+
+const configJobSourcesBlacklistRedirectRoute = createRoute({
   getParentRoute: () => configLayoutRoute,
   path: '/config/job-sources/blacklist',
-  component: ConfigJobSourcesBlacklistRoute,
-  loader: () => queryClient.ensureQueryData({ queryKey: ['blacklist'], queryFn: fetchBlacklist }),
+  beforeLoad: () => { throw redirect({ to: '/config/sources/blacklist' }) },
+})
+
+const configJobSourcesAuthSetupRedirectRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/job-sources/auth-setup',
+  beforeLoad: () => { throw redirect({ to: '/config/connections/linkedin' }) },
 })
 
 const configPromptsRoute = createRoute({
@@ -317,11 +359,23 @@ const configPromptsResumeRoute = createRoute({
   loader: () => queryClient.ensureQueryData({ queryKey: ['prompts'], queryFn: fetchPrompts }),
 })
 
-const configLogsRoute = createRoute({
+const configSystemRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/system',
+  component: ConfigSystemIndexRoute,
+})
+
+const configSystemLogsRoute = createRoute({
+  getParentRoute: () => configLayoutRoute,
+  path: '/config/system/logs',
+  component: SystemLogsRoute,
+  loader: () => queryClient.ensureQueryData({ queryKey: ['webhook-runs'], queryFn: fetchWebhookRuns }),
+})
+
+const configLogsRedirectRoute = createRoute({
   getParentRoute: () => configLayoutRoute,
   path: '/config/logs',
-  component: ConfigLogsRoute,
-  loader: () => queryClient.ensureQueryData({ queryKey: ['webhook-runs'], queryFn: fetchWebhookRuns }),
+  beforeLoad: () => { throw redirect({ to: '/config/system/logs' }) },
 })
 
 const adminUsersRoute = createRoute({
@@ -358,17 +412,26 @@ const routeTree = rootRoute.addChildren([
       configOverviewRoute,
       configProfileRoute,
       configProfileResumeRoute,
-      configProfileApiKeysRoute,
-      configProfileInboxMappingRoute,
-      configJobSourcesRoute,
-      configJobSourcesAuthSetupRoute,
-      configJobSourcesSearchesRoute,
-      configJobSourcesBlacklistRoute,
+      configConnectionsRoute,
+      configConnectionsLinkedinRoute,
+      configConnectionsInboxRoute,
+      configConnectionsApiKeyRoute,
+      configProfileApiKeysRedirectRoute,
+      configProfileInboxMappingRedirectRoute,
+      configJobSourcesAuthSetupRedirectRoute,
+      configSourcesRoute,
+      configSourcesSearchesRoute,
+      configSourcesBlacklistRoute,
+      configJobSourcesRedirectRoute,
+      configJobSourcesSearchesRedirectRoute,
+      configJobSourcesBlacklistRedirectRoute,
       configPromptsRoute,
       configPromptsAnalysisRoute,
       configPromptsCoverLetterRoute,
       configPromptsResumeRoute,
-      configLogsRoute,
+      configSystemRoute,
+      configSystemLogsRoute,
+      configLogsRedirectRoute,
     ]),
   ]),
 ])

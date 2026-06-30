@@ -386,3 +386,29 @@ export const resumeDataSchema = z.object({
   })).min(1),
 })
 export type ResumeData = z.infer<typeof resumeDataSchema>
+
+export const SETUP_TASK_ORDER = ['linkedin', 'apiKey', 'profile', 'inboxConnect', 'inboxMapping'] as const
+
+export const setupTaskIdSchema = z.enum(SETUP_TASK_ORDER)
+export const setupTaskStateSchema = z.enum(['notStarted', 'partial', 'complete', 'broken'])
+export const setupTaskTierSchema = z.enum(['required', 'optional'])
+
+export const setupTaskSchema = z.object({
+  id: setupTaskIdSchema,
+  state: setupTaskStateSchema,
+  tier: setupTaskTierSchema,
+  dependsOn: setupTaskIdSchema.nullable(),
+  dismissed: z.boolean(),
+  progress: z.object({ filled: z.number().int(), total: z.number().int() }).nullable(),
+})
+
+export const setupStatusSchema = z.object({
+  tasks: z.array(setupTaskSchema),
+  ready: z.boolean(),
+})
+
+export type SetupTaskId = z.infer<typeof setupTaskIdSchema>
+export type SetupTaskState = z.infer<typeof setupTaskStateSchema>
+export type SetupTaskTier = z.infer<typeof setupTaskTierSchema>
+export type SetupTask = z.infer<typeof setupTaskSchema>
+export type SetupStatus = z.infer<typeof setupStatusSchema>

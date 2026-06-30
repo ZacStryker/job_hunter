@@ -1,14 +1,31 @@
 import { withFirefoxPage, scrapeWithRetry } from './base.js';
 
+// A logged-out / expired LinkedIn session lands on an auth-wall, login, or
+// checkpoint page instead of the jobs search results.
+const AUTH_WALL_PATTERNS = ['/authwall', '/login', '/uas/login', '/checkpoint'];
+const isAuthWall = (currentUrl) => AUTH_WALL_PATTERNS.some((p) => currentUrl.includes(p));
+
 export async function searchLinkedIn({ query, location = 'Remote', maxResults = 25, storageStatePath = null }) {
   return scrapeWithRetry('linkedin', () => {
     const url = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}&sortBy=DD&f_TPR=r86400`;
     return withFirefoxPage(storageStatePath, async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForSelector('div[data-job-id]', { timeout: 80000 });
+
+      if (isAuthWall(page.url())) return { results: [], sessionInvalid: true };
+
+      try {
+        await page.waitForSelector('div[data-job-id]', { timeout: 80000 });
+      } catch (err) {
+        // Distinguish a sign-in interstitial (session invalid) from a generic
+        // failure (inconclusive — must not flip LinkedIn health).
+        const signedOut = isAuthWall(page.url())
+          || await page.$('input[name="session_key"], .authwall, form.login__form').then((el) => Boolean(el)).catch(() => false);
+        if (signedOut) return { results: [], sessionInvalid: true };
+        throw err;
+      }
       await page.waitForTimeout(2000 + Math.random() * 2000);
 
-      return page.evaluate((max) => {
+      const results = await page.evaluate((max) => {
         const cards = [...document.querySelectorAll('div[data-job-id]')].slice(0, max);
         return cards.map(card => {
           const timeEl = card.querySelector('time[datetime]');
@@ -23,6 +40,7 @@ export async function searchLinkedIn({ query, location = 'Remote', maxResults = 
           };
         });
       }, maxResults);
+      return { results, sessionInvalid: false };
     });
   }, 1);
 }

@@ -22,7 +22,7 @@ type MessageType = typeof MESSAGE_TYPES[number]
 type MappingRow = { folderPath: string; jobStatus: MessageType }
 type GmailMappingRow = { label: string; jobStatus: MessageType }
 
-export function ProfileInboxMappingRoute() {
+export function ConnectionsInboxRoute() {
   const { data: status } = useOnboardingStatusQuery()
   const { data: mappings = [] } = useInboxMappingsQuery()
   const mutation = useInboxMappingsMutation()
@@ -74,6 +74,7 @@ export function ProfileInboxMappingRoute() {
     if (result === 'connected') {
       toast.success('Gmail connected')
       queryClient.invalidateQueries({ queryKey: ['onboarding-status'] })
+      queryClient.invalidateQueries({ queryKey: ['setup-status'] })
     } else if (result === 'error') {
       toast.error('Could not connect Gmail — please try again')
     }
@@ -112,6 +113,7 @@ export function ProfileInboxMappingRoute() {
       })
       if (res.ok) {
         await queryClient.invalidateQueries({ queryKey: ['onboarding-status'] })
+        await queryClient.invalidateQueries({ queryKey: ['setup-status'] })
         toast.success('IMAP settings saved')
         setImapHost(''); setImapPort(993); setImapUser(''); setImapPass('')
         setImapTestState('idle'); setImapTestMsg('')
