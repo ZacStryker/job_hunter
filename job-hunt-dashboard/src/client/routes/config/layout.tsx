@@ -1,6 +1,8 @@
 import { Outlet, Link, type LinkProps } from '@tanstack/react-router'
+import type { SetupTask, SetupTaskId } from '@shared/schemas'
 import { ConfigBreadcrumb } from '@/components/config/ConfigBreadcrumb'
 import { useFeatureSettingsQuery } from '@/hooks/useFeatureSettingsQuery'
+import { useSetupStatus } from '@/hooks/useSetupStatus'
 
 const headerBaseClass =
   'block px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors rounded'
@@ -13,9 +15,39 @@ const childInactiveProps = { className: 'text-zinc-500 hover:text-zinc-300' }
 
 type ToPath = LinkProps['to']
 type ChildLink = { label: string; to: ToPath; requiresEmail?: boolean }
-type Section = { label: string; to?: ToPath; links: ChildLink[] }
+export type Section = { label: string; to?: ToPath; links: ChildLink[] }
 
-const SECTIONS: Section[] = [
+export function taskNeedsAttention(t: SetupTask): boolean {
+  if (t.dismissed) return false
+  return t.state === 'broken' || (t.tier === 'required' && t.state !== 'complete')
+}
+
+const NAV_TASK_IDS: Partial<Record<string, SetupTaskId[]>> = {
+  '/config/profile/resume': ['profile'],
+  '/config/connections/linkedin': ['linkedin'],
+  '/config/connections/inbox': ['inboxConnect', 'inboxMapping'],
+  '/config/connections/api-key': ['apiKey'],
+}
+
+export function childNeedsAttention(to: ToPath, tasks: SetupTask[]): boolean {
+  const ids = NAV_TASK_IDS[String(to)]
+  if (!ids) return false
+  return ids.some((id) => {
+    const task = tasks.find((t) => t.id === id)
+    return !!task && taskNeedsAttention(task)
+  })
+}
+
+export function sectionNeedsAttention(section: Section, tasks: SetupTask[], emailFeatures: boolean): boolean {
+  return section.links.some((link) => {
+    if (link.requiresEmail && !emailFeatures) return false
+    return childNeedsAttention(link.to, tasks)
+  })
+}
+
+const attentionDotClass = 'ml-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500'
+
+export const SECTIONS: Section[] = [
   {
     label: 'Profile',
     to: '/config/profile',
@@ -60,6 +92,7 @@ const SECTIONS: Section[] = [
 export function ConfigLayout() {
   const { data: featureSettings } = useFeatureSettingsQuery()
   const emailFeatures = !!featureSettings?.emailFeatures
+  const { tasks } = useSetupStatus()
   return (
     <div className="flex h-full">
       <nav className="w-52 shrink-0 border-r border-zinc-800 p-4">
@@ -72,10 +105,22 @@ export function ConfigLayout() {
                 activeProps={headerActiveProps}
                 inactiveProps={headerInactiveProps}
               >
-                {section.label}
+                <span className="flex items-center">
+                  {section.label}
+                  {sectionNeedsAttention(section, tasks, emailFeatures) && (
+                    <span className={attentionDotClass} aria-hidden />
+                  )}
+                </span>
               </Link>
             ) : (
-              <div className={`${headerBaseClass} text-zinc-400`}>{section.label}</div>
+              <div className={`${headerBaseClass} text-zinc-400`}>
+                <span className="flex items-center">
+                  {section.label}
+                  {sectionNeedsAttention(section, tasks, emailFeatures) && (
+                    <span className={attentionDotClass} aria-hidden />
+                  )}
+                </span>
+              </div>
             )}
             {section.links.map((link) =>
               link.requiresEmail && !emailFeatures ? null : (
@@ -87,7 +132,12 @@ export function ConfigLayout() {
                   activeProps={childActiveProps}
                   inactiveProps={childInactiveProps}
                 >
-                  {link.label}
+                  <span className="flex items-center">
+                    {link.label}
+                    {childNeedsAttention(link.to, tasks) && (
+                      <span className={attentionDotClass} aria-hidden />
+                    )}
+                  </span>
                 </Link>
               ),
             )}

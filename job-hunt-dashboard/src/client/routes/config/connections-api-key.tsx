@@ -54,10 +54,6 @@ export function ConnectionsApiKeyRoute() {
     <div className="p-6 max-w-md">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold text-zinc-100">API Key</h1>
-        {status?.hasAnthropicKey
-          ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400">Configured</span>
-          : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
-        }
       </div>
       <p className="text-sm text-zinc-400 mb-4">
         Enter your Anthropic API key. Find it at <span className="text-zinc-300">console.anthropic.com</span>.

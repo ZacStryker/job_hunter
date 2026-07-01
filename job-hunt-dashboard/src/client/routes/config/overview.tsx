@@ -1,20 +1,11 @@
 import { Link } from '@tanstack/react-router'
-import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
-import { useProfileQuery } from '@/hooks/useProfileQuery'
-import { useSearchConfigsQuery } from '@/hooks/useSearchConfigsQuery'
 import { usePromptsQuery } from '@/hooks/usePromptsQuery'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { CircleHelp } from 'lucide-react'
 
 export function ConfigOverviewRoute() {
-  const { data: status } = useOnboardingStatusQuery()
-  const { data: profile } = useProfileQuery()
-  const { data: searchConfigs = [] } = useSearchConfigsQuery()
   const { data: prompts = [] } = usePromptsQuery()
 
-  const profileConfigured = !!profile?.personal?.fullName
-  const sourcesConfigured = searchConfigs.length > 0
-  const connectionsConfigured = !!(status?.hasLinkedinAuth && status?.hasAnthropicKey)
   const promptsEdited = prompts.some(p => p.isCustom)
 
   return (
@@ -42,10 +33,6 @@ export function ConfigOverviewRoute() {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {profileConfigured
-                ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400">Configured</span>
-                : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
-              }
             </div>
           </Link>
 
@@ -69,10 +56,6 @@ export function ConfigOverviewRoute() {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {sourcesConfigured
-                ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400">Configured</span>
-                : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
-              }
             </div>
           </Link>
 
@@ -96,10 +79,6 @@ export function ConfigOverviewRoute() {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {connectionsConfigured
-                ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400">Configured</span>
-                : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
-              }
             </div>
           </Link>
 

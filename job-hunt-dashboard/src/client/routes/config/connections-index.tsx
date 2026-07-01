@@ -1,16 +1,11 @@
 import { Link } from '@tanstack/react-router'
-import { useOnboardingStatusQuery } from '@/hooks/useOnboardingStatusQuery'
 import { useFeatureSettingsQuery } from '@/hooks/useFeatureSettingsQuery'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { CircleHelp } from 'lucide-react'
 
 export function ConfigConnectionsIndexRoute() {
-  const { data: status } = useOnboardingStatusQuery()
   const { data: featureSettings } = useFeatureSettingsQuery()
 
-  const linkedinConfigured = !!status?.hasLinkedinAuth
-  const inboxConfigured = !!status?.hasImap
-  const apiKeyConfigured = !!status?.hasAnthropicKey
   const emailFeatures = !!featureSettings?.emailFeatures
 
   return (
@@ -38,10 +33,6 @@ export function ConfigConnectionsIndexRoute() {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {linkedinConfigured
-                ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400">Configured</span>
-                : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
-              }
             </div>
           </Link>
 
@@ -66,10 +57,6 @@ export function ConfigConnectionsIndexRoute() {
                     </TooltipContent>
                   </Tooltip>
                 </div>
-                {inboxConfigured
-                  ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400">Configured</span>
-                  : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
-                }
               </div>
             </Link>
           )}
@@ -94,10 +81,6 @@ export function ConfigConnectionsIndexRoute() {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {apiKeyConfigured
-                ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400">Configured</span>
-                : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
-              }
             </div>
           </Link>
         </div>

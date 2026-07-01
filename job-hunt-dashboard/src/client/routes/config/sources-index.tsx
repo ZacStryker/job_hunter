@@ -1,13 +1,8 @@
 import { Link } from '@tanstack/react-router'
-import { useSearchConfigsQuery } from '@/hooks/useSearchConfigsQuery'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { CircleHelp } from 'lucide-react'
 
 export function ConfigSourcesIndexRoute() {
-  const { data: searchConfigs = [] } = useSearchConfigsQuery()
-
-  const searchesConfigured = searchConfigs.length > 0
-
   return (
     <TooltipProvider>
       <div className="p-6">
@@ -33,10 +28,6 @@ export function ConfigSourcesIndexRoute() {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {searchesConfigured
-                ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400">Configured</span>
-                : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
-              }
             </div>
           </Link>
           <Link to="/config/sources/blacklist" className="border border-zinc-800 rounded-lg p-4 block hover:border-zinc-700 transition-colors">

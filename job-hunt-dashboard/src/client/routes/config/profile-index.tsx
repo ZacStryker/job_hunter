@@ -1,13 +1,8 @@
 import { Link } from '@tanstack/react-router'
-import { useProfileQuery } from '@/hooks/useProfileQuery'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { CircleHelp } from 'lucide-react'
 
 export function ConfigProfileIndexRoute() {
-  const { data: profile } = useProfileQuery()
-
-  const resumeConfigured = !!profile?.personal?.fullName
-
   return (
     <TooltipProvider>
       <div className="p-6">
@@ -33,10 +28,6 @@ export function ConfigProfileIndexRoute() {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {resumeConfigured
-                ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400">Configured</span>
-                : <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Incomplete</span>
-              }
             </div>
           </Link>
         </div>

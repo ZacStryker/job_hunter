@@ -1,29 +1,18 @@
-import { Outlet, Link, useNavigate } from '@tanstack/react-router'
-import { LogOut } from 'lucide-react'
+import { Outlet, Link } from '@tanstack/react-router'
 import { useSessionQuery } from '@/hooks/useSessionQuery'
 import { useFeatureSettingsQuery } from '@/hooks/useFeatureSettingsQuery'
 import { ImpersonationBanner } from '@/components/admin/ImpersonationBanner'
 import { ActivityIndicator } from '@/components/shared/ActivityIndicator'
-import { queryClient } from '@/lib/query-client'
+import { NotificationsDropdown } from '@/components/shared/NotificationsDropdown'
+import { UserMenu } from '@/components/shared/UserMenu'
 import { cn } from '@/lib/utils'
 
 export function Layout() {
   const { data: session } = useSessionQuery()
   const { data: featureSettings } = useFeatureSettingsQuery()
-  const navigate = useNavigate()
   const isImpersonating = !!session?.impersonating
   const isAdmin = session?.role === 'admin'
   const emailFeatures = !!featureSettings?.emailFeatures
-
-  async function handleLogout() {
-    try {
-      await fetch('/auth/logout', { method: 'POST' })
-    } catch {
-      // sign out locally regardless of network/server error
-    }
-    queryClient.clear()
-    await navigate({ to: '/login' })
-  }
 
   return (
     <div className={cn('min-h-screen bg-zinc-950 text-zinc-100', isImpersonating && 'pt-10')}>
@@ -108,16 +97,11 @@ export function Layout() {
         {/* Activity — right */}
         <ActivityIndicator />
 
-        {/* Logout — right */}
-        <button
-          type="button"
-          onClick={handleLogout}
-          aria-label="Log out"
-          title="Log out"
-          className="shrink-0 text-zinc-500 hover:text-zinc-200 transition-colors"
-        >
-          <LogOut className="h-5 w-5" />
-        </button>
+        {/* Notifications — right */}
+        <NotificationsDropdown />
+
+        {/* User — right */}
+        <UserMenu />
       </header>
 
       <main className={isImpersonating ? 'h-[calc(100vh-96px)] overflow-auto' : 'h-[calc(100vh-56px)] overflow-auto'}>
