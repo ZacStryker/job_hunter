@@ -701,3 +701,104 @@ describe('admin access control — AC #7', () => {
     expect(res.status).toBe(200)
   })
 })
+
+describe('POST /api/admin/users/test-user', () => {
+  test('creates an active test-role user, no invite key consumed', async () => {
+    insertUser(1, { role: 'admin' })
+    insertInviteKey(1, { usedByUserId: null })
+    process.env.TEST_USER_ANTHROPIC_API_KEY = 'sk-ant-test-123'
+    const app = makeAdminApp()
+    const res = await request(app, '/users/test-user', { method: 'POST' })
+    expect(res.status).toBe(201)
+    const body = await res.json() as Record<string, unknown>
+    expect(body.email).toBe('admin@hitlobster.ai')
+    expect(body.role).toBe('test')
+    expect(body.isActive).toBe(true)
+    expect(body).not.toHaveProperty('passwordHash')
+
+    const secrets = prodSqlite
+      .query("SELECT * FROM user_secrets WHERE user_id = ? AND key_name = 'anthropic_api_key'")
+      .all(body.id as number) as Array<Record<string, unknown>>
+    expect(secrets).toHaveLength(1)
+
+    const key = prodSqlite.query('SELECT * FROM invite_keys WHERE id = 1').get() as Record<string, unknown>
+    expect(key.used_by_user_id).toBeNull()
+  })
+
+  test('seeds anthropic_api_key ciphertext that decrypts to the env value', async () => {
+    insertUser(1, { role: 'admin' })
+    process.env.TEST_USER_ANTHROPIC_API_KEY = 'sk-ant-decrypt-me'
+    const { decrypt } = await import('../lib/crypto')
+    const app = makeAdminApp()
+    const res = await request(app, '/users/test-user', { method: 'POST' })
+    const body = await res.json() as { id: number }
+    const secret = prodSqlite
+      .query("SELECT ciphertext FROM user_secrets WHERE user_id = ? AND key_name = 'anthropic_api_key'")
+      .get(body.id) as { ciphertext: string }
+    expect(decrypt(secret.ciphertext)).toBe('sk-ant-decrypt-me')
+  })
+
+  test('creates the user even when the API key env is unset (empty secret)', async () => {
+    insertUser(1, { role: 'admin' })
+    delete process.env.TEST_USER_ANTHROPIC_API_KEY
+    const { decrypt } = await import('../lib/crypto')
+    const app = makeAdminApp()
+    const res = await request(app, '/users/test-user', { method: 'POST' })
+    expect(res.status).toBe(201)
+    const body = await res.json() as { id: number }
+    const secret = prodSqlite
+      .query("SELECT ciphertext FROM user_secrets WHERE user_id = ? AND key_name = 'anthropic_api_key'")
+      .get(body.id) as { ciphertext: string }
+    expect(decrypt(secret.ciphertext)).toBe('')
+  })
+
+  test('second call deletes-and-recreates rather than erroring', async () => {
+    insertUser(1, { role: 'admin' })
+    process.env.TEST_USER_ANTHROPIC_API_KEY = 'sk-ant-test-123'
+    const app = makeAdminApp()
+
+    const first = await request(app, '/users/test-user', { method: 'POST' })
+    const firstBody = await first.json() as { id: number }
+    // Seed data owned by the first test user that must be purged on recreate
+    insertSession('test-user-session', firstBody.id)
+    prodSqlite.run(
+      `INSERT INTO jobs (company, job_title, user_id) VALUES ('Acme', 'Engineer', ?)`,
+      [firstBody.id]
+    )
+
+    const second = await request(app, '/users/test-user', { method: 'POST' })
+    expect(second.status).toBe(201)
+    const secondBody = await second.json() as { id: number }
+    expect(secondBody.id).not.toBe(firstBody.id)
+
+    const emailRows = prodSqlite
+      .query("SELECT id FROM users WHERE email = 'admin@hitlobster.ai'")
+      .all() as Array<{ id: number }>
+    expect(emailRows).toHaveLength(1)
+    const oldSession = prodSqlite.query('SELECT * FROM sessions WHERE user_id = ?').get(firstBody.id)
+    expect(oldSession).toBeNull()
+    const oldJobs = prodSqlite.query('SELECT * FROM jobs WHERE user_id = ?').all(firstBody.id) as unknown[]
+    expect(oldJobs).toHaveLength(0)
+  })
+
+  test('non-admin (test-role) caller is rejected with 403 and no user created', async () => {
+    insertUser(1, { role: 'test' })
+    const { adminMiddleware } = await import('../middleware/admin-middleware')
+    const { Hono: H } = await import('hono')
+    const w = new H<AppEnv>()
+    w.use('*', (c, next) => {
+      c.set('userId', 1)
+      c.set('sessionUserId', 1)
+      return next()
+    })
+    w.use('*', adminMiddleware)
+    w.route('/', adminRoute)
+    const res = await request(w, '/users/test-user', { method: 'POST' })
+    expect(res.status).toBe(403)
+    const body = await res.json() as Record<string, unknown>
+    expect(body.error).toBe('Forbidden')
+    expect(body).not.toHaveProperty('message')
+    const created = prodSqlite.query("SELECT * FROM users WHERE email = 'admin@hitlobster.ai'").get()
+    expect(created).toBeNull()
+  })
+})

@@ -3,10 +3,14 @@ import { z } from 'zod'
 import { asc, desc, eq, inArray } from 'drizzle-orm'
 import { getCookie } from 'hono/cookie'
 import { randomBytes } from 'node:crypto'
+import argon2 from 'argon2'
 import { db } from '../../db/client'
 import { users, sessions, inviteKeys, jobs, coverLetters, statusEvents, messages, searchConfigs, userSecrets, sourceSettings, featureSettings } from '../../db/schema'
+import { encrypt } from '../lib/crypto'
 import { scraperSourceSchema } from '../../shared/schemas'
 import type { AppEnv } from '../types'
+
+const TEST_USER_EMAIL = 'admin@hitlobster.ai'
 
 const app = new Hono<AppEnv>()
 
@@ -125,6 +129,56 @@ app.delete('/users/:id', (c) => {
   })
 
   return c.body(null, 204)
+})
+
+app.post('/users/test-user', async (c) => {
+  const passwordHash = await argon2.hash(process.env.TEST_USER_PASSWORD ?? 'test-user-1234', {
+    type: argon2.argon2id,
+    memoryCost: 65536,
+    timeCost: 3,
+    parallelism: 4,
+  })
+  const now = new Date().toISOString()
+  const ciphertext = encrypt(process.env.TEST_USER_ANTHROPIC_API_KEY ?? '')
+
+  const created = db.transaction((tx) => {
+    const existing = tx.select({ id: users.id }).from(users)
+      .where(eq(users.email, TEST_USER_EMAIL)).get()
+    if (existing) {
+      const id = existing.id
+      tx.delete(sessions).where(eq(sessions.userId, id)).run()
+      tx.delete(userSecrets).where(eq(userSecrets.userId, id)).run()
+      tx.delete(messages).where(eq(messages.userId, id)).run()
+      tx.delete(searchConfigs).where(eq(searchConfigs.userId, id)).run()
+      tx.delete(coverLetters).where(eq(coverLetters.userId, id)).run()
+      const jobIds = tx.select({ id: jobs.id }).from(jobs).where(eq(jobs.userId, id)).all().map(r => r.id)
+      if (jobIds.length > 0) {
+        tx.delete(statusEvents).where(inArray(statusEvents.jobId, jobIds)).run()
+      }
+      tx.delete(jobs).where(eq(jobs.userId, id)).run()
+      tx.update(inviteKeys).set({ usedByUserId: null }).where(eq(inviteKeys.usedByUserId, id)).run()
+      tx.delete(users).where(eq(users.id, id)).run()
+    }
+
+    tx.insert(users).values({
+      email: TEST_USER_EMAIL, passwordHash, role: 'test',
+      isActive: true, createdAt: now,
+    }).run()
+
+    const user = tx.select({
+      id: users.id, email: users.email, name: users.name,
+      role: users.role, isActive: users.isActive,
+      createdAt: users.createdAt, lastLoginAt: users.lastLoginAt,
+    }).from(users).where(eq(users.email, TEST_USER_EMAIL)).get()!
+
+    tx.insert(userSecrets)
+      .values({ userId: user.id, keyName: 'anthropic_api_key', ciphertext, updatedAt: now })
+      .run()
+
+    return user
+  })
+
+  return c.json(created, 201)
 })
 
 // Exit FIRST — prevents "exit" from being captured as :id

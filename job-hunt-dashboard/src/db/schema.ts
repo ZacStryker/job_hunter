@@ -126,7 +126,7 @@ export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
-  role: text('role').notNull().default('standard'), // 'standard' | 'admin'
+  role: text('role').notNull().default('standard'), // 'standard' | 'admin' | 'test'
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(false),
   activationToken: text('activation_token'),
   activationTokenExpiresAt: text('activation_token_expires_at'),

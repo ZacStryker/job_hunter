@@ -16,6 +16,7 @@ import { useAdminUserPatchMutation } from '@/hooks/useAdminUserPatchMutation'
 import { useImpersonateMutation } from '@/hooks/useImpersonateMutation'
 import { useInviteKeysQuery } from '@/hooks/useInviteKeysQuery'
 import { useGenerateInviteKeyMutation } from '@/hooks/useGenerateInviteKeyMutation'
+import { useGenerateTestUserMutation } from '@/hooks/useGenerateTestUserMutation'
 import { useRevokeInviteKeyMutation } from '@/hooks/useRevokeInviteKeyMutation'
 import { useDeleteAdminUserMutation } from '@/hooks/useDeleteAdminUserMutation'
 import { useSourceSettingsQuery } from '@/hooks/useSourceSettingsQuery'
@@ -32,6 +33,7 @@ type DialogState =
   | { type: 'impersonate'; user: AdminUser }
   | { type: 'delete-user'; user: AdminUser }
   | { type: 'revoke-key'; keyId: number }
+  | { type: 'test-user' }
   | null
 
 export function AdminUsersRoute() {
@@ -47,6 +49,7 @@ export function AdminUsersRoute() {
 
   const { data: inviteKeys = [], isLoading: keysLoading } = useInviteKeysQuery()
   const generateMutation = useGenerateInviteKeyMutation()
+  const generateTestUserMutation = useGenerateTestUserMutation()
   const revokeMutation = useRevokeInviteKeyMutation()
   const deleteMutation = useDeleteAdminUserMutation()
   const [copiedKeyId, setCopiedKeyId] = useState<number | null>(null)
@@ -116,6 +119,16 @@ export function AdminUsersRoute() {
     }
   }
 
+  async function handleGenerateTestUser() {
+    try {
+      await generateTestUserMutation.mutateAsync()
+      setDialog(null)
+      toast('Test user created')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to create test user')
+    }
+  }
+
   async function handleRevokeKey() {
     if (!dialog || dialog.type !== 'revoke-key') return
     try {
@@ -164,6 +177,17 @@ export function AdminUsersRoute() {
   return (
     <div className="p-6">
       <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+          <h2 className="text-sm font-medium text-zinc-100">Users</h2>
+          <Button
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs h-7 px-3"
+            size="sm"
+            onClick={() => setDialog({ type: 'test-user' })}
+            disabled={generateTestUserMutation.isPending}
+          >
+            {generateTestUserMutation.isPending ? 'Creating…' : 'Generate Test User'}
+          </Button>
+        </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-zinc-800 text-zinc-400 text-xs">
@@ -471,6 +495,30 @@ export function AdminUsersRoute() {
               className="bg-red-700 hover:bg-red-600 text-white border-0"
             >
               {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Generate Test User dialog */}
+      <Dialog open={dialog?.type === 'test-user'} onOpenChange={(v) => { if (!v) setDialog(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Generate Test User</DialogTitle>
+            <DialogDescription>
+              This creates a ready-to-use <span className="font-mono">admin@hitlobster.ai</span> test
+              account with its Claude API key pre-seeded. If it already exists, the existing account
+              and all its data are deleted and recreated fresh. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button
+              onClick={handleGenerateTestUser}
+              disabled={generateTestUserMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-500 text-white border-0"
+            >
+              {generateTestUserMutation.isPending ? 'Creating…' : 'Confirm'}
             </Button>
           </DialogFooter>
         </DialogContent>
