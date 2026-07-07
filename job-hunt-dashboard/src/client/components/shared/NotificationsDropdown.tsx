@@ -173,7 +173,8 @@ function ReadyLaunchpad({ discovery }: { discovery: WebhookStreamState }) {
   }
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-zinc-400">No notifications</p>
       <button
         type="button"
         onClick={() => discovery.trigger()}
@@ -218,7 +219,7 @@ export function NotificationsDropdown() {
           type="button"
           aria-label="Notifications"
           title="Notifications"
-          className="shrink-0 text-zinc-500 transition-colors hover:text-zinc-200"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
         >
           <span className="relative inline-flex items-center justify-center">
             <Bell className="h-5 w-5" />

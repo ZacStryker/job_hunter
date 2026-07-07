@@ -60,7 +60,7 @@ export function UserMenu() {
           type="button"
           aria-label="Account menu"
           title="Account menu"
-          className="shrink-0 text-zinc-500 hover:text-zinc-200 transition-colors"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
         >
           {avatar}
         </button>
