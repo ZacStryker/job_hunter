@@ -56,7 +56,16 @@ export function ConnectionsApiKeyRoute() {
         <h1 className="text-xl font-semibold text-zinc-100">API Key</h1>
       </div>
       <p className="text-sm text-zinc-400 mb-4">
-        Enter your Anthropic API key. Find it at <span className="text-zinc-300">console.anthropic.com</span>.
+        Enter your Anthropic API key. Find it at{' '}
+        <a
+          href="https://platform.claude.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-zinc-300 underline underline-offset-2 hover:text-zinc-100 transition-colors"
+        >
+          platform.claude.com
+        </a>
+        .
       </p>
       <div className="mb-4">
         <Label htmlFor="apiKey">API Key</Label>

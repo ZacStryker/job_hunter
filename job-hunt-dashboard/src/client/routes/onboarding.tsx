@@ -220,9 +220,28 @@ export function OnboardingRoute() {
           <div>
             <h2 ref={step1Ref} tabIndex={-1} className="text-xl font-semibold mt-6">Anthropic API Key</h2>
             <p className="text-zinc-400 mt-2 text-sm">
-              Enter your Anthropic API key. Find it at{' '}
-              <span className="text-zinc-300">console.anthropic.com</span>.
+              HITLOBSTER is bring-your-own-key: every AI feature runs on your own
+              Anthropic API key, so you&apos;ll need one before you can continue.
             </p>
+            <div className="mt-3 rounded-md border border-zinc-800 bg-zinc-950/50 p-3 text-sm text-zinc-400">
+              <p>
+                Don&apos;t have a key? Get one at{' '}
+                <a
+                  href="https://platform.claude.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-zinc-300 underline underline-offset-2 hover:text-zinc-100 transition-colors"
+                >
+                  platform.claude.com
+                </a>
+                :
+              </p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5">
+                <li>Sign in or create an Anthropic account.</li>
+                <li>Open <span className="text-zinc-300">API keys</span> and choose <span className="text-zinc-300">Create key</span>.</li>
+                <li>Copy the key (starts with <span className="font-mono text-zinc-300">sk-ant-</span>) and paste it below.</li>
+              </ol>
+            </div>
             <div className="mt-4">
               <Label htmlFor="apiKey">API Key</Label>
               <Input

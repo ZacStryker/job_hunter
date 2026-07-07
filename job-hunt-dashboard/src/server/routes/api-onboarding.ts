@@ -70,13 +70,13 @@ app.put('/anthropic', async (c) => {
   }
 
   if (res.status === 401) {
-    return c.json({ error: 'Invalid key — verify at console.anthropic.com' }, 400)
+    return c.json({ error: 'Invalid key — verify at platform.claude.com' }, 400)
   }
   if (res.status >= 500) {
     return c.json({ error: 'Server error — try again in a moment' }, 400)
   }
   if (!res.ok) {
-    return c.json({ error: 'Invalid key — verify at console.anthropic.com' }, 400)
+    return c.json({ error: 'Invalid key — verify at platform.claude.com' }, 400)
   }
 
   const now = new Date().toISOString()
