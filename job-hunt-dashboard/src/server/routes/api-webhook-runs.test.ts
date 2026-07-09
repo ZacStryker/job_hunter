@@ -2,6 +2,7 @@ process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, beforeAll, beforeEach } from 'bun:test'
 import { Hono } from 'hono'
+import type { AppEnv } from '../types'
 import { Database } from 'bun:sqlite'
 
 const { default: webhookRunsRoute, recordRun } = await import('./api-webhook-runs')
@@ -9,7 +10,7 @@ const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
 
 const webhookRunsApp = (() => {
-  const w = new Hono()
+  const w = new Hono<AppEnv>()
   w.use('*', (c, next) => { c.set('userId', 1); return next() })
   w.route('/', webhookRunsRoute)
   return w
@@ -87,7 +88,7 @@ describe('recordRun utility', () => {
   })
 
   test('new fields default to null when not provided', () => {
-    recordRun({ name: 'Discovery', success: true, itemCount: 3 })
+    recordRun({ userId: 1, name: 'Discovery', success: true, itemCount: 3 })
     const row = prodSqlite.query('SELECT * FROM webhook_runs WHERE name = ?').get('Discovery') as {
       duration_ms: number | null; input_tokens: number | null; output_tokens: number | null; cost_usd: number | null
     }

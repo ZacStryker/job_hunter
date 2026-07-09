@@ -378,7 +378,7 @@ describe('GET /api/onboarding/gmail/callback', () => {
         return new Response(JSON.stringify({ emailAddress: 'jobseeker@gmail.com' }), { status: 200 })
       }
       return originalFetch(input)
-    }) as typeof fetch
+    }) as unknown as typeof fetch
   })
 
   afterAll(() => {
@@ -491,7 +491,7 @@ describe('GET /api/onboarding/gmail/labels', () => {
         return new Response(JSON.stringify({ labels: [{ id: 'Label_1', name: 'Jobs', type: 'user' }] }), { status: 200 })
       }
       return originalFetch(input)
-    }) as typeof fetch
+    }) as unknown as typeof fetch
   })
 
   beforeEach(() => {
@@ -527,7 +527,7 @@ describe('GET /api/onboarding/gmail/labels', () => {
       const url = typeof input === 'string' ? input : input.toString()
       if (url.includes('gmail/v1/users/me/labels')) return new Response('nope', { status: 401 })
       return originalFetch(input)
-    }) as typeof fetch
+    }) as unknown as typeof fetch
     const res = await onboardingApp.request('/gmail/labels', { method: 'GET' })
     expect(res.status).toBe(502)
     const body = await res.json() as Record<string, unknown>
@@ -539,7 +539,7 @@ describe('GET /api/onboarding/gmail/labels', () => {
         return new Response(JSON.stringify({ labels: [{ id: 'Label_1', name: 'Jobs', type: 'user' }] }), { status: 200 })
       }
       return originalFetch(input)
-    }) as typeof fetch
+    }) as unknown as typeof fetch
   })
 
   test('connected but refresh token revoked (getAccessToken rejects) → 502 with error key', async () => {
@@ -568,7 +568,7 @@ describe('GET /api/onboarding/gmail/labels', () => {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       fetchCalled = true
       return guardedFetch(input)
-    }) as typeof fetch
+    }) as unknown as typeof fetch
     await seedRefreshToken()
     const res = await onboardingApp.request('/gmail/labels', { method: 'GET' })
     expect(res.status).toBe(503)

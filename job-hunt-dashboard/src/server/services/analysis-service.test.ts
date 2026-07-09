@@ -110,7 +110,7 @@ afterEach(() => {
   globalThis.fetch = originalFetch
 })
 
-function insertPendingJob(overrides: Partial<Record<string, unknown>> = {}) {
+function insertPendingJob(overrides: Partial<Record<string, string | number | null>> = {}) {
   prodSqlite.run(
     `INSERT INTO jobs (company, job_title, source, source_url, external_job_id, analysis_status)
      VALUES (?, ?, ?, ?, ?, 'pending')`,
@@ -145,7 +145,7 @@ function mockFetchSuccess(scraperDescription = 'We are building AI products.', u
         { status: 200, headers: { 'content-type': 'application/json' } }
       )
     )
-  }) as typeof globalThis.fetch
+  }) as unknown as typeof globalThis.fetch
 }
 
 describe('runAnalysis()', () => {
@@ -193,7 +193,7 @@ describe('runAnalysis()', () => {
           { status: 200, headers: { 'content-type': 'application/json' } }
         )
       )
-    }) as typeof globalThis.fetch
+    }) as unknown as typeof globalThis.fetch
 
     const result = await runAnalysis(undefined, 1)
 
@@ -220,7 +220,7 @@ describe('runAnalysis()', () => {
         )
       }
       return Promise.resolve(new Response(null, { status: 500 }))
-    }) as typeof globalThis.fetch
+    }) as unknown as typeof globalThis.fetch
 
     const result = await runAnalysis(undefined, 1)
 
@@ -249,7 +249,7 @@ describe('runAnalysis()', () => {
           { status: 200, headers: { 'content-type': 'application/json' } }
         )
       )
-    }) as typeof globalThis.fetch
+    }) as unknown as typeof globalThis.fetch
 
     const result = await runAnalysis(undefined, 1)
 
@@ -303,7 +303,7 @@ describe('runAnalysis()', () => {
           { status: 200, headers: { 'content-type': 'application/json' } }
         )
       )
-    }) as typeof globalThis.fetch
+    }) as unknown as typeof globalThis.fetch
 
     const result = await runAnalysis(undefined, 1)
 
@@ -385,7 +385,7 @@ describe('runAnalysis()', () => {
       }
       // Second job Anthropic call fails
       return Promise.resolve(new Response(null, { status: 500 }))
-    }) as typeof globalThis.fetch
+    }) as unknown as typeof globalThis.fetch
 
     const result = await runAnalysis(undefined, 1)
 
@@ -403,7 +403,7 @@ describe('runAnalysis()', () => {
     const { id } = prodSqlite.prepare('SELECT id FROM jobs ORDER BY id DESC LIMIT 1').get() as { id: number }
 
     let scraperCalled = false
-    let anthropicBody: Record<string, unknown> | null = null
+    let anthropicBody = null as Record<string, unknown> | null
 
     globalThis.fetch = mock((url: string, init?: RequestInit) => {
       if (String(url).includes('scrape/listing')) {
@@ -420,7 +420,7 @@ describe('runAnalysis()', () => {
           { status: 200, headers: { 'content-type': 'application/json' } }
         )
       )
-    }) as typeof globalThis.fetch
+    }) as unknown as typeof globalThis.fetch
 
     const result = await runAnalysis(undefined, 1)
 
@@ -442,7 +442,7 @@ describe('runAnalysis()', () => {
 
   test('prompt caching: stable prefix block carries cache_control; job listing is the trailing non-cached block', async () => {
     insertPendingJob()
-    let anthropicBody: Record<string, unknown> | null = null
+    let anthropicBody = null as Record<string, unknown> | null
     globalThis.fetch = mock((url: string, init?: RequestInit) => {
       if (String(url).includes('scrape/listing')) {
         return Promise.resolve(new Response(JSON.stringify({ description: 'Acme builds rockets.' }), { status: 200, headers: { 'content-type': 'application/json' } }))
@@ -452,7 +452,7 @@ describe('runAnalysis()', () => {
         content: [{ type: 'text', text: JSON.stringify(VALID_ANALYSIS_RESPONSE) }],
         usage: { input_tokens: 50, output_tokens: 30 },
       }), { status: 200, headers: { 'content-type': 'application/json' } }))
-    }) as typeof globalThis.fetch
+    }) as unknown as typeof globalThis.fetch
 
     await runAnalysis(undefined, 1)
 
@@ -482,7 +482,7 @@ describe('runAnalysis()', () => {
         content: [{ type: 'text', text: JSON.stringify(VALID_ANALYSIS_RESPONSE) }],
         usage: { input_tokens: 50, output_tokens: 30 },
       }), { status: 200, headers: { 'content-type': 'application/json' } }))
-    }) as typeof globalThis.fetch
+    }) as unknown as typeof globalThis.fetch
 
     await runAnalysis(undefined, 1)
 
@@ -500,7 +500,7 @@ describe('runAnalysis()', () => {
         content: [{ type: 'text', text: JSON.stringify(VALID_ANALYSIS_RESPONSE) }],
         usage: { input_tokens: 20, output_tokens: 30, cache_creation_input_tokens: 100, cache_read_input_tokens: 0 },
       }), { status: 200, headers: { 'content-type': 'application/json' } }))
-    }) as typeof globalThis.fetch
+    }) as unknown as typeof globalThis.fetch
 
     const result = await runAnalysis(undefined, 1)
 

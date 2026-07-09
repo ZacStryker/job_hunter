@@ -6,6 +6,7 @@ process.env.APP_URL = 'http://localhost:3000'
 
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from 'bun:test'
 import { Hono } from 'hono'
+import type { AppEnv } from '../types'
 import { Database } from 'bun:sqlite'
 import { OAuth2Client } from 'google-auth-library'
 
@@ -15,7 +16,7 @@ const { encrypt } = await import('../lib/crypto')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
 
 const messagesApp = (() => {
-  const w = new Hono()
+  const w = new Hono<AppEnv>()
   w.use('*', (c, next) => { c.set('userId', 1); return next() })
   w.route('/', messagesRoute)
   return w
@@ -24,8 +25,8 @@ const messagesApp = (() => {
 const CREATE_MESSAGES_TABLE = `
   CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    uid TEXT NOT NULL UNIQUE,
-    message_id TEXT UNIQUE,
+    uid TEXT NOT NULL,
+    message_id TEXT,
     received_at TEXT NOT NULL,
     from_address TEXT NOT NULL,
     subject TEXT NOT NULL,
@@ -35,6 +36,8 @@ const CREATE_MESSAGES_TABLE = `
     user_id INTEGER NOT NULL DEFAULT 1
   )
 `
+const CREATE_MESSAGES_UID_INDEX = `CREATE UNIQUE INDEX IF NOT EXISTS messages_uid_user_id_idx ON messages (uid, user_id)`
+const CREATE_MESSAGES_MSGID_INDEX = `CREATE UNIQUE INDEX IF NOT EXISTS messages_message_id_user_id_idx ON messages (message_id, user_id)`
 
 const CREATE_USER_SECRETS_TABLE = `
   CREATE TABLE IF NOT EXISTS user_secrets (
@@ -58,6 +61,8 @@ const CREATE_GMAIL_LABEL_MAPPINGS_TABLE = `
 
 beforeAll(() => {
   prodSqlite.run(CREATE_MESSAGES_TABLE)
+  prodSqlite.run(CREATE_MESSAGES_UID_INDEX)
+  prodSqlite.run(CREATE_MESSAGES_MSGID_INDEX)
   prodSqlite.run(CREATE_USER_SECRETS_TABLE)
   prodSqlite.run(CREATE_GMAIL_LABEL_MAPPINGS_TABLE)
 })
@@ -210,7 +215,7 @@ describe('POST /api/messages/sync (Gmail)', () => {
         throw new Error(`Unexpected fetch to ${url}`)
       }
       return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } })
-    }) as typeof fetch
+    }) as unknown as typeof fetch
   }
 
   function mockAccessToken(resolve: boolean) {

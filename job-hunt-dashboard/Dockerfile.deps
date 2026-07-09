@@ -14,4 +14,9 @@ RUN bunx playwright install --with-deps chromium firefox
 RUN cd scraper && bunx playwright install --with-deps firefox
 RUN bunx patchright install chromium
 
+# Bake the embedding model so the first embed() call in production never reaches the
+# HuggingFace hub. embedding-service.ts reads the same env var to locate this cache.
+ENV EMBEDDING_CACHE_DIR=/app/.cache/transformers
+RUN bun -e "const { env, pipeline } = await import('@xenova/transformers'); env.cacheDir = process.env.EMBEDDING_CACHE_DIR; await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');"
+
 ENV NODE_ENV=production

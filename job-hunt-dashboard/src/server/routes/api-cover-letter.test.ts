@@ -2,6 +2,7 @@ process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, mock, spyOn, beforeAll, beforeEach } from 'bun:test'
 import { Hono } from 'hono'
+import type { AppEnv } from '../types'
 import { Database } from 'bun:sqlite'
 
 // --- Mock cover-letter-service BEFORE dynamic import ---
@@ -31,7 +32,7 @@ const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
 
 const jobsApp = (() => {
-  const w = new Hono()
+  const w = new Hono<AppEnv>()
   w.use('*', (c, next) => { c.set('userId', 1); return next() })
   w.route('/', jobsRoute)
   return w

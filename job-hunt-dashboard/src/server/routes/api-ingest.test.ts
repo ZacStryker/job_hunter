@@ -5,6 +5,7 @@ process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, beforeAll, beforeEach } from 'bun:test'
 import { Hono } from 'hono'
+import type { AppEnv } from '../types'
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import * as schema from '../../db/schema'
@@ -28,7 +29,7 @@ const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
 
 const ingestApp = (() => {
-  const w = new Hono()
+  const w = new Hono<AppEnv>()
   w.use('*', (c, next) => { c.set('userId', 1); return next() })
   w.route('/', ingestRoute)
   return w

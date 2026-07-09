@@ -2,16 +2,16 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Message } from '@shared/schemas'
 import { apiFetch } from '../lib/api'
 
-type MessagePatch = {
-  type?: string | null
-  company?: string | null
-  jobTitle?: string | null
-}
+// Mirrors Message so an optimistic `{ ...m, ...patch }` still yields a Message —
+// a widened `type?: string` silently breaks that spread.
+type MessagePatch = Partial<Pick<Message, 'type' | 'company' | 'jobTitle'>>
+
+type MessageMutationContext = { previous: Message[] | undefined }
 
 export function useMessageMutation() {
   const queryClient = useQueryClient()
 
-  return useMutation<Message, Error, { id: number; patch: MessagePatch }>({
+  return useMutation<Message, Error, { id: number; patch: MessagePatch }, MessageMutationContext>({
     mutationFn: async ({ id, patch }) => {
       const res = await apiFetch(`/api/messages/${id}`, {
         method: 'PATCH',

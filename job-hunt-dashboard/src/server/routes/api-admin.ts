@@ -202,7 +202,8 @@ app.post('/impersonate/:id', (c) => {
   if (session?.data) {
     try {
       const existing = JSON.parse(session.data) as { impersonating?: number }
-      if (Number.isInteger(existing.impersonating) && existing.impersonating > 0) {
+      const impersonating = existing.impersonating
+      if (typeof impersonating === 'number' && Number.isInteger(impersonating) && impersonating > 0) {
         return c.json({ error: 'Already impersonating a user — exit first' }, 409)
       }
     } catch {}

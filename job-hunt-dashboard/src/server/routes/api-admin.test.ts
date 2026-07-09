@@ -128,8 +128,8 @@ beforeAll(() => {
   prodSqlite.run(`
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      uid TEXT NOT NULL UNIQUE,
-      message_id TEXT UNIQUE,
+      uid TEXT NOT NULL,
+      message_id TEXT,
       received_at TEXT NOT NULL,
       from_address TEXT NOT NULL,
       subject TEXT NOT NULL,
@@ -139,6 +139,8 @@ beforeAll(() => {
       user_id INTEGER NOT NULL DEFAULT 1
     )
   `)
+  prodSqlite.run(`CREATE UNIQUE INDEX IF NOT EXISTS messages_uid_user_id_idx ON messages (uid, user_id)`)
+  prodSqlite.run(`CREATE UNIQUE INDEX IF NOT EXISTS messages_message_id_user_id_idx ON messages (message_id, user_id)`)
   prodSqlite.run(`
     CREATE TABLE IF NOT EXISTS search_configs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

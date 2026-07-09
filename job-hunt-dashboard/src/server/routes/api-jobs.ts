@@ -481,7 +481,9 @@ app.post('/:id/generate-resume', async (c) => {
     recordRun({ userId, name: `Resume - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
       durationMs: Date.now() - resumeStartMs, inputTokens: resumeInputTokens, outputTokens: resumeOutputTokens, costUsd: resumeCostUsd })
     outcome = 'done'
-    return new Response(pdfBuffer, {
+    // Node Buffer is not a BodyInit; view the same bytes without copying.
+    const pdfBytes = new Uint8Array(pdfBuffer.buffer as ArrayBuffer, pdfBuffer.byteOffset, pdfBuffer.byteLength)
+    return new Response(pdfBytes, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${fileName}"`,

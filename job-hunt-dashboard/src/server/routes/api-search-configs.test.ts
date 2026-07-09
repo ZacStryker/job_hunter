@@ -2,6 +2,7 @@ process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, beforeAll, beforeEach } from 'bun:test'
 import { Hono } from 'hono'
+import type { AppEnv } from '../types'
 import { Database } from 'bun:sqlite'
 
 const { default: searchConfigsRoute } = await import('./api-search-configs')
@@ -9,7 +10,7 @@ const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
 
 const searchConfigsApp = (() => {
-  const w = new Hono()
+  const w = new Hono<AppEnv>()
   w.use('*', (c, next) => { c.set('userId', 1); return next() })
   w.route('/', searchConfigsRoute)
   return w

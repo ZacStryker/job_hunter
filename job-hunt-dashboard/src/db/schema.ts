@@ -90,8 +90,8 @@ export const profile = sqliteTable('profile', {
 
 export const messages = sqliteTable('messages', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  uid: text('uid').notNull().unique(), // IMAP UID — dedup key (folder:uid)
-  messageId: text('message_id').unique(), // RFC 2822 Message-ID — stable across folder moves
+  uid: text('uid').notNull(), // IMAP UID — dedup key (folder:uid), unique per user
+  messageId: text('message_id'), // RFC 2822 Message-ID — stable across folder moves, unique per user
   receivedAt: text('received_at').notNull(), // ISO 8601 datetime
   fromAddress: text('from_address').notNull(), // "Name <email>" or "email"
   subject: text('subject').notNull(),
@@ -101,6 +101,8 @@ export const messages = sqliteTable('messages', {
   jobTitle: text('job_title'),
   userId: integer('user_id').notNull().references(() => users.id),
 }, (table) => [
+  uniqueIndex('messages_uid_user_id_idx').on(table.uid, table.userId),
+  uniqueIndex('messages_message_id_user_id_idx').on(table.messageId, table.userId),
   index('messages_user_id_idx').on(table.userId),
 ])
 

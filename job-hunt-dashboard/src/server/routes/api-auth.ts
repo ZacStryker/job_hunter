@@ -242,9 +242,10 @@ app.get('/session', (c) => {
   if (session.data) {
     try {
       const parsed = JSON.parse(session.data) as { impersonating?: number }
-      if (Number.isInteger(parsed.impersonating) && parsed.impersonating > 0) {
+      const impersonatingId = parsed.impersonating
+      if (typeof impersonatingId === 'number' && Number.isInteger(impersonatingId) && impersonatingId > 0) {
         const target = db.select({ id: users.id, email: users.email, name: users.name })
-          .from(users).where(eq(users.id, parsed.impersonating)).get()
+          .from(users).where(eq(users.id, impersonatingId)).get()
         if (target) impersonating = target
       }
     } catch (e) {

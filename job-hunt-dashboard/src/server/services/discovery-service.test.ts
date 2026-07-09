@@ -181,7 +181,7 @@ describe('runDiscovery()', () => {
         JSON.stringify({ results: [{ id: 'job-1', title: 'SWE', company: 'Acme', location: 'NL', url: 'https://acme.com/1' }] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
-    )
+    ) as unknown as typeof fetch
 
     const { inserted } = await runDiscovery(undefined, 1)
     // 6 searches × 1 result = 6 total, but job-1 is deduplicated within batch → 1 inserted
@@ -209,7 +209,7 @@ describe('runDiscovery()', () => {
         ]}),
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
-    )
+    ) as unknown as typeof fetch
 
     const { inserted } = await runDiscovery(undefined, 1)
     expect(inserted).toBe(1) // only job-2
@@ -224,7 +224,7 @@ describe('runDiscovery()', () => {
     )
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response(null, { status: 500 }))
-    )
+    ) as unknown as typeof fetch
 
     const { inserted, errors } = await runDiscovery(undefined, 1)
     expect(inserted).toBe(0)
@@ -241,7 +241,7 @@ describe('runDiscovery()', () => {
         JSON.stringify({ results: [{ id: 'job-cb1', title: 'Dev', company: 'CallbackCo', location: null, url: null }] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
-    )
+    ) as unknown as typeof fetch
 
     const calls: Array<{ count: number; source: string }> = []
     await runDiscovery(undefined, 1, (count, source) => calls.push({ count, source }))
@@ -267,7 +267,7 @@ describe('runDiscovery()', () => {
         JSON.stringify({ results: [{ id: 'job-p1', title: 'Dev', company: 'ProgressCo', location: null, url: null }] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
-    )
+    ) as unknown as typeof fetch
 
     const messages: string[] = []
     await runDiscovery((msg) => messages.push(msg), 1)
@@ -287,7 +287,7 @@ describe('runDiscovery()', () => {
         JSON.stringify({ results: [{ id: 'job-existing', title: 'SWE', company: 'Acme', location: null, url: null }] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
-    )
+    ) as unknown as typeof fetch
 
     const messages: string[] = []
     await runDiscovery((msg) => messages.push(msg), 1)
@@ -305,7 +305,7 @@ describe('runDiscovery()', () => {
         JSON.stringify({ results: [{ id: 'job-99', title: 'Eng', company: 'Co', location: null, url: null }] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
-    )
+    ) as unknown as typeof fetch
     await runDiscovery(undefined, 1)
     const row = prodSqlite.prepare('SELECT analysis_status FROM jobs WHERE external_job_id = ?').get('job-99') as { analysis_status: string }
     expect(row.analysis_status).toBe('pending')
@@ -319,7 +319,7 @@ describe('runDiscovery()', () => {
         JSON.stringify({ results: [{ id: 'job-arc', title: 'Dev', company: 'Co', location: null, url: null }] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
-    )
+    ) as unknown as typeof fetch
 
     try {
       const { inserted, errors } = await runDiscovery(undefined, 1)
@@ -340,7 +340,7 @@ describe('runDiscovery()', () => {
 
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
-    )
+    ) as unknown as typeof fetch
 
     try {
       const { inserted, errors } = await runDiscovery(undefined, 1)
@@ -364,7 +364,7 @@ describe('runDiscovery()', () => {
       const body = JSON.parse((options as RequestInit).body as string) as Record<string, unknown>
       capturedSources.push(body.source as string)
       return Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
-    })
+    }) as unknown as typeof fetch
 
     try {
       const { errors } = await runDiscovery(undefined, 1)
@@ -389,7 +389,7 @@ describe('runDiscovery()', () => {
         JSON.stringify({ results: [{ id: 'job-ind', title: 'Dev', company: 'Co', location: null, url: null }] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
-    )
+    ) as unknown as typeof fetch
 
     try {
       const { errors } = await runDiscovery(undefined, 1)
@@ -413,7 +413,7 @@ describe('runDiscovery()', () => {
       const body = JSON.parse((options as RequestInit).body as string) as Record<string, unknown>
       if (body.source === 'indeed') capturedContent = body.storageStateContent as string
       return Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
-    })
+    }) as unknown as typeof fetch
 
     try {
       await runDiscovery(undefined, 1)
@@ -442,7 +442,7 @@ describe('runDiscovery()', () => {
         ))
       }
       return Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
-    })
+    }) as unknown as typeof fetch
 
     try {
       await runDiscovery(undefined, 1)
@@ -461,7 +461,7 @@ describe('runDiscovery()', () => {
     const messages: string[] = []
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
-    )
+    ) as unknown as typeof fetch
     await runDiscovery((msg) => messages.push(msg), 1)
     expect(messages.some((m) => m.toLowerCase().includes('linkedin'))).toBe(true)
   })
@@ -475,7 +475,7 @@ describe('runDiscovery()', () => {
         JSON.stringify({ results: [{ id: 'job-li', title: 'PM', company: 'Corp', location: null, url: null }] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
-    )
+    ) as unknown as typeof fetch
     const { errors } = await runDiscovery(undefined, 1)
     expect(errors).toHaveLength(0)
   })
@@ -486,14 +486,14 @@ describe('runDiscovery()', () => {
     )
 
     let capturedStorageStateContent: string | undefined
-    globalThis.fetch = mock((url: unknown, options: unknown) => {
+    globalThis.fetch = mock((_url: unknown, options: unknown) => {
       const body = JSON.parse((options as RequestInit).body as string) as Record<string, unknown>
       if (body.source === 'linkedin') capturedStorageStateContent = body.storageStateContent as string
       return Promise.resolve(new Response(
         JSON.stringify({ results: [] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
-    })
+    }) as unknown as typeof fetch
 
     await runDiscovery(undefined, 1)
     expect(capturedStorageStateContent).toBe('{"cookies":[],"origins":[]}')
@@ -512,7 +512,7 @@ describe('runDiscovery()', () => {
         JSON.stringify({ results: [] }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       ))
-    })
+    }) as unknown as typeof fetch
 
     await runDiscovery(undefined, 1)
     expect(sawStorageStatePath).toBe(false)
@@ -524,7 +524,7 @@ describe('runDiscovery()', () => {
     )
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
-    )
+    ) as unknown as typeof fetch
 
     const { inserted, errors } = await runDiscovery(undefined, 1)
     expect(errors).toHaveLength(1)
@@ -545,7 +545,7 @@ describe('runDiscovery()', () => {
           JSON.stringify({ results: [{ id: 'bl-1', title: 'SWE', company: 'Acme Corp', location: null, url: null }] }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         ))
-      )
+      ) as unknown as typeof fetch
 
       const { inserted } = await runDiscovery(undefined, 1)
       expect(inserted).toBe(0)
@@ -564,7 +564,7 @@ describe('runDiscovery()', () => {
           JSON.stringify({ results: [{ id: 'bl-2', title: 'SWE', company: 'ACME CORP', location: null, url: null }] }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         ))
-      )
+      ) as unknown as typeof fetch
 
       const { inserted } = await runDiscovery(undefined, 1)
       expect(inserted).toBe(0)
@@ -581,7 +581,7 @@ describe('runDiscovery()', () => {
           JSON.stringify({ results: [{ id: 'bl-3', title: 'SWE', company: 'Acme Corporation', location: null, url: null }] }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         ))
-      )
+      ) as unknown as typeof fetch
 
       const { inserted } = await runDiscovery(undefined, 1)
       expect(inserted).toBe(1)
@@ -597,7 +597,7 @@ describe('runDiscovery()', () => {
           JSON.stringify({ results: [{ id: 'bl-4', title: 'SWE', company: 'Acme Corp', location: null, url: null }] }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         ))
-      )
+      ) as unknown as typeof fetch
 
       const { inserted, bySource } = await runDiscovery(undefined, undefined)
       expect(inserted).toBe(0)
@@ -614,7 +614,7 @@ describe('runDiscovery()', () => {
           JSON.stringify({ results: [{ id: 'bl-5', title: 'SWE', company: 'Some Company', location: null, url: null }] }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         ))
-      )
+      ) as unknown as typeof fetch
 
       const { inserted } = await runDiscovery(undefined, 1)
       expect(inserted).toBe(1)
@@ -635,7 +635,7 @@ describe('runDiscovery()', () => {
           JSON.stringify({ results: [{ id: 'job-r1', title: 'Backend Engineer', company: 'Acme', location: null, url: null }] }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         ))
-      )
+      ) as unknown as typeof fetch
 
       const { inserted } = await runDiscovery(undefined, 1)
       expect(inserted).toBe(1)
@@ -662,7 +662,7 @@ describe('runDiscovery()', () => {
           JSON.stringify({ results: [{ id: 'job-r2', title: 'Dev', company: 'Beta', location: null, url: null }] }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         ))
-      )
+      ) as unknown as typeof fetch
 
       const { inserted } = await runDiscovery(undefined, 1)
       expect(inserted).toBe(1)
@@ -686,7 +686,7 @@ describe('runDiscovery()', () => {
           JSON.stringify({ results: [{ id: 'job-r3', title: 'Dev', company: 'Beta', location: null, url: null }] }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         ))
-      )
+      ) as unknown as typeof fetch
 
       const { inserted } = await runDiscovery(undefined, 1)
       expect(inserted).toBe(1)
@@ -722,7 +722,7 @@ describe('runDiscovery()', () => {
           }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         ))
-      )
+      ) as unknown as typeof fetch
 
       const { inserted } = await runDiscovery(undefined, 1)
       expect(inserted).toBe(2) // Both jobs inserted
@@ -756,7 +756,7 @@ describe('runDiscovery()', () => {
           }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         ))
-      )
+      ) as unknown as typeof fetch
 
       // First run: 2 new jobs — getOrComputeResumeEmbedding called once (not per job)
       await runDiscovery(undefined, 1)
@@ -778,7 +778,7 @@ describe('runDiscovery()', () => {
           }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         ))
-      )
+      ) as unknown as typeof fetch
 
       await runDiscovery(undefined, 1)
       expect(mockGetOrComputeResumeEmbedding).toHaveBeenCalledTimes(1)
@@ -810,7 +810,7 @@ describe('runDiscovery()', () => {
           }),
           { status: 200, headers: { 'content-type': 'application/json' } }
         ))
-      )
+      ) as unknown as typeof fetch
 
       const { inserted } = await runDiscovery(undefined, 1)
       expect(inserted).toBe(1) // Only the new job inserted

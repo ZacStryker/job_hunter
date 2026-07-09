@@ -73,7 +73,7 @@ function mockAnthropicSuccess(text = 'Dear Hiring Manager,\n\nI am excited.\n\nS
         { status: 200, headers: { 'content-type': 'application/json' } }
       )
     )
-  ) as typeof globalThis.fetch
+  ) as unknown as typeof globalThis.fetch
 }
 
 describe('generateCoverLetter()', () => {
@@ -105,7 +105,7 @@ describe('generateCoverLetter()', () => {
   test('Anthropic HTTP error: throws with status', async () => {
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response(null, { status: 500 }))
-    ) as typeof globalThis.fetch
+    ) as unknown as typeof globalThis.fetch
 
     await expect(generateCoverLetter(MOCK_JOB)).rejects.toThrow('Anthropic error 500')
   })
@@ -132,7 +132,7 @@ describe('generateCoverLetter()', () => {
           { status: 200, headers: { 'content-type': 'application/json' } }
         )
       )
-    ) as typeof globalThis.fetch
+    ) as unknown as typeof globalThis.fetch
 
     await expect(generateCoverLetter(MOCK_JOB)).rejects.toThrow('Anthropic returned empty cover letter')
   })

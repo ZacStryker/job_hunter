@@ -34,7 +34,10 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (session.data) {
     try {
       const data = JSON.parse(session.data) as { impersonating?: number }
-      if (Number.isInteger(data.impersonating) && data.impersonating > 0) effectiveUserId = data.impersonating
+      const impersonating = data.impersonating
+      if (typeof impersonating === 'number' && Number.isInteger(impersonating) && impersonating > 0) {
+        effectiveUserId = impersonating
+      }
     } catch (e) {
       console.error('[auth] Failed to parse session.data:', e)
     }

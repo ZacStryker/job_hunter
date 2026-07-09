@@ -2,6 +2,7 @@ process.env.DB_PATH = ':memory:'
 
 import { describe, test, expect, beforeAll, beforeEach, afterEach, mock, spyOn } from 'bun:test'
 import { Hono } from 'hono'
+import type { AppEnv } from '../types'
 import { Database } from 'bun:sqlite'
 import { activityRegistry } from '../services/activity-registry'
 
@@ -19,7 +20,7 @@ const { db: prodDb } = await import('../../db/client')
 const prodSqlite = (prodDb as unknown as { $client: Database }).$client
 
 const jobsApp = (() => {
-  const w = new Hono()
+  const w = new Hono<AppEnv>()
   w.use('*', (c, next) => { c.set('userId', 1); return next() })
   w.route('/', jobsRoute)
   return w
@@ -76,8 +77,8 @@ const CREATE_STATUS_EVENTS_TABLE = `
 const CREATE_MESSAGES_TABLE = `
   CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    uid TEXT NOT NULL UNIQUE,
-    message_id TEXT UNIQUE,
+    uid TEXT NOT NULL,
+    message_id TEXT,
     received_at TEXT NOT NULL,
     from_address TEXT NOT NULL,
     subject TEXT NOT NULL,
@@ -129,6 +130,8 @@ beforeAll(() => {
   prodSqlite.run(CREATE_JOBS_TABLE)
   prodSqlite.run(CREATE_STATUS_EVENTS_TABLE)
   prodSqlite.run(CREATE_MESSAGES_TABLE)
+  prodSqlite.run(`CREATE UNIQUE INDEX IF NOT EXISTS messages_uid_user_id_idx ON messages (uid, user_id)`)
+  prodSqlite.run(`CREATE UNIQUE INDEX IF NOT EXISTS messages_message_id_user_id_idx ON messages (message_id, user_id)`)
   prodSqlite.run(CREATE_COVER_LETTERS_TABLE)
   prodSqlite.run(CREATE_PROFILE_TABLE)
   prodSqlite.run(CREATE_WEBHOOK_RUNS_TABLE)

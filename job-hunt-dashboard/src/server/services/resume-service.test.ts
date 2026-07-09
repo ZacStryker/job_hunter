@@ -85,7 +85,7 @@ function mockAnthropicSuccess(text: string): void {
       JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 100, output_tokens: 200 } }),
       { status: 200, headers: { 'content-type': 'application/json' } }
     ))
-  ) as typeof globalThis.fetch
+  ) as unknown as typeof globalThis.fetch
 }
 
 describe('generateResume() — JSON pipeline', () => {
@@ -141,7 +141,7 @@ describe('generateResume() — error handling', () => {
   })
 
   test('throws when Anthropic returns HTTP error', async () => {
-    globalThis.fetch = mock(() => Promise.resolve(new Response(null, { status: 500 }))) as typeof globalThis.fetch
+    globalThis.fetch = mock(() => Promise.resolve(new Response(null, { status: 500 }))) as unknown as typeof globalThis.fetch
     await expect(generateResume(MOCK_JOB)).rejects.toThrow('Anthropic error 500')
   })
 

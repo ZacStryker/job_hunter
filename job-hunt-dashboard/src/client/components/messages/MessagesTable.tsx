@@ -291,7 +291,7 @@ export function MessagesTable({ messages, jobs }: MessagesTableProps) {
             <Select
               value={value}
               onValueChange={(v) => {
-                mutate({ id: row.id, patch: { type: v === NONE_SENTINEL ? null : v } })
+                mutate({ id: row.id, patch: { type: v === NONE_SENTINEL ? null : (v as Message['type']) } })
               }}
             >
               <SelectTrigger className="h-7 w-[130px] bg-zinc-800 border-zinc-700 text-zinc-200 text-xs">

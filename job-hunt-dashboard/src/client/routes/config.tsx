@@ -21,8 +21,8 @@ function LogsPreviewCard() {
       role="button"
       tabIndex={0}
       className="border border-zinc-800 rounded-lg p-4 cursor-pointer hover:border-zinc-600 transition-colors"
-      onClick={() => navigate({ to: '/logs' })}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate({ to: '/logs' }) }}
+      onClick={() => navigate({ to: '/config/logs' })}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate({ to: '/config/logs' }) }}
     >
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold text-zinc-100">Logs</h2>
@@ -80,8 +80,8 @@ function ProfilePreviewCard() {
       role="button"
       tabIndex={0}
       className="border border-zinc-800 rounded-lg p-4 cursor-pointer hover:border-zinc-600 transition-colors"
-      onClick={() => navigate({ to: '/profile' })}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate({ to: '/profile' }) }}
+      onClick={() => navigate({ to: '/config/profile' })}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate({ to: '/config/profile' }) }}
     >
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold text-zinc-100">Profile</h2>
@@ -89,21 +89,34 @@ function ProfilePreviewCard() {
       </div>
       {isLoading && <p className="text-sm text-zinc-400">Loading…</p>}
       {!isLoading && (
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { label: 'Full Name', value: data?.name },
-            { label: 'Email', value: data?.email },
-            { label: 'Phone', value: data?.phone },
-            { label: 'Location', value: data?.location },
-            { label: 'LinkedIn URL', value: data?.linkedinUrl },
-            { label: 'GitHub URL', value: data?.githubUrl },
-          ].map(({ label, value }) => (
-            <div key={label}>
-              <label className="block text-xs text-zinc-400 mb-1">{label}</label>
-              <p className="text-sm text-zinc-100">{value ?? '—'}</p>
+        <>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { label: 'Full Name', value: data?.personal.fullName },
+              { label: 'Email', value: data?.personal.email },
+              { label: 'Phone', value: data?.personal.phone },
+              { label: 'Location', value: data?.personal.location },
+            ].map(({ label, value }) => (
+              <div key={label}>
+                <label className="block text-xs text-zinc-400 mb-1">{label}</label>
+                <p className="text-sm text-zinc-100">{value ?? '—'}</p>
+              </div>
+            ))}
+          </div>
+          {data && data.personal.websites.length > 0 && (
+            <div className="mt-4">
+              <label className="block text-xs text-zinc-400 mb-1">Websites</label>
+              <ul className="space-y-1">
+                {data.personal.websites.map(({ label, url }) => (
+                  <li key={`${label}-${url}`} className="flex gap-2 text-sm">
+                    <span className="text-zinc-400 shrink-0">{label}</span>
+                    <span className="text-zinc-100 truncate">{url}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -124,8 +137,8 @@ function PromptsPreviewCard() {
       role="button"
       tabIndex={0}
       className="border border-zinc-800 rounded-lg p-4 cursor-pointer hover:border-zinc-600 transition-colors"
-      onClick={() => navigate({ to: '/prompts' })}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate({ to: '/prompts' }) }}
+      onClick={() => navigate({ to: '/config/prompts' })}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate({ to: '/config/prompts' }) }}
     >
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold text-zinc-100">Prompts</h2>
