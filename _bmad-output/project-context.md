@@ -3,7 +3,7 @@ project_name: 'hitlobster'
 user_name: 'Stryker'
 date: '2026-07-09'
 status: 'complete'
-verified_against_commit: 'fix/context-defect-sweep (uncommitted — set to the sha on merge)'
+verified_against_commit: '95f2d6e'
 verified_by: 'scripts/verify-context.sh (39 checks, all passing)'
 rule_count: 27
 optimized_for_llm: true
