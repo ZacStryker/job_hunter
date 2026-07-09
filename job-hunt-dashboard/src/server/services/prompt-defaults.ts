@@ -44,11 +44,16 @@ export const DEFAULT_PROMPTS: Record<PromptFlow, PromptConfig> = {
       'FORMAT for those four fields: a single string of comma-separated shorthand bullets. The comma ' +
       'is a reserved delimiter that separates one bullet from the next — NEVER use a comma inside ' +
       'a bullet\'s text. Use a different separator (e.g. "/", ";", "and", or just a space) if you need ' +
-      'to list things within one bullet. Prefix EVERY bullet with exactly one marker character:\n' +
+      'to list things within one bullet. Prefix EVERY bullet with exactly one marker character, and ' +
+      'the marker MUST match the field polarity:\n' +
+      'In the *_met fields (job_reqs_met, candidate_reqs_met) use ONLY:\n' +
       '- "+" = full match / met\n' +
       '- "~" = partial match or an equivalent/transferable substitute\n' +
+      'In the *_missed fields (job_reqs_missed, candidate_reqs_missed) use ONLY:\n' +
       '- "-" = not met / missing\n' +
-      'Example candidate_reqs_met: "+5+ yrs TypeScript, ~Go (Rust transferable), -No Kubernetes exp"\n\n' +
+      'Never put a "-" bullet in a *_met field, and never put a "+" or "~" bullet in a *_missed field.\n' +
+      'Example candidate_reqs_met: "+5+ yrs TypeScript, ~Go (Rust transferable), +Docker"\n' +
+      'Example candidate_reqs_missed: "-No Kubernetes exp, -No Terraform"\n\n' +
       'SCORING: compute the score AFTER the four fields, deriving it from them. It reflects both ' +
       'qualification fit and role/logistics fit. Bands (0-100):\n' +
       '- 90-100 exceptional: strongly qualified AND the role fits the candidate\'s preferences well.\n' +
