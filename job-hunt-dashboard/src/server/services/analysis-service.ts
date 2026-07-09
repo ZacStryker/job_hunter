@@ -32,7 +32,6 @@ interface AnthropicMessage {
 type TextBlock = { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }
 
 interface AnalysisResult {
-  score: number
   job_reqs_met: string | null
   job_reqs_missed: string | null
   candidate_reqs_met: string | null
@@ -43,6 +42,7 @@ interface AnalysisResult {
   contact_email: string | null
   contact_phone: string | null
   recommended_action: string
+  score: number
 }
 
 // Builds the user-message content blocks. The candidate-dependent prefix (everything before the

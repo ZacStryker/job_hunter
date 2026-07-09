@@ -295,10 +295,10 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 items-start">
-                <AssessmentSection label="Job Meets Expectations" content={job?.jobReqsMet ?? null} defaultMet />
-                <AssessmentSection label="Job Falls Short" content={job?.jobReqsMissed ?? null} defaultMet={false} />
-                <AssessmentSection label="Requirements Met" content={job?.candidateReqsMet ?? null} defaultMet />
-                <AssessmentSection label="Requirements Missed" content={job?.candidateReqsMissed ?? null} defaultMet={false} />
+                <AssessmentSection label="Job Meets Expectations" content={job?.jobReqsMet ?? null} defaultMet tooltip="Ways this role fits your preferences — arrangement, location, language, pay, company. Not about your skills." />
+                <AssessmentSection label="Job Falls Short" content={job?.jobReqsMissed ?? null} defaultMet={false} tooltip="Ways this role misses your preferences." />
+                <AssessmentSection label="Requirements Met" content={job?.candidateReqsMet ?? null} defaultMet tooltip="Job requirements you satisfy — skills, experience, education, certifications." />
+                <AssessmentSection label="Requirements Missed" content={job?.candidateReqsMissed ?? null} defaultMet={false} tooltip="Job requirements you're missing." />
               </div>
             </TabsContent>
             <TabsContent value="description" className="pt-4">
