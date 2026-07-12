@@ -72,11 +72,22 @@ function backfillDateArchived(): void {
   }
 }
 
+// runAnalysis marks a job 'analyzing' before the Anthropic call, so a crash or restart mid-run
+// leaves the row in a state no query ever selects again. Nothing else writes 'analyzing', and no
+// run can be in flight at boot, so every such row is by definition stranded.
+export function reclaimStrandedAnalyzing(): void {
+  const result = sqlite.prepare(`UPDATE jobs SET analysis_status = 'pending' WHERE analysis_status = 'analyzing'`).run()
+  if (result.changes > 0) {
+    console.log(`[db] Reclaim: reset ${result.changes} job(s) stranded at 'analyzing' to 'pending'`)
+  }
+}
+
 export function runMigrations(): void {
   migrate(db, { migrationsFolder: join(import.meta.dir, 'migrations') })
   repairSchema()
   repairWebhookRunsSchema()
   backfillDateArchived()
+  reclaimStrandedAnalyzing()
   console.log('[db] Migrations complete')
 }
 

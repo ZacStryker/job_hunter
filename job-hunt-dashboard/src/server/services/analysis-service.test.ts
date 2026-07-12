@@ -528,3 +528,190 @@ describe('runAnalysis()', () => {
     expect(pendingCount).toBe(2)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Job selection — which rows each path picks up, and which it must not.
+// ---------------------------------------------------------------------------
+
+function insertJob(opts: { company: string; status: string | null; archived?: boolean; userId?: number }): number {
+  prodSqlite.run(
+    `INSERT INTO jobs (company, job_title, source, source_url, external_job_id, analysis_status, archived, user_id)
+     VALUES (?, ?, 'linkedin', 'https://linkedin.com/jobs/view/1', ?, ?, ?, ?)`,
+    [
+      opts.company,
+      'Engineer',
+      `ext-${opts.company}`,
+      opts.status,
+      opts.archived ? 1 : 0,
+      opts.userId ?? 1,
+    ]
+  )
+  return (prodSqlite.prepare('SELECT id FROM jobs ORDER BY id DESC LIMIT 1').get() as { id: number }).id
+}
+
+function statusOf(id: number): string | null {
+  const row = prodSqlite.prepare('SELECT analysis_status FROM jobs WHERE id = ?').get(id) as { analysis_status: string | null }
+  return row.analysis_status
+}
+
+describe('runAnalysis() batch selection', () => {
+  // The original bug: only 'pending' was selected, and nothing ever wrote a job back to it. A row
+  // ingested with a NULL status was invisible to the queue forever, so Analyze reported "0 analyzed"
+  // while the user could plainly see unanalyzed jobs.
+  test('picks up a job stranded at NULL', async () => {
+    const id = insertJob({ company: 'Null Co', status: null })
+    mockFetchSuccess()
+
+    const result = await runAnalysis(undefined, 1)
+
+    expect(result.processed).toBe(1)
+    expect(statusOf(id)).toBe('done')
+  })
+
+  // Load-bearing exclusion. If the batch retried failures, one permanently-unanalyzable job would
+  // occupy a slot in every 10-job batch forever — the exact stall being fixed.
+  test("never selects a 'failed' job, so it cannot consume the batch budget", async () => {
+    const failedId = insertJob({ company: 'Failed Co', status: 'failed' })
+    const pendingId = insertJob({ company: 'Pending Co', status: 'pending' })
+    mockFetchSuccess()
+
+    const result = await runAnalysis(undefined, 1)
+
+    expect(result.processed).toBe(1)
+    expect(statusOf(failedId)).toBe('failed')
+    expect(statusOf(pendingId)).toBe('done')
+  })
+
+  test("never selects 'analyzing' (would double-charge) or 'done' (would discard a result)", async () => {
+    const analyzingId = insertJob({ company: 'Analyzing Co', status: 'analyzing' })
+    const doneId = insertJob({ company: 'Done Co', status: 'done' })
+    mockFetchSuccess()
+
+    const result = await runAnalysis(undefined, 1)
+
+    expect(result.processed).toBe(0)
+    expect(statusOf(analyzingId)).toBe('analyzing')
+    expect(statusOf(doneId)).toBe('done')
+  })
+
+  test('never selects an archived job, whatever its status', async () => {
+    const archivedPending = insertJob({ company: 'Archived Pending', status: 'pending', archived: true })
+    const archivedNull = insertJob({ company: 'Archived Null', status: null, archived: true })
+    mockFetchSuccess()
+
+    const result = await runAnalysis(undefined, 1)
+
+    expect(result.processed).toBe(0)
+    expect(statusOf(archivedPending)).toBe('pending')
+    expect(statusOf(archivedNull)).toBeNull()
+  })
+
+  test("another user's eligible jobs are never selected", async () => {
+    const foreignId = insertJob({ company: 'Foreign Co', status: 'pending', userId: 2 })
+    mockFetchSuccess()
+
+    const result = await runAnalysis(undefined, 1)
+
+    expect(result.processed).toBe(0)
+    expect(statusOf(foreignId)).toBe('pending')
+  })
+})
+
+describe('runAnalysis() targeted selection', () => {
+  test("re-analyzes a 'failed' job when it is named explicitly", async () => {
+    const id = insertJob({ company: 'Failed Co', status: 'failed' })
+    mockFetchSuccess()
+
+    const result = await runAnalysis(undefined, 1, { jobIds: [id] })
+
+    expect(result.processed).toBe(1)
+    expect(statusOf(id)).toBe('done')
+  })
+
+  test('analyzes only the named jobs, leaving other eligible ones alone', async () => {
+    const targetId = insertJob({ company: 'Target Co', status: 'failed' })
+    const bystanderId = insertJob({ company: 'Bystander Co', status: 'pending' })
+    mockFetchSuccess()
+
+    const result = await runAnalysis(undefined, 1, { jobIds: [targetId] })
+
+    expect(result.processed).toBe(1)
+    expect(statusOf(targetId)).toBe('done')
+    expect(statusOf(bystanderId)).toBe('pending')
+  })
+
+  // The ids come straight from the client, so the userId filter is the ONLY barrier between one
+  // tenant and another's rows. Seed as user 2, act as user 1, assert nothing crosses over.
+  test("ignores ids belonging to another user — no cross-tenant read or write", async () => {
+    const foreignId = insertJob({ company: 'Foreign Co', status: 'failed', userId: 2 })
+    mockFetchSuccess()
+
+    const result = await runAnalysis(undefined, 1, { jobIds: [foreignId] })
+
+    expect(result.processed).toBe(0)
+    expect(result.failed).toBe(0)
+    expect(statusOf(foreignId)).toBe('failed')
+  })
+
+  test("ignores a named job that is 'analyzing' or 'done'", async () => {
+    const analyzingId = insertJob({ company: 'Analyzing Co', status: 'analyzing' })
+    const doneId = insertJob({ company: 'Done Co', status: 'done' })
+    mockFetchSuccess()
+
+    const result = await runAnalysis(undefined, 1, { jobIds: [analyzingId, doneId] })
+
+    expect(result.processed).toBe(0)
+    expect(statusOf(analyzingId)).toBe('analyzing')
+    expect(statusOf(doneId)).toBe('done')
+  })
+
+  test('ignores a named job that is archived', async () => {
+    const id = insertJob({ company: 'Archived Co', status: 'failed', archived: true })
+    mockFetchSuccess()
+
+    const result = await runAnalysis(undefined, 1, { jobIds: [id] })
+
+    expect(result.processed).toBe(0)
+    expect(statusOf(id)).toBe('failed')
+  })
+
+  test('a retry that fails again lands back at failed, ready to retry once more', async () => {
+    const id = insertJob({ company: 'Broken Co', status: 'failed' })
+    globalThis.fetch = mock((url: string) => {
+      if (String(url).includes('scrape/listing')) {
+        return Promise.resolve(new Response(JSON.stringify({ description: 'desc' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      }
+      return Promise.resolve(new Response('rate limited', { status: 429 }))
+    }) as unknown as typeof globalThis.fetch
+
+    const result = await runAnalysis(undefined, 1, { jobIds: [id] })
+
+    expect(result.failed).toBe(1)
+    expect(statusOf(id)).toBe('failed')
+  })
+
+  // "Analyze these zero jobs" must not widen into "analyze everything" — that would bill a caller
+  // for a full 10-job batch they never asked for.
+  test('an empty jobIds array analyzes nothing — it does not fall back to a batch run', async () => {
+    const failedId = insertJob({ company: 'Failed Co', status: 'failed' })
+    const pendingId = insertJob({ company: 'Pending Co', status: 'pending' })
+    mockFetchSuccess()
+
+    const result = await runAnalysis(undefined, 1, { jobIds: [] })
+
+    expect(result.processed).toBe(0)
+    expect(statusOf(pendingId)).toBe('pending')
+    expect(statusOf(failedId)).toBe('failed')
+  })
+
+  // The ids come from the client, so userId is the only tenant barrier. An unscoped call would fall
+  // back to `1=1` and analyze whatever ids it was handed. Refuse loudly rather than degrade quietly.
+  test('refuses to run targeted without a userId rather than analyzing across tenants', async () => {
+    const id = insertJob({ company: 'Some Co', status: 'failed', userId: 2 })
+    mockFetchSuccess()
+
+    await expect(runAnalysis(undefined, undefined, { jobIds: [id] })).rejects.toThrow(/userId/)
+
+    expect(statusOf(id)).toBe('failed')
+  })
+})

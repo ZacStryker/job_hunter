@@ -251,6 +251,10 @@ export function PipelineRoute() {
             selectedJobId={selectedJobId}
             onBulkArchive={bulkArchiveMutation.mutate}
             isBulkArchiving={bulkArchiveMutation.isPending}
+            onRetryAnalysis={(ids) => analysisStream.trigger({ jobIds: ids })}
+            // Only the analysis stream: discovery and analysis are separate run types that may
+            // legitimately overlap, so a running discovery must not claim a retry is in flight.
+            isRetryingAnalysis={analysisStream.isPending}
             fixedColumns={['company', 'jobTitle', 'location', 'locationType', 'source', 'relevanceScore', 'date_scraped']}
             sizingStorageKey="hitlobster-column-sizing-jobs"
             sortingStorageKey="hitlobster-column-sorting-jobs"

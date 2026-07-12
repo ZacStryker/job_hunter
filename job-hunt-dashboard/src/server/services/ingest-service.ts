@@ -16,9 +16,16 @@ export function ingestJobs(rows: JobInput[], userId: number): { added: number; u
 
   db.transaction((tx) => {
     for (const row of rows) {
+      // Both states the analysis queue can never see again. NULL because the payload is allowed to
+      // omit the status and the column has no DB default; 'analyzing' because it means "a run has
+      // this job in flight", which cannot be true of a row arriving from a scraper — and once
+      // written it is invisible to both selection paths until the next process boot.
+      const analysisStatus =
+        row.analysisStatus == null || row.analysisStatus === 'analyzing' ? 'pending' : row.analysisStatus
+
       tx
         .insert(jobs)
-        .values({ ...row, userId })
+        .values({ ...row, userId, analysisStatus })
         .onConflictDoUpdate({
           target: [jobs.company, jobs.jobTitle, jobs.userId],
           set: {

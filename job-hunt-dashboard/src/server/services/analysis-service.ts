@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { jobs, profile, userSecrets } from '../../db/schema'
 import { decrypt } from '../lib/crypto'
@@ -72,7 +72,7 @@ function buildAnalysisContent(
   ]
 }
 
-export async function runAnalysis(onProgress?: (msg: string) => void, userId?: number): Promise<{ processed: number; failed: number; matched: number; archived: number; inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number }> {
+export async function runAnalysis(onProgress?: (msg: string) => void, userId?: number, opts?: { jobIds?: number[] }): Promise<{ processed: number; failed: number; matched: number; archived: number; inputTokens: number; outputTokens: number; cacheCreationTokens: number; cacheReadTokens: number }> {
   let apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey && userId !== undefined) {
     const row = db.select({ ciphertext: userSecrets.ciphertext })
@@ -101,15 +101,45 @@ export async function runAnalysis(onProgress?: (msg: string) => void, userId?: n
     }
   }
 
+  // Two selection modes over the same eligibility rules.
+  //
+  // A job is eligible when its status is NULL (ingested before the column was populated) or
+  // 'pending'. 'analyzing' and 'done' are never eligible on either path — re-selecting them would
+  // double-charge Anthropic or discard a completed result.
+  //
+  // 'failed' is deliberately eligible ONLY on the targeted path. If a batch run picked up failures,
+  // a single permanently-unanalyzable job would occupy a slot in every 10-job batch forever, which
+  // is the "click Analyze and nothing drains" stall this is fixing. Failures surface as an error
+  // glyph instead and the user retries them explicitly.
+  const targetedIds = opts?.jobIds
+  const isTargeted = targetedIds !== undefined
+
+  // The targeted path selects rows by ids the CLIENT chose, so `eq(jobs.userId, userId)` is the only
+  // barrier between one tenant and another's jobs. A caller that omits userId would silently fall
+  // back to `1=1` and analyze whatever ids it was handed. Refuse rather than degrade.
+  if (isTargeted && userId === undefined) {
+    throw new Error('Targeted analysis requires a userId — refusing to run unscoped')
+  }
+  // An explicit empty list means "analyze these zero jobs", not "analyze everything". Falling
+  // through to the batch path here would bill a 10-job run to a caller who asked for none.
+  if (isTargeted && targetedIds.length === 0) {
+    return { processed: 0, failed: 0, matched: 0, archived: 0, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 }
+  }
+
+  const eligibleStatus = isTargeted
+    ? or(isNull(jobs.analysisStatus), eq(jobs.analysisStatus, 'pending'), eq(jobs.analysisStatus, 'failed'))
+    : or(isNull(jobs.analysisStatus), eq(jobs.analysisStatus, 'pending'))
+
   const pendingJobs = db
     .select()
     .from(jobs)
     .where(and(
-      eq(jobs.analysisStatus, 'pending'),
+      eligibleStatus,
       eq(jobs.archived, false),
       userId !== undefined ? eq(jobs.userId, userId) : sql`1=1`,
+      isTargeted ? inArray(jobs.id, targetedIds) : undefined,
     ))
-    .limit(10)
+    .limit(isTargeted ? targetedIds.length : 10)
     .all()
 
   onProgress?.(`Found ${pendingJobs.length} jobs to analyze`)

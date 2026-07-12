@@ -8,7 +8,11 @@ export interface WebhookStreamState {
   isSuccess: boolean
   isError: boolean
   error: string | null
-  trigger: () => void
+  // Deliberately NOT `unknown`: `unknown` accepts a React MouseEvent, so a caller written as
+  // onClick={stream.trigger} would compile and then POST a circular synthetic event — which
+  // JSON.stringify throws on, breaking the button with an error about nothing. A plain-object
+  // type makes that mistake a compile error instead.
+  trigger: (body?: Record<string, unknown>) => void
   reset: () => void
 }
 
@@ -22,7 +26,7 @@ export function useWebhookStream(url: string): WebhookStreamState {
   const abortRef = useRef<AbortController | null>(null)
   const inFlightRef = useRef(false)
 
-  const trigger = useCallback(async () => {
+  const trigger = useCallback(async (body?: Record<string, unknown>) => {
     // Re-entrancy guard: a single user action must produce exactly one run. isPending
     // (which disables the button) only takes effect on re-render, so a synchronous
     // re-fire before that commit would otherwise start a second, duplicate run.
@@ -43,7 +47,15 @@ export function useWebhookStream(url: string): WebhookStreamState {
     let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
 
     try {
-      const response = await apiFetch(url, { method: 'POST', signal: controller.signal })
+      // Body is omitted entirely unless a caller supplies one, so endpoints that read no body
+      // (and the plain no-arg trigger) see exactly the request they saw before.
+      const response = await apiFetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        ...(body !== undefined
+          ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+          : {}),
+      })
 
       if (!response.ok) {
         // 409 = a run of this type is already in progress server-side. This is the

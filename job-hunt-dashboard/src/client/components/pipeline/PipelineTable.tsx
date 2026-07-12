@@ -17,7 +17,8 @@ import {
   TableRow,
 } from '../ui/table'
 import type { Job } from '@shared/schemas'
-import { Check, Minus } from 'lucide-react'
+import { ANALYSIS_RETRY_MAX } from '@shared/schemas'
+import { Check, Minus, AlertTriangle } from 'lucide-react'
 import { ScoreBadge } from './ScoreBadge'
 import { ActionChip } from './ActionChip'
 import { ColumnVisibilityToggle } from './ColumnVisibilityToggle'
@@ -144,8 +145,24 @@ const staticColumns = [
   columnHelper.accessor('company', {
     header: 'Company',
     size: 180,
+    // The glyph lives here rather than in the Score cell because the Jobs page — the one page where
+    // a failed analysis matters — hides the Score column. A failed job and a never-analyzed one both
+    // have a null score, so without this marker they are indistinguishable.
     cell: (info) => (
-      <span className="whitespace-nowrap overflow-hidden text-ellipsis block text-zinc-300" title={info.getValue()}>{info.getValue()}</span>
+      <span className="flex items-center gap-1.5 min-w-0 text-zinc-300">
+        {info.row.original.analysisStatus === 'failed' && (
+          <AlertTriangle
+            role="img"
+            aria-label="Analysis failed"
+            className="w-3.5 h-3.5 shrink-0 text-amber-500"
+          >
+            <title>Analysis failed — select this row to retry or archive it</title>
+          </AlertTriangle>
+        )}
+        {/* min-w-0 is required: a flex item defaults to min-width:auto and would refuse to shrink
+            below its content width, so the ellipsis would never engage on a long company name. */}
+        <span className="min-w-0 whitespace-nowrap overflow-hidden text-ellipsis" title={info.getValue()}>{info.getValue()}</span>
+      </span>
     ),
   }),
   columnHelper.accessor('jobTitle', {
@@ -327,13 +344,15 @@ interface PipelineTableProps {
   selectedJobId: number | null
   onBulkArchive?: (ids: number[]) => void
   isBulkArchiving?: boolean
+  onRetryAnalysis?: (ids: number[]) => void
+  isRetryingAnalysis?: boolean
   fixedColumns?: string[]
   initialSort?: SortingState
   sizingStorageKey: string
   sortingStorageKey: string
 }
 
-export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, isBulkArchiving = false, fixedColumns, initialSort, sizingStorageKey, sortingStorageKey }: PipelineTableProps) {
+export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, isBulkArchiving = false, onRetryAnalysis, isRetryingAnalysis = false, fixedColumns, initialSort, sizingStorageKey, sortingStorageKey }: PipelineTableProps) {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
     if (fixedColumns) {
       const state: VisibilityState = {}
@@ -495,9 +514,27 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
   const selectedIds = table.getSelectedRowModel().rows.map((r) => r.original.id)
   const selectedCount = selectedIds.length
 
+  // Only the failed rows in the selection are retryable — the server would ignore the rest anyway,
+  // so sending them would just inflate the count the button shows. Clamped to the same cap the
+  // server validates against, so selecting 40 failed rows retries 25 rather than 400-ing on all 40.
+  const retryableIds = table
+    .getSelectedRowModel()
+    .rows.filter((r) => r.original.analysisStatus === 'failed')
+    .map((r) => r.original.id)
+    .slice(0, ANALYSIS_RETRY_MAX)
+
   function handleBulkArchive() {
     onBulkArchive?.(selectedIds)
     setRowSelection({})
+  }
+
+  // Unlike archive, the selection is NOT cleared here. Clearing it would unmount this button on the
+  // same commit (its render is gated on retryableIds.length), so its own pending state could never
+  // be seen — and if the request 409s or 400s, the user would have lost the rows they had picked.
+  // On success the invalidated jobs query flips the rows to 'done', which empties retryableIds and
+  // retires the button on its own.
+  function handleRetryAnalysis() {
+    onRetryAnalysis?.(retryableIds)
   }
 
   return (
@@ -505,6 +542,11 @@ export function PipelineTable({ jobs, onRowClick, selectedJobId, onBulkArchive, 
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-zinc-800 shrink-0">
         <div className="flex items-center gap-2">
           <KeywordFilterInput value={keyword} onChange={setKeyword} placeholder="Filter jobs…" />
+          {onRetryAnalysis && retryableIds.length > 0 && (
+            <Button size="sm" variant="outline" onClick={handleRetryAnalysis} disabled={isRetryingAnalysis}>
+              {isRetryingAnalysis ? 'Retrying…' : `Retry analysis (${retryableIds.length})`}
+            </Button>
+          )}
           {onBulkArchive && selectedCount > 0 && (
             <Button size="sm" variant="outline" onClick={handleBulkArchive} disabled={isBulkArchiving}>
               {isBulkArchiving ? 'Archiving…' : `Archive (${selectedCount})`}

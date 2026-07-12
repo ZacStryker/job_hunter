@@ -13,10 +13,10 @@ mock.module('../services/discovery-service', () => ({
   runDiscovery: (onProgress?: (msg: string) => void, _userId?: number, onJobsInserted?: (count: number, source: string) => void) => mockRunDiscovery(onProgress, onJobsInserted),
 }))
 
-let mockRunAnalysis: (onProgress?: (msg: string) => void) => Promise<{ processed: number; failed: number; matched: number; archived: number; inputTokens: number; outputTokens: number }> =
+let mockRunAnalysis: (onProgress?: (msg: string) => void, opts?: { jobIds?: number[] }) => Promise<{ processed: number; failed: number; matched: number; archived: number; inputTokens: number; outputTokens: number }> =
   async () => ({ processed: 0, failed: 0, matched: 0, archived: 0, inputTokens: 0, outputTokens: 0 })
 mock.module('../services/analysis-service', () => ({
-  runAnalysis: (onProgress?: (msg: string) => void, _userId?: number) => mockRunAnalysis(onProgress),
+  runAnalysis: (onProgress?: (msg: string) => void, _userId?: number, opts?: { jobIds?: number[] }) => mockRunAnalysis(onProgress, opts),
 }))
 
 const { default: webhooksApp } = await import('./api-webhooks')
@@ -481,5 +481,139 @@ describe('concurrency guard — one click, one run (1:1:1)', () => {
 
     activityRegistry.finalize(seededId, 'done', 0)
     delete process.env.SCRAPER_URL
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Optional request body — a bodiless POST is a batch run; { jobIds } targets specific jobs,
+// which is the only way a 'failed' job gets re-analyzed (the batch path never selects failures).
+// ---------------------------------------------------------------------------
+
+describe('POST /api/webhooks/analysis — request body', () => {
+  test('a bodiless POST still runs a batch, passing no jobIds', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    let seenOpts: { jobIds?: number[] } | undefined = { jobIds: [999] } // poisoned, must be overwritten
+    mockRunAnalysis = async (_onProgress, opts) => {
+      seenOpts = opts
+      return { processed: 0, failed: 0, matched: 0, archived: 0, inputTokens: 0, outputTokens: 0 }
+    }
+
+    const res = await asUser(5100).request('/analysis', { method: 'POST' })
+
+    expect(res.status).toBe(200)
+    expect(seenOpts?.jobIds).toBeUndefined()
+    const events = await parseNdjson(res)
+    expect(events.find((e) => 'done' in e)?.done).toBe(true)
+    delete process.env.ANTHROPIC_API_KEY
+  })
+
+  test('jobIds in the body are passed through to runAnalysis', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    let seenOpts: { jobIds?: number[] } | undefined
+    mockRunAnalysis = async (_onProgress, opts) => {
+      seenOpts = opts
+      return { processed: 2, failed: 0, matched: 2, archived: 0, inputTokens: 10, outputTokens: 5 }
+    }
+
+    const res = await asUser(5101).request('/analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobIds: [7, 9] }),
+    })
+
+    expect(res.status).toBe(200)
+    expect(seenOpts?.jobIds).toEqual([7, 9])
+    const events = await parseNdjson(res)
+    expect(events.find((e) => 'done' in e)?.processed).toBe(2)
+    delete process.env.ANTHROPIC_API_KEY
+  })
+
+  test('a targeted run still records cost and token accounting', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockRunAnalysis = async () => ({ processed: 1, failed: 0, matched: 1, archived: 0, inputTokens: 100, outputTokens: 50 })
+
+    const res = await asUser(5102).request('/analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobIds: [3] }),
+    })
+    expect(res.status).toBe(200)
+    await parseNdjson(res)
+
+    const row = prodSqlite.prepare('SELECT * FROM webhook_runs WHERE user_id = ?').get(5102) as Record<string, unknown>
+    expect(row.name).toBe('Analysis')
+    expect(row.input_tokens).toBe(100)
+    expect(row.output_tokens).toBe(50)
+    expect(row.cost_usd as number).toBeGreaterThan(0)
+    delete process.env.ANTHROPIC_API_KEY
+  })
+
+  test.each([
+    ['an empty jobIds array', { jobIds: [] }],
+    ['a non-integer id', { jobIds: [1.5] }],
+    ['a negative id', { jobIds: [-3] }],
+    ['a non-numeric id', { jobIds: ['7'] }],
+    ['more than 25 ids', { jobIds: Array.from({ length: 26 }, (_, i) => i + 1) }],
+  ])('rejects %s with 400 and never starts a run', async (_label, body) => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    let called = false
+    mockRunAnalysis = async () => {
+      called = true
+      return { processed: 0, failed: 0, matched: 0, archived: 0, inputTokens: 0, outputTokens: 0 }
+    }
+
+    const res = await asUser(5103).request('/analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toHaveProperty('error')
+    expect(called).toBe(false)
+    const runs = prodSqlite.prepare('SELECT COUNT(*) as c FROM webhook_runs WHERE user_id = ?').get(5103) as { c: number }
+    expect(runs.c).toBe(0)
+    delete process.env.ANTHROPIC_API_KEY
+  })
+
+  // A truncated/corrupt body must not be swallowed as "no body". Doing so would silently convert an
+  // intended one-job retry into a billed 10-job batch run.
+  test('a malformed JSON body is a 400, not a silent fallback to a batch run', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    let called = false
+    mockRunAnalysis = async () => {
+      called = true
+      return { processed: 0, failed: 0, matched: 0, archived: 0, inputTokens: 0, outputTokens: 0 }
+    }
+
+    const res = await asUser(5105).request('/analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"jobIds":[1,2',   // truncated
+    })
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toHaveProperty('error')
+    expect(called).toBe(false)
+    delete process.env.ANTHROPIC_API_KEY
+  })
+
+  test('the 409 guard still fires for a targeted run', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key'
+    const USER = 5104
+    const seededId = activityRegistry.register({ userId: USER, type: 'analysis', progress: { count: 0, total: null } })
+
+    const res = await asUser(USER).request('/analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobIds: [1] }),
+    })
+
+    expect(res.status).toBe(409)
+    const runs = prodSqlite.prepare('SELECT COUNT(*) as c FROM webhook_runs WHERE user_id = ?').get(USER) as { c: number }
+    expect(runs.c).toBe(0)
+
+    activityRegistry.finalize(seededId, 'done', 0)
+    delete process.env.ANTHROPIC_API_KEY
   })
 })

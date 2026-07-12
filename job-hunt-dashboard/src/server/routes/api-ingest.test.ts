@@ -70,6 +70,7 @@ const CREATE_JOBS_TABLE = `
     cover_letter_sent_at TEXT,
     date_applied TEXT,
     applied_at TEXT,
+    date_archived TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
     resume_generated_at TEXT,
     user_id INTEGER NOT NULL DEFAULT 1,
@@ -390,5 +391,51 @@ describe('POST /api/ingest HTTP contract (production handler)', () => {
     expect(res.status).toBe(200)
     const row = prodSqlite.query('SELECT archived FROM jobs WHERE company = ?').get('Acme') as { archived: number }
     expect(row.archived).toBe(1)
+  })
+
+  // A NULL analysis_status is invisible to the analysis queue forever — the job can never be
+  // analyzed and never reports an error. The column has no DB default, so ingest must supply one.
+  test('a payload with a null analysisStatus lands as pending, not NULL', async () => {
+    const res = await ingestApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([baseJob]),
+    })
+
+    expect(res.status).toBe(200)
+    const row = prodSqlite
+      .query('SELECT analysis_status FROM jobs WHERE company = ?')
+      .get(baseJob.company) as { analysis_status: string | null }
+    expect(row.analysis_status).toBe('pending')
+  })
+
+  test('an explicit analysisStatus in the payload is preserved', async () => {
+    const res = await ingestApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ ...baseJob, company: 'Explicit Co', analysisStatus: 'done' }]),
+    })
+
+    expect(res.status).toBe(200)
+    const row = prodSqlite
+      .query('SELECT analysis_status FROM jobs WHERE company = ?')
+      .get('Explicit Co') as { analysis_status: string | null }
+    expect(row.analysis_status).toBe('done')
+  })
+
+  // 'analyzing' means "a run has this job in flight", which cannot be true of a row arriving from a
+  // scraper. Stored as-is it would be invisible to both selection paths until the next process boot.
+  test("an ingested 'analyzing' status is coerced to pending, not stored", async () => {
+    const res = await ingestApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ ...baseJob, company: 'Analyzing Co', analysisStatus: 'analyzing' }]),
+    })
+
+    expect(res.status).toBe(200)
+    const row = prodSqlite
+      .query('SELECT analysis_status FROM jobs WHERE company = ?')
+      .get('Analyzing Co') as { analysis_status: string | null }
+    expect(row.analysis_status).toBe('pending')
   })
 })

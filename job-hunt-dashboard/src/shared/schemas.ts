@@ -51,6 +51,19 @@ export const syncResultSchema = z.object({
   updated: z.number().int(),
 })
 
+// POST /api/webhooks/analysis body — optional. Absent body means a normal batch run.
+// Supplying jobIds targets those jobs specifically, which is how a 'failed' job is retried
+// (the batch path never selects failures). The cap keeps a targeted run comparable in cost to a
+// batch one; the server still scopes every id to the caller's userId.
+//
+// The client clamps its request to this same constant, so a user who selects more failed rows than
+// the cap gets a smaller retry rather than a 400.
+export const ANALYSIS_RETRY_MAX = 25
+
+export const analysisRequestSchema = z.object({
+  jobIds: z.array(z.number().int().positive()).min(1).max(ANALYSIS_RETRY_MAX).optional(),
+})
+
 export const statusEventSchema = z.object({
   id: z.number().int(),
   jobId: z.number().int(),
@@ -268,6 +281,7 @@ export type Job = z.infer<typeof jobSchema>
 export type JobInput = z.infer<typeof jobInputSchema>
 export type IngestPayload = z.infer<typeof ingestPayloadSchema>
 export type SyncResult = z.infer<typeof syncResultSchema>
+export type AnalysisRequest = z.infer<typeof analysisRequestSchema>
 export type StatusEvent = z.infer<typeof statusEventSchema>
 export type Message = z.infer<typeof messageSchema>
 

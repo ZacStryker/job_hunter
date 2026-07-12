@@ -7,6 +7,7 @@ import { recordRun } from './api-webhook-runs'
 import { activityRegistry } from '../services/activity-registry'
 import { runDiscovery } from '../services/discovery-service'
 import { runAnalysis } from '../services/analysis-service'
+import { analysisRequestSchema, ANALYSIS_RETRY_MAX } from '../../shared/schemas'
 import type { AppEnv } from '../types'
 
 // USD per token for claude-sonnet-4-6 (the model runAnalysis calls): $3 input / $15 output per 1M.
@@ -56,6 +57,27 @@ app.post('/discovery', (c) => {
 
 app.post('/analysis', async (c) => {
   const userId = c.get('userId')
+
+  // The body is optional: a bodiless POST is a normal batch run (unchanged behavior). A body with
+  // jobIds targets those jobs, which is the only way a 'failed' job gets re-analyzed.
+  //
+  // "No body" and "a body that failed to parse" must not collapse into the same branch: swallowing a
+  // truncated payload as {} would silently turn an intended one-job retry into a billed 10-job batch
+  // run. Only a request that never claimed to carry JSON is treated as bodiless.
+  let rawBody: unknown = {}
+  if (c.req.header('content-type')?.includes('application/json')) {
+    try {
+      rawBody = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+  }
+  const parsed = analysisRequestSchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return c.json({ error: `Invalid analysis request — jobIds must be 1 to ${ANALYSIS_RETRY_MAX} positive integers` }, 400)
+  }
+  const { jobIds } = parsed.data
+
   if (!process.env.ANTHROPIC_API_KEY) {
     const row = db.select({ keyName: userSecrets.keyName })
       .from(userSecrets)
@@ -76,7 +98,7 @@ app.post('/analysis', async (c) => {
         write({ status: msg })
         const m = ANALYZING_RE.exec(msg)
         if (m) activityRegistry.progress(runId, { count: Number(m[1]), total: Number(m[2]) })
-      }, userId)
+      }, userId, { jobIds })
       const { processed, failed, matched, archived, inputTokens, outputTokens } = result
       // inputTokens is the folded total (uncached + cache writes + cache reads). Bill each tier at its
       // real rate so prompt-cache savings (reads at 0.1x) actually show up in the recorded cost.
