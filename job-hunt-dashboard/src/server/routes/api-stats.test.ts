@@ -81,7 +81,8 @@ const CREATE_COVER_LETTERS_TABLE = `
     job_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
     content TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'generated'
   )
 `
 

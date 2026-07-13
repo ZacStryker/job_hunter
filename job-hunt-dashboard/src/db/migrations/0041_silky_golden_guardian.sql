@@ -1,0 +1,1 @@
+ALTER TABLE `cover_letters` ADD `source` text DEFAULT 'generated' NOT NULL;

@@ -50,6 +50,9 @@ export const coverLetters = sqliteTable('cover_letters', {
   userId: integer('user_id').notNull().references(() => users.id),
   content: text('content').notNull(),
   createdAt: text('created_at').notNull(),
+  // The table is append-only, so the version history already exists — this column only labels it.
+  // Defaulted, so every pre-existing row reads back as 'generated' with no backfill.
+  source: text('source', { enum: ['generated', 'edited'] }).notNull().default('generated'),
 }, (table) => [
   index('cover_letters_user_id_idx').on(table.userId),
 ])

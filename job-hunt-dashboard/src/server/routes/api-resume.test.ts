@@ -17,6 +17,7 @@ mock.module('../services/resume-service', () => ({
 mock.module('node:fs', () => ({
   mkdirSync: () => {},
   renameSync: () => {},
+  unlinkSync: () => {},
 }))
 
 // Mock Bun.write to avoid writing real files in tests
@@ -75,7 +76,11 @@ const CREATE_MESSAGES_TABLE = `
 const CREATE_COVER_LETTERS_TABLE = `
   CREATE TABLE IF NOT EXISTS cover_letters (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id INTEGER NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL
+    job_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'generated'
   )
 `
 const CREATE_WEBHOOK_RUNS_TABLE = `

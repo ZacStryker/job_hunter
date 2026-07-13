@@ -120,10 +120,11 @@ beforeAll(() => {
   prodSqlite.run(`
     CREATE TABLE IF NOT EXISTS cover_letters (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      job_id INTEGER NOT NULL REFERENCES jobs(id),
-      user_id INTEGER NOT NULL REFERENCES users(id),
+      job_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
       content TEXT NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'generated'
     )
   `)
   prodSqlite.run(`

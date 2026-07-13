@@ -10,6 +10,7 @@ import { fetchJobs } from '../hooks/useJobsQuery'
 import { fetchProfile } from '../hooks/useProfileQuery'
 import { fetchPrompts } from '../hooks/usePromptsQuery'
 import { MatchesRoute } from '../routes/matches'
+import { DocumentsRoute } from '../routes/documents'
 import { fetchSearchConfigs } from '../hooks/useSearchConfigsQuery'
 import { fetchSourceSettings } from '../hooks/useSourceSettingsQuery'
 import { fetchFeatureSettings } from '../hooks/useFeatureSettingsQuery'
@@ -149,10 +150,37 @@ const dashboardRoute = createRoute({
   component: DashboardRoute,
 })
 
+// `?job=&tab=` is how the document editor reopens the drawer it was launched from — Back must land
+// the user back on the Documents tab of that job, not on a bare list with the drawer closed.
+// The keys must be OPTIONAL in the return type, not present-but-undefined: TanStack derives link
+// requirements from this shape, and `{ job: number | undefined }` would make `search` mandatory on
+// every existing <Link to="/matches"> in the app.
+const validateJobDrawerSearch = (search: Record<string, unknown>): { job?: number; tab?: string } => {
+  const out: { job?: number; tab?: string } = {}
+  if (typeof search.job === 'number') out.job = search.job
+  else if (typeof search.job === 'string' && /^\d+$/.test(search.job)) out.job = Number(search.job)
+  if (typeof search.tab === 'string') out.tab = search.tab
+  return out
+}
+
+const documentsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/documents/$jobId/$docType',
+  component: DocumentsRoute,
+  validateSearch: (search: Record<string, unknown>) => ({
+    from: typeof search.from === 'string' ? search.from : undefined,
+  }),
+  loader: () => Promise.all([
+    queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
+    queryClient.ensureQueryData({ queryKey: ['profile'], queryFn: fetchProfile }),
+  ]),
+})
+
 const indexRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/',
   component: PipelineRoute,
+  validateSearch: validateJobDrawerSearch,
   loader: () => Promise.all([
     queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
     queryClient.ensureQueryData({ queryKey: ['blacklist'], queryFn: fetchBlacklist }),
@@ -163,6 +191,7 @@ const trackerRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/applications',
   component: TrackerRoute,
+  validateSearch: validateJobDrawerSearch,
   loader: () => Promise.all([
     queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
     queryClient.ensureQueryData({ queryKey: ['blacklist'], queryFn: fetchBlacklist }),
@@ -173,6 +202,7 @@ const archivedRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/archive',
   component: ArchivedRoute,
+  validateSearch: validateJobDrawerSearch,
   loader: () => Promise.all([
     queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
     queryClient.ensureQueryData({ queryKey: ['blacklist'], queryFn: fetchBlacklist }),
@@ -194,6 +224,7 @@ const matchesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/matches',
   component: MatchesRoute,
+  validateSearch: validateJobDrawerSearch,
   loader: () => Promise.all([
     queryClient.ensureQueryData({ queryKey: ['jobs'], queryFn: fetchJobs }),
     queryClient.ensureQueryData({ queryKey: ['blacklist'], queryFn: fetchBlacklist }),
@@ -407,6 +438,7 @@ const routeTree = rootRoute.addChildren([
     archivedRoute,
     messagesRoute,
     matchesRoute,
+    documentsRoute,
     adminUsersRoute,
     configLayoutRoute.addChildren([
       configOverviewRoute,

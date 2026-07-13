@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useJobsQuery } from '../hooks/useJobsQuery'
+import { useJobDrawerSearch, drawerTabFor } from '../hooks/useJobDrawerSearch'
 import { PipelineTable } from '../components/pipeline/PipelineTable'
 import { JobDrawer } from '../components/detail/JobDrawer'
 
 export function ArchivedRoute() {
   const { data: jobs = [] } = useJobsQuery()
   const archivedJobs = jobs.filter(j => j.archived)
-  const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
+  const { job: jobFromUrl, tab: tabFromUrl } = useJobDrawerSearch()
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(jobFromUrl ?? null)
 
   useEffect(() => {
     if (selectedJobId !== null && !archivedJobs.find(j => j.id === selectedJobId)) {
@@ -43,6 +45,7 @@ export function ArchivedRoute() {
         job={archivedJobs.find(j => j.id === selectedJobId) ?? null}
         open={selectedJobId !== null}
         onClose={() => setSelectedJobId(null)}
+        defaultTab={drawerTabFor(selectedJobId, jobFromUrl, tabFromUrl)}
       />
     </>
   )

@@ -37,6 +37,11 @@ const WEBHOOK_RUNS_COLUMNS: Array<[string, string]> = [
   ['user_id', 'INTEGER DEFAULT 1 NOT NULL REFERENCES users(id)'], // 1 = bootstrap admin user
 ]
 
+// Columns added via ALTER TABLE after initial cover_letters creation (migration 0041).
+const COVER_LETTERS_COLUMNS: Array<[string, string]> = [
+  ["source", "TEXT DEFAULT 'generated' NOT NULL"], // 'generated' | 'edited'
+]
+
 function repairSchema(): void {
   const rows = sqlite.query('PRAGMA table_info(jobs)').all() as Array<{ name: string }>
   const cols = new Set(rows.map((r) => r.name))
@@ -55,6 +60,20 @@ function repairWebhookRunsSchema(): void {
     if (!cols.has(col)) {
       sqlite.prepare(`ALTER TABLE webhook_runs ADD COLUMN ${col} ${type}`).run()
       console.log(`[db] Schema repair: added webhook_runs.${col}`)
+    }
+  }
+}
+
+function repairCoverLettersSchema(): void {
+  const rows = sqlite.query('PRAGMA table_info(cover_letters)').all() as Array<{ name: string }>
+  // No table => nothing to repair. PRAGMA returns [] for a missing table, and without this guard the
+  // loop would see no `source` column and fire ALTER TABLE against a table that does not exist.
+  if (rows.length === 0) return
+  const cols = new Set(rows.map((r) => r.name))
+  for (const [col, type] of COVER_LETTERS_COLUMNS) {
+    if (!cols.has(col)) {
+      sqlite.prepare(`ALTER TABLE cover_letters ADD COLUMN ${col} ${type}`).run()
+      console.log(`[db] Schema repair: added cover_letters.${col}`)
     }
   }
 }
@@ -87,6 +106,7 @@ export function runMigrations(): void {
   migrate(db, { migrationsFolder: join(import.meta.dir, 'migrations') })
   repairSchema()
   repairWebhookRunsSchema()
+  repairCoverLettersSchema()
   backfillDateArchived()
   reclaimStrandedAnalyzing()
   console.log('[db] Migrations complete')

@@ -145,16 +145,16 @@ anti-detection stack. Anything touching Playwright, Xvfb, or the embedding model
 - `bun run typecheck` (`bunx tsc --noEmit`) — the **only** type gate, and a separate step.
   `bun test` transpiles without type-checking, so a test file with wrong types runs and passes.
   It is **green**; keep it that way. Judge a change by the *delta*, not the absolute count.
-- `[!]` **`bun test` is red: 9 tests fail on a clean checkout** (673 pass, measured on `main`
-  at `ce803e3`; a flaky resume-E2E test can make it 10). A green run is not the bar; "no new
-  failures versus the merge base" is. Capture the baseline before you start, and diff failing
-  *names*, not counts. The 9 standing failures, so you can tell yours from these:
+- `[!]` **`bun test` is red: 8 tests fail on a clean checkout** (685 pass, measured on
+  `feat/cover-letter-editing-and-history` at `7128f74`; a flaky resume-E2E test can make it 9).
+  A green run is not the bar; "no new failures versus the merge base" is. Capture the baseline
+  before you start, and diff failing *names*, not counts. The 8 standing failures, so you can
+  tell yours from these:
   - `PUT /api/onboarding/linkedin` — all five (`valid content → 200`, `missing content field
     → 400`, `empty content → 400`, `invalid JSON body → 400`, `second PUT upserts`)
   - `GET /api/onboarding/gmail/labels > connected but refresh token revoked … → 502`
   - `POST /api/messages/sync (Gmail) > revoked/expired token → 502`
   - `startScraperProcess > defaults AUTH_DIR to <scraper_dir>/auth when not set`
-  - `GET /:id/cover-letter > returns 200 with most recent cover letter`
   This count is **not** asserted by `verify-context.sh` — checking it costs a full suite run,
   and the suite can hang (see the Playwright/Xvfb note above), so the script stays fast and
   this line stays faith-maintained. It read `43` for months while the real number was `9`;

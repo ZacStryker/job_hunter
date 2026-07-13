@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
+import { Link, useLocation } from '@tanstack/react-router'
 import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, Pencil, Info, Ban, ChevronRight } from 'lucide-react'
+import { CoverLetterVersions } from './CoverLetterVersions'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
@@ -82,9 +84,17 @@ interface JobDrawerProps {
   job: Job | null
   open: boolean
   onClose: () => void
+  /** Set from `?tab=` so the document editor's Back link lands on the tab it was launched from. */
+  defaultTab?: string
 }
 
-export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
+export function JobDrawer({ job, open, onClose, defaultTab }: JobDrawerProps) {
+  // Controlled rather than defaultValue: the drawer stays mounted across job selections, so a
+  // defaultValue would only ever apply on first mount and Back would land on Analysis.
+  const [tab, setTab] = useState(defaultTab ?? 'analysis')
+  useEffect(() => { setTab(defaultTab ?? 'analysis') }, [defaultTab, job?.id])
+  // Where the editor's Back link should return to — whichever list the drawer was opened from.
+  const { pathname } = useLocation()
   const [showFullDescription, setShowFullDescription] = useState(false)
   const [editingDescription, setEditingDescription] = useState(false)
   const [descriptionDraft, setDescriptionDraft] = useState('')
@@ -292,7 +302,7 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
           )}
           {job && <JobDetailFields job={job} />}
           {job && <StatusTimeline events={events} />}
-          <Tabs defaultValue="analysis" className="mt-2">
+          <Tabs value={tab} onValueChange={setTab} className="mt-2">
             <TabsList className="w-full bg-zinc-800 border border-zinc-700">
               <TabsTrigger value="analysis" className="flex-1">Analysis</TabsTrigger>
               <TabsTrigger value="description" className="flex-1">Description</TabsTrigger>
@@ -468,7 +478,18 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                     <p className="text-xs text-zinc-500 uppercase tracking-wide">Cover Letter</p>
                     {job?.coverLetterSentAt && (
                       <div className="flex items-center gap-2">
-                        <p className="text-xs text-zinc-600">{new Date(job.coverLetterSentAt).toLocaleDateString()}</p>
+                        {/* The version control replaces the date; Edit is a ghost beside Download.
+                            Zero new rows, zero new buttons — Generate/Regenerate stays the column's
+                            only primary action. */}
+                        <CoverLetterVersions jobId={job.id} sentAt={job.coverLetterSentAt} />
+                        <Link
+                          to="/documents/$jobId/$docType"
+                          params={{ jobId: String(job.id), docType: 'cover-letter' }}
+                          search={{ from: pathname }}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                        >
+                          <Pencil size={11} /> Edit
+                        </Link>
                         <a
                           href={`/api/jobs/${job.id}/cover-letter/pdf?t=${job.coverLetterSentAt}`}
                           download
