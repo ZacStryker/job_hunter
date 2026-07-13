@@ -348,3 +348,79 @@ though a `resumes` row cannot be written without it; legacy and never-generated 
 despite being distinguishable only by `resumeGeneratedAt`; the Google Fonts runtime dependency of every
 render was unmentioned; the sandbox was oversold as a backstop it cannot be for the PDF path; and
 `migrate.ts` drift protection was waved off in a repo with a documented history of it.
+
+## Suggested Review Order
+
+**The one write path (start here)**
+
+- The whole feature in one function: render → INSERT → bump → rename, and why the rename is *inside* the transaction.
+  [`api-jobs.ts:551`](../../job-hunt-dashboard/src/server/routes/api-jobs.ts#L551)
+
+- The review's one real acceptance violation: a failed rename must roll back the row *and* the bump.
+  [`api-jobs.ts:623`](../../job-hunt-dashboard/src/server/routes/api-jobs.ts#L623)
+
+- Generate now routes through the same helper, so Regenerate appends a version instead of overwriting.
+  [`api-jobs.ts:480`](../../job-hunt-dashboard/src/server/routes/api-jobs.ts#L480)
+
+**The cache-buster (the bug the spec was written to catch)**
+
+- The resume PDF had no cache-buster at all; this URL is half the fix.
+  [`JobDrawer.tsx:569`](../../job-hunt-dashboard/src/client/components/detail/JobDrawer.tsx#L569)
+
+- Invalidating `['jobs']` is the other half — it carries the bumped timestamp into the href.
+  [`useResumeMutation.ts:33`](../../job-hunt-dashboard/src/client/hooks/useResumeMutation.ts#L33)
+
+**Escaping — the only real control on the unsandboxed PDF path**
+
+- `JSON.stringify` does not escape `<`; a user-typed `</script>` would otherwise break out of the data tag.
+  [`resume-html.ts:22`](../../job-hunt-dashboard/src/shared/resume-html.ts#L22)
+
+**Validation — the form is not the security boundary**
+
+- Bounds and non-blank rules; these stand between a pasted 10 MB summary and a 15s Playwright hang.
+  [`schemas.ts:422`](../../job-hunt-dashboard/src/shared/schemas.ts#L422)
+
+- PUT rejects before any chromium launch, and 404s rather than creating a first version.
+  [`api-jobs.ts:689`](../../job-hunt-dashboard/src/server/routes/api-jobs.ts#L689)
+
+- Restore re-validates the stored row (422) and is scoped on **both** `userId` and `jobId`.
+  [`api-jobs.ts:777`](../../job-hunt-dashboard/src/server/routes/api-jobs.ts#L777)
+
+**Persistence**
+
+- The new append-only table — the row is the version, the PDF is merely the current render.
+  [`schema.ts:69`](../../job-hunt-dashboard/src/db/schema.ts#L69)
+
+- Drift guard: a DB that never applied 0042 would 500 every resume route with `no such table`.
+  [`migrate.ts:86`](../../job-hunt-dashboard/src/db/migrate.ts#L86)
+
+- Both admin cascade transactions, before the `jobs` delete.
+  [`api-admin.ts:124`](../../job-hunt-dashboard/src/server/routes/api-admin.ts#L124)
+
+**The editor**
+
+- Legacy vs never-generated: `resumeGeneratedAt` is the only thing telling them apart.
+  [`documents.tsx:178`](../../job-hunt-dashboard/src/client/routes/documents.tsx#L178)
+
+- `allow-scripts` (never `allow-same-origin`), scaled to the pane, and scrollable for page 2.
+  [`documents.tsx:325`](../../job-hunt-dashboard/src/client/routes/documents.tsx#L325)
+
+- Structured form: text + add/remove, no reordering, no raw JSON, no new deps.
+  [`documents.tsx:407`](../../job-hunt-dashboard/src/client/routes/documents.tsx#L407)
+
+- The restore error renders *beside* the control, never instead of it — replacing it stranded the user.
+  [`DocumentVersions.tsx:79`](../../job-hunt-dashboard/src/client/components/detail/DocumentVersions.tsx#L79)
+
+**Tests**
+
+- Atomicity: a failed rename commits no row and bumps no clock, on all three write paths.
+  [`api-resume.test.ts:683`](../../job-hunt-dashboard/src/server/routes/api-resume.test.ts#L683)
+
+- Tenant isolation proven, not assumed: seed as user 2, act as user 1, assert 404 *and* untouched rows.
+  [`api-resume.test.ts:627`](../../job-hunt-dashboard/src/server/routes/api-resume.test.ts#L627)
+
+- A real `</script><script>alert(1)</script>` payload survives as literal text.
+  [`resume-html.test.ts:49`](../../job-hunt-dashboard/src/shared/resume-html.test.ts#L49)
+
+- The `resumes` DDL — identical column-for-column here, in `api-jobs.test.ts` and in `api-admin.test.ts`.
+  [`api-resume.test.ts:124`](../../job-hunt-dashboard/src/server/routes/api-resume.test.ts#L124)
