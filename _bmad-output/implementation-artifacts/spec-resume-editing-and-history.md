@@ -2,7 +2,7 @@
 title: 'Resume structured editing + version history (G3)'
 type: 'feature'
 created: '2026-07-13'
-status: 'draft'
+status: 'ready'
 baseline_commit: '8516f90'
 reviewed: '2026-07-13 — adversarial review, 14 findings, all applied. See Review Findings Applied.'
 context:

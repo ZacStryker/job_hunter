@@ -83,7 +83,7 @@ only in the full run).
 structured editing (needs a new append-only `resumes` table first, because the validated JSON is
 currently discarded after render at `resume-service.ts:145-149`; this is the stage that makes the
 resume editable *and* gives it history on the same code path). **Now specced and adversarially
-reviewed:** `spec-resume-editing-and-history.md` (status `draft`; 14 review findings applied).
+reviewed:** `spec-resume-editing-and-history.md` (status `ready`; 14 review findings applied).
 Decisions: editing is text + add/remove, **no reorder**; Regenerate becomes **non-destructive**;
 the client gets the template from a new `GET /api/resume-template`. The review surfaced two live
 bugs that G3 must fix and that exist **today**: (a) the resume PDF has **no cache-buster** —
