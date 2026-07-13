@@ -9,8 +9,15 @@ import { Database } from 'bun:sqlite'
 let mockGenerateCoverLetter: () => Promise<{ content: string; pdf: Buffer; inputTokens: number; outputTokens: number }> =
   async () => ({ content: 'Mock cover letter text', pdf: Buffer.from('%PDF-mock'), inputTokens: 100, outputTokens: 200 })
 
+// renderCoverLetterPdf is the no-Anthropic render path that edit and restore take. It is mocked for
+// the same reason generateCoverLetter is: unmocked it reaches Playwright, and a Playwright test in
+// this suite hangs rather than fails.
+let mockRenderCoverLetterPdf: (content: string, userId: number) => Promise<Buffer> =
+  async () => Buffer.from('%PDF-mock')
+
 mock.module('../services/cover-letter-service', () => ({
   generateCoverLetter: () => mockGenerateCoverLetter(),
+  renderCoverLetterPdf: (content: string, userId: number) => mockRenderCoverLetterPdf(content, userId),
 }))
 
 // Prevent real Playwright PDF launch from cover-letter-service
@@ -119,6 +126,179 @@ beforeEach(() => {
   prodSqlite.run('DELETE FROM cover_letters')
   prodSqlite.run('DELETE FROM jobs')
   mockGenerateCoverLetter = async () => ({ content: 'Mock cover letter text', pdf: Buffer.from('%PDF-mock'), inputTokens: 100, outputTokens: 200 })
+  mockRenderCoverLetterPdf = async () => Buffer.from('%PDF-mock')
+})
+
+// Seeds a job owned by `userId` plus one 'generated' letter, and returns both ids.
+function seedJobWithLetter(userId = 1, company = 'Acme'): { jobId: number; letterId: number } {
+  prodSqlite.run(
+    `INSERT INTO jobs (company, job_title, job_description, user_id) VALUES (?, 'Engineer', 'Build stuff', ?)`,
+    [company, userId]
+  )
+  const jobId = (prodSqlite.query('SELECT last_insert_rowid() AS id').get() as { id: number }).id
+  prodSqlite.run(
+    `INSERT INTO cover_letters (job_id, user_id, content, created_at, source) VALUES (?, ?, ?, ?, 'generated')`,
+    [jobId, userId, 'Original letter', '2026-04-01T10:00:00.000Z']
+  )
+  const letterId = (prodSqlite.query('SELECT last_insert_rowid() AS id').get() as { id: number }).id
+  return { jobId, letterId }
+}
+
+const rowsFor = (jobId: number) =>
+  prodSqlite.query('SELECT id, content, source, user_id FROM cover_letters WHERE job_id = ? ORDER BY id')
+    .all(jobId) as Array<{ id: number; content: string; source: string; user_id: number }>
+
+describe('PUT /:id/cover-letter', () => {
+  test('inserts a NEW edited version and leaves the original intact', async () => {
+    const { jobId, letterId } = seedJobWithLetter()
+
+    const res = await jobsApp.request(`/${jobId}/cover-letter`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'My edited prose' }),
+    })
+    expect(res.status).toBe(200)
+
+    // Append-only: the edit is an INSERT, not an UPDATE. The original must still be there — that is
+    // what makes the edit reversible, and what lets G6 restore it.
+    const rows = rowsFor(jobId)
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toMatchObject({ id: letterId, content: 'Original letter', source: 'generated' })
+    expect(rows[1]).toMatchObject({ content: 'My edited prose', source: 'edited' })
+  })
+
+  test('bumps jobs.cover_letter_sent_at — the PDF cache-buster', async () => {
+    const { jobId } = seedJobWithLetter()
+    prodSqlite.run(`UPDATE jobs SET cover_letter_sent_at = '2026-04-01T10:00:00.000Z' WHERE id = ?`, [jobId])
+
+    const res = await jobsApp.request(`/${jobId}/cover-letter`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'Edited' }),
+    })
+    expect(res.status).toBe(200)
+
+    // Both the preview iframe and the Download link cache-bust on this value. If it does not move,
+    // the browser serves the previous PDF and the save looks lost.
+    const job = prodSqlite.query('SELECT cover_letter_sent_at AS t FROM jobs WHERE id = ?')
+      .get(jobId) as { t: string }
+    expect(job.t).not.toBe('2026-04-01T10:00:00.000Z')
+  })
+
+  test('blank / whitespace-only content → 400, nothing written', async () => {
+    const { jobId } = seedJobWithLetter()
+    const res = await jobsApp.request(`/${jobId}/cover-letter`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: '   ' }),
+    })
+    expect(res.status).toBe(400)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+    expect(rowsFor(jobId)).toHaveLength(1)
+  })
+
+  test('oversized content → 400', async () => {
+    const { jobId } = seedJobWithLetter()
+    const res = await jobsApp.request(`/${jobId}/cover-letter`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'x'.repeat(20001) }),
+    })
+    expect(res.status).toBe(400)
+    expect(rowsFor(jobId)).toHaveLength(1)
+  })
+
+  // Tenant isolation, proven not assumed: the app fixes userId=1, so seed as user 2 and act as user 1.
+  test("on another user's job → 404, and their letter is untouched", async () => {
+    const { jobId } = seedJobWithLetter(2, 'Tenant')
+
+    const res = await jobsApp.request(`/${jobId}/cover-letter`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'I should not be able to write this' }),
+    })
+    expect(res.status).toBe(404)
+
+    const rows = rowsFor(jobId)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ content: 'Original letter', user_id: 2 })
+  })
+})
+
+describe('GET /:id/cover-letter/versions', () => {
+  test('returns versions newest first', async () => {
+    const { jobId } = seedJobWithLetter()
+    prodSqlite.run(
+      `INSERT INTO cover_letters (job_id, user_id, content, created_at, source) VALUES (?, 1, 'Newer', '2026-04-02T10:00:00.000Z', 'edited')`,
+      [jobId]
+    )
+
+    const res = await jobsApp.request(`/${jobId}/cover-letter/versions`, { method: 'GET' })
+    expect(res.status).toBe(200)
+    const { versions } = await res.json() as { versions: Array<{ source: string; createdAt: string }> }
+    expect(versions).toHaveLength(2)
+    expect(versions[0]).toMatchObject({ source: 'edited', createdAt: '2026-04-02T10:00:00.000Z' })
+    expect(versions[1]).toMatchObject({ source: 'generated', createdAt: '2026-04-01T10:00:00.000Z' })
+  })
+
+  test('job with no letter yet → 200 with [], not 404', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, user_id) VALUES ('Empty', 'Engineer', 1)`)
+    const jobId = (prodSqlite.query('SELECT last_insert_rowid() AS id').get() as { id: number }).id
+
+    const res = await jobsApp.request(`/${jobId}/cover-letter/versions`, { method: 'GET' })
+    expect(res.status).toBe(200)
+    const { versions } = await res.json() as { versions: unknown[] }
+    expect(versions).toEqual([])
+  })
+
+  test("on another user's job → 404", async () => {
+    const { jobId } = seedJobWithLetter(2, 'Tenant')
+    const res = await jobsApp.request(`/${jobId}/cover-letter/versions`, { method: 'GET' })
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('POST /:id/cover-letter/versions/:versionId/restore', () => {
+  test('copies the old version forward as a new row, destroying nothing', async () => {
+    const { jobId, letterId } = seedJobWithLetter()
+    prodSqlite.run(
+      `INSERT INTO cover_letters (job_id, user_id, content, created_at, source) VALUES (?, 1, 'Edited prose', '2026-04-02T10:00:00.000Z', 'edited')`,
+      [jobId]
+    )
+
+    const res = await jobsApp.request(`/${jobId}/cover-letter/versions/${letterId}/restore`, { method: 'POST' })
+    expect(res.status).toBe(200)
+
+    // Three rows now: original, edit, and the restored copy. Restore is never destructive — the edit
+    // it superseded is still there and still restorable.
+    const rows = rowsFor(jobId)
+    expect(rows).toHaveLength(3)
+    expect(rows[0].content).toBe('Original letter')
+    expect(rows[1].content).toBe('Edited prose')
+    expect(rows[2]).toMatchObject({ content: 'Original letter', source: 'generated' })
+  })
+
+  test("a versionId from a DIFFERENT job of the same user → 404", async () => {
+    const { jobId } = seedJobWithLetter(1, 'Acme')
+    const other = seedJobWithLetter(1, 'Globex')
+
+    // Same owner, wrong job. Scoping on userId alone would let one job restore another's history.
+    const res = await jobsApp.request(`/${jobId}/cover-letter/versions/${other.letterId}/restore`, { method: 'POST' })
+    expect(res.status).toBe(404)
+    expect(rowsFor(jobId)).toHaveLength(1)
+  })
+
+  test("on another user's job → 404, and their letter is untouched", async () => {
+    const { jobId, letterId } = seedJobWithLetter(2, 'Tenant')
+
+    const res = await jobsApp.request(`/${jobId}/cover-letter/versions/${letterId}/restore`, { method: 'POST' })
+    expect(res.status).toBe(404)
+
+    const rows = rowsFor(jobId)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ content: 'Original letter', user_id: 2 })
+  })
 })
 
 describe('POST /:id/generate-cover-letter', () => {

@@ -5,11 +5,11 @@ import { mkdirSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { db } from '../../db/client'
 import { jobs, statusEvents, coverLetters, messages, profile } from '../../db/schema'
-import { generateCoverLetter } from '../services/cover-letter-service'
+import { generateCoverLetter, renderCoverLetterPdf } from '../services/cover-letter-service'
 import { generateResume } from '../services/resume-service'
 import { recordRun } from './api-webhook-runs'
 import { activityRegistry } from '../services/activity-registry'
-import { profileDataSchema } from '../../shared/schemas'
+import { coverLetterEditSchema, profileDataSchema } from '../../shared/schemas'
 import type { Job, ProfileData } from '../../shared/schemas'
 import type { AppEnv } from '../types'
 
@@ -553,7 +553,7 @@ app.get('/:id/cover-letter', async (c) => {
 
   const letter = db.select().from(coverLetters)
     .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.userId, userId)))
-    .orderBy(desc(coverLetters.createdAt))
+    .orderBy(desc(coverLetters.createdAt), desc(coverLetters.id))
     .get()
 
   if (!letter) {
@@ -561,6 +561,170 @@ app.get('/:id/cover-letter', async (c) => {
   }
 
   return c.json({ coverLetter: letter })
+})
+
+// Writes a new version of a job's cover letter: renders the PDF, INSERTs an append-only row, and
+// bumps jobs.coverLetterSentAt. Shared by edit and restore — the only difference between them is
+// where `content` and `source` come from.
+//
+// The bump is NOT bookkeeping. Both the drawer's preview iframe and the Download link cache-bust on
+// `?t=${job.coverLetterSentAt}`, so a re-render that leaves the column untouched serves the user the
+// PREVIOUS pdf and looks exactly like the save was lost.
+//
+// The PDF is one file per JOB, not per version: the row is the version, the file is merely the
+// current render. Restore overwrites it, which is the point.
+async function writeCoverLetterVersion(
+  rawId: number,
+  userId: number,
+  content: string,
+  source: 'generated' | 'edited'
+): Promise<{ ok: true; letter: typeof coverLetters.$inferSelect } | { ok: false; status: 500; error: string }> {
+  let pdf: Buffer
+  try {
+    pdf = await renderCoverLetterPdf(content, userId)
+  } catch {
+    return { ok: false, status: 500, error: 'Failed to render cover letter' }
+  }
+
+  const now = new Date().toISOString()
+  const clDir = join(DATA_DIR, 'cover-letters')
+  const finalPath = join(clDir, `${rawId}.pdf`)
+  const tmpPath = join(clDir, `${rawId}.pdf.tmp`)
+  try {
+    mkdirSync(clDir, { recursive: true })
+    await Bun.write(tmpPath, pdf)
+  } catch {
+    return { ok: false, status: 500, error: 'Failed to render cover letter' }
+  }
+
+  try {
+    db.transaction((tx) => {
+      tx.insert(coverLetters).values({ jobId: rawId, userId, content, source, createdAt: now }).run()
+      tx.update(jobs).set({ coverLetterSentAt: now })
+        .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
+    })
+  } catch {
+    return { ok: false, status: 500, error: 'Failed to store cover letter' }
+  }
+
+  try {
+    renameSync(tmpPath, finalPath)
+  } catch (err) {
+    console.error('Failed to finalize cover letter PDF:', err)
+  }
+
+  const letter = db.select().from(coverLetters)
+    .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.userId, userId), eq(coverLetters.createdAt, now)))
+    .get()
+  return { ok: true, letter: letter! }
+}
+
+app.put('/:id/cover-letter', async (c) => {
+  const userId = c.get('userId')
+  const idParam = c.req.param('id')
+  if (!/^\d+$/.test(idParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  if (rawId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const job = db.select({ id: jobs.id }).from(jobs)
+    .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
+  }
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
+  const parsed = coverLetterEditSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid cover letter content' }, 400)
+  }
+
+  const result = await writeCoverLetterVersion(rawId, userId, parsed.data.content, 'edited')
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status)
+  }
+  return c.json({ coverLetter: result.letter })
+})
+
+app.get('/:id/cover-letter/versions', async (c) => {
+  const userId = c.get('userId')
+  const idParam = c.req.param('id')
+  if (!/^\d+$/.test(idParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  if (rawId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const job = db.select({ id: jobs.id }).from(jobs)
+    .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
+  }
+
+  // Newest first. id DESC is the tiebreaker, not decoration: an edit saved in the same millisecond
+  // as a restore would otherwise order arbitrarily. A job with no letter yet returns [], not a 404 —
+  // "no versions" is a valid answer to this question.
+  const versions = db.select({
+    id: coverLetters.id,
+    source: coverLetters.source,
+    createdAt: coverLetters.createdAt,
+  }).from(coverLetters)
+    .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.userId, userId)))
+    .orderBy(desc(coverLetters.createdAt), desc(coverLetters.id))
+    .all()
+
+  return c.json({ versions })
+})
+
+app.post('/:id/cover-letter/versions/:versionId/restore', async (c) => {
+  const userId = c.get('userId')
+  const idParam = c.req.param('id')
+  const versionParam = c.req.param('versionId')
+  if (!/^\d+$/.test(idParam) || !/^\d+$/.test(versionParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  const versionId = Number(versionParam)
+  if (rawId <= 0 || versionId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const job = db.select({ id: jobs.id }).from(jobs)
+    .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
+  }
+
+  // Scoped on BOTH userId and jobId. userId alone would let one of the caller's own jobs restore a
+  // version belonging to a different one of their jobs.
+  const version = db.select().from(coverLetters)
+    .where(and(
+      eq(coverLetters.id, versionId),
+      eq(coverLetters.jobId, rawId),
+      eq(coverLetters.userId, userId),
+    ))
+    .get()
+  if (!version) {
+    return c.json({ error: 'Version not found' }, 404)
+  }
+
+  // Restore COPIES forward into a new row. The table stays append-only and nothing is destroyed —
+  // which is what makes editing safe enough to ship without a confirmation dialog.
+  const result = await writeCoverLetterVersion(rawId, userId, version.content, version.source)
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status)
+  }
+  return c.json({ coverLetter: result.letter })
 })
 
 app.get('/:id/cover-letter/pdf', async (c) => {

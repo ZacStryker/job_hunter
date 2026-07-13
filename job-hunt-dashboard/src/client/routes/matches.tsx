@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useJobsQuery } from '../hooks/useJobsQuery'
+import { useJobDrawerSearch } from '../hooks/useJobDrawerSearch'
 import { useBulkArchiveMutation } from '../hooks/useBulkArchiveMutation'
 import { PipelineTable } from '../components/pipeline/PipelineTable'
 import { JobDrawer } from '../components/detail/JobDrawer'
@@ -10,7 +11,8 @@ export function MatchesRoute() {
   const matchedJobs = jobs.filter(
     j => !j.archived && !j.applied && j.analysisStatus === 'done' && (j.recommendation === 'apply' || j.recommendation === 'investigate')
   )
-  const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
+  const { job: jobFromUrl, tab: tabFromUrl } = useJobDrawerSearch()
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(jobFromUrl ?? null)
 
   useEffect(() => {
     if (selectedJobId !== null && !matchedJobs.find(j => j.id === selectedJobId)) {
@@ -48,6 +50,7 @@ export function MatchesRoute() {
         job={matchedJobs.find(j => j.id === selectedJobId) ?? null}
         open={selectedJobId !== null}
         onClose={() => setSelectedJobId(null)}
+        defaultTab={tabFromUrl}
       />
     </>
   )

@@ -288,6 +288,13 @@
       "when": 1783939264205,
       "tag": "0040_previous_swarm",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1783947848296,
+      "tag": "0041_silky_golden_guardian",
+      "breakpoints": true
     }
   ]
 }

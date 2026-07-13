@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useJobsQuery } from '../hooks/useJobsQuery'
+import { useJobDrawerSearch } from '../hooks/useJobDrawerSearch'
 import { TrackerTable } from '../components/tracker/TrackerTable'
 import { JobDrawer } from '../components/detail/JobDrawer'
 
 export function TrackerRoute() {
   const { data: jobs = [] } = useJobsQuery()
   const activeJobs = jobs.filter(j => !j.archived)
-  const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
+  const { job: jobFromUrl, tab: tabFromUrl } = useJobDrawerSearch()
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(jobFromUrl ?? null)
 
   useEffect(() => {
     if (selectedJobId !== null && !activeJobs.find(j => j.id === selectedJobId)) {
@@ -27,6 +29,7 @@ export function TrackerRoute() {
         job={activeJobs.find((j) => j.id === selectedJobId) ?? null}
         open={selectedJobId !== null}
         onClose={() => setSelectedJobId(null)}
+        defaultTab={tabFromUrl}
       />
     </>
   )

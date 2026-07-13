@@ -4,6 +4,7 @@ import { profile, userSecrets } from '../../db/schema'
 import { decrypt } from '../lib/crypto'
 import { loadEffectivePrompt } from './prompt-defaults'
 import { generatePdf } from './generate-pdf'
+import { buildCoverLetterHtml } from '../../shared/cover-letter-html'
 import { profileDataSchema } from '../../shared/schemas'
 import type { Job, ProfileData } from '../../shared/schemas'
 
@@ -54,37 +55,12 @@ interface AnthropicResponse {
   usage: { input_tokens: number; output_tokens: number }
 }
 
-function escHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-function buildCoverLetterHtml(content: string, personal: ProfileData['personal'] | null): string {
-  const name = personal?.fullName ?? ''
-  const contacts = [personal?.email, personal?.phone, personal?.location].filter(Boolean).join(' · ')
-  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: system-ui, sans-serif; font-size: 11pt; color: #1a1a1a; padding: 48px 56px; line-height: 1.6; max-width: 760px; }
-  .name { font-size: 15pt; font-weight: 700; letter-spacing: 0.3px; }
-  .contact { font-size: 9.5pt; color: #555; margin-top: 3px; }
-  hr { border: none; border-top: 1.5px solid #1a1a1a; margin: 14px 0 20px; }
-  .date { font-size: 10pt; color: #444; margin-bottom: 24px; }
-  .body { font-size: 11pt; white-space: pre-wrap; }
-</style>
-</head>
-<body>
-  <div class="name">${escHtml(name)}</div>
-  <div class="contact">${escHtml(contacts)}</div>
-  <hr />
-  <div class="date">${date}</div>
-  <div class="body">${escHtml(content)}</div>
-<script>window.__paginationComplete = true;</script>
-</body>
-</html>`
+// Renders an EXISTING letter to a PDF. No Anthropic call — this is the path an edit and a restore
+// take, where the prose is already decided and only the artifact needs rebuilding.
+export async function renderCoverLetterPdf(content: string, userId: number): Promise<Buffer> {
+  const profileRow = db.select().from(profile).where(eq(profile.userId, userId)).get() ?? null
+  const profileData = parseProfileData(profileRow?.profileData)
+  return generatePdf(buildCoverLetterHtml(content, profileData.personal))
 }
 
 export async function generateCoverLetter(job: Job, userId?: number): Promise<{ content: string; pdf: Buffer; inputTokens: number; outputTokens: number }> {

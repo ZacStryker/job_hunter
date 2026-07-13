@@ -75,13 +75,32 @@ export const statusEventSchema = z.object({
   emailSender: z.string().optional(),
 })
 
+export const COVER_LETTER_SOURCES = ['generated', 'edited'] as const
+export const COVER_LETTER_MAX_CHARS = 20000
+
 export const coverLetterSchema = z.object({
   id: z.number().int(),
   jobId: z.number().int(),
   content: z.string().min(1),
   createdAt: z.string(),
+  source: z.enum(COVER_LETTER_SOURCES),
 })
 export type CoverLetter = z.infer<typeof coverLetterSchema>
+
+// PUT /api/jobs/:id/cover-letter body. A blank letter is not a letter, so trim-then-min(1) rather
+// than min(1) — '   ' must not save.
+export const coverLetterEditSchema = z.object({
+  content: z.string().trim().min(1).max(COVER_LETTER_MAX_CHARS),
+})
+
+// A row in the version list. Content is deliberately absent — the list renders id/source/date only,
+// and shipping every draft's full prose to populate a dropdown would be wasteful.
+export const coverLetterVersionSchema = z.object({
+  id: z.number().int(),
+  source: z.enum(COVER_LETTER_SOURCES),
+  createdAt: z.string(),
+})
+export type CoverLetterVersion = z.infer<typeof coverLetterVersionSchema>
 
 export const MESSAGE_TYPES = ['Submitted', 'Rejected', 'Screening', 'Interview', 'Offer', 'Other'] as const
 
