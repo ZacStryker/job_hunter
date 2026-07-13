@@ -1,10 +1,10 @@
 ---
 project_name: 'hitlobster'
 user_name: 'Stryker'
-date: '2026-07-09'
+date: '2026-07-13'
 status: 'complete'
-verified_against_commit: '95f2d6e'
-verified_by: 'scripts/verify-context.sh (39 checks, all passing)'
+verified_against_commit: 'ce803e3'
+verified_by: 'scripts/verify-context.sh (39 checks, all passing) + bun test baseline re-measured'
 rule_count: 27
 optimized_for_llm: true
 design: 'Owns rules and rationale. Borrows facts by reference. See Maintenance.'
@@ -145,9 +145,20 @@ anti-detection stack. Anything touching Playwright, Xvfb, or the embedding model
 - `bun run typecheck` (`bunx tsc --noEmit`) — the **only** type gate, and a separate step.
   `bun test` transpiles without type-checking, so a test file with wrong types runs and passes.
   It is **green**; keep it that way. Judge a change by the *delta*, not the absolute count.
-- `[!]` **`bun test` is red: 43 tests fail on a clean checkout** (42 some runs — one
-  resume-E2E test is flaky). A green run is not the bar; "no new failures versus the merge
-  base" is. Capture the baseline before you start, and diff failing *names*, not counts.
+- `[!]` **`bun test` is red: 9 tests fail on a clean checkout** (673 pass, measured on `main`
+  at `ce803e3`; a flaky resume-E2E test can make it 10). A green run is not the bar; "no new
+  failures versus the merge base" is. Capture the baseline before you start, and diff failing
+  *names*, not counts. The 9 standing failures, so you can tell yours from these:
+  - `PUT /api/onboarding/linkedin` — all five (`valid content → 200`, `missing content field
+    → 400`, `empty content → 400`, `invalid JSON body → 400`, `second PUT upserts`)
+  - `GET /api/onboarding/gmail/labels > connected but refresh token revoked … → 502`
+  - `POST /api/messages/sync (Gmail) > revoked/expired token → 502`
+  - `startScraperProcess > defaults AUTH_DIR to <scraper_dir>/auth when not set`
+  - `GET /:id/cover-letter > returns 200 with most recent cover letter`
+  This count is **not** asserted by `verify-context.sh` — checking it costs a full suite run,
+  and the suite can hang (see the Playwright/Xvfb note above), so the script stays fast and
+  this line stays faith-maintained. It read `43` for months while the real number was `9`;
+  re-measure it when you touch it.
 - **Tenant isolation must be proven, not assumed.** A passing query proves nothing. Seed as
   user A, act as user B, assert A's rows are invisible.
   — `src/server/services/tenant-isolation.test.ts`
