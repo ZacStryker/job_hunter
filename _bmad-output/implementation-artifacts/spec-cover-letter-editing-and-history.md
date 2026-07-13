@@ -2,7 +2,7 @@
 title: 'Cover letter editing + version history (G2 + G6)'
 type: 'feature'
 created: '2026-07-13'
-status: 'in-review'
+status: 'done'
 baseline_commit: '4fcdb88'
 context:
   - '{project-root}/_bmad-output/project-context.md'

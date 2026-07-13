@@ -66,6 +66,9 @@ function repairWebhookRunsSchema(): void {
 
 function repairCoverLettersSchema(): void {
   const rows = sqlite.query('PRAGMA table_info(cover_letters)').all() as Array<{ name: string }>
+  // No table => nothing to repair. PRAGMA returns [] for a missing table, and without this guard the
+  // loop would see no `source` column and fire ALTER TABLE against a table that does not exist.
+  if (rows.length === 0) return
   const cols = new Set(rows.map((r) => r.name))
   for (const [col, type] of COVER_LETTERS_COLUMNS) {
     if (!cols.has(col)) {

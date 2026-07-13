@@ -8,6 +8,9 @@ import { useCoverLetterMutation } from '../hooks/useCoverLetterMutation'
 import { buildCoverLetterHtml } from '@shared/cover-letter-html'
 import { COVER_LETTER_MAX_CHARS } from '@shared/schemas'
 
+// The only routes that host JobDrawer, so the only places Back can meaningfully return to.
+const BACK_TARGETS = ['/', '/applications', '/archive', '/matches'] as const
+
 // A focused mode, not a new visual language: same zinc surfaces, same type scale, and the preview
 // keeps the drawer's `border border-zinc-800 rounded` + A4 aspect treatment so it reads as the same
 // object the drawer just showed.
@@ -19,7 +22,7 @@ export function DocumentsRoute() {
   const { data: jobs = [] } = useJobsQuery()
   const job = jobs.find((j) => j.id === id)
   const { data: profile } = useProfileQuery()
-  const { data: letter, isLoading } = useCoverLetterQuery(id)
+  const { data: letter, isLoading, isError: loadFailed } = useCoverLetterQuery(id)
   const { mutate: save, isPending, isError, error, reset } = useCoverLetterMutation(id)
 
   const [draft, setDraft] = useState<string | null>(null)
@@ -36,10 +39,18 @@ export function DocumentsRoute() {
     [current, profile]
   )
 
-  const backTo = from ?? '/'
+  // `from` arrives from the URL, so it is user-supplied. Allowlist it to the four routes that
+  // actually host the drawer rather than feeding an arbitrary string into <Link to={...}>.
+  const backTo = from && (BACK_TARGETS as readonly string[]).includes(from) ? from : '/'
 
   function handleSave() {
-    save({ content: current }, { onSuccess: () => setDraft(null) })
+    const submitted = current
+    save({ content: submitted }, {
+      // Clear the draft ONLY if it still matches what was submitted. The textarea is disabled while
+      // saving, but a restore landing mid-flight can still move `saved` underneath us — and clearing
+      // unconditionally would silently discard anything that diverged.
+      onSuccess: () => setDraft((d) => (d === submitted ? null : d)),
+    })
   }
 
   function handleDiscard() {
@@ -63,6 +74,17 @@ export function DocumentsRoute() {
     </Link>
   )
 
+  // Ownership before doc type: /documents/<foreign-id>/resume must read as "not found", not as
+  // "not editable yet".
+  if (!Number.isInteger(id) || id <= 0 || (!isLoading && !job)) {
+    return (
+      <div className="p-6 space-y-4">
+        {backLink}
+        <p className="text-sm text-zinc-500">Job not found.</p>
+      </div>
+    )
+  }
+
   if (docType !== 'cover-letter') {
     // The shell is deliberately generic — the resume editor (G3) reuses this route — but the resume
     // is not editable yet: its JSON is discarded after render, so there is nothing to edit.
@@ -74,16 +96,31 @@ export function DocumentsRoute() {
     )
   }
 
-  if (!isLoading && !job) {
+  // Every guard below used to read `!isLoading && …`, so during the initial fetch execution fell
+  // through to the editor with an EMPTY textarea. Typing into that and saving would have written a
+  // blank-ish letter over a real one.
+  if (isLoading) {
     return (
       <div className="p-6 space-y-4">
         {backLink}
-        <p className="text-sm text-zinc-500">Job not found.</p>
+        <p className="text-sm text-zinc-500">Loading…</p>
       </div>
     )
   }
 
-  if (!isLoading && !letter) {
+  // A failed fetch is NOT an absent letter. Collapsing the two would tell a user who has a letter
+  // that they have none — and the obvious next move, Generate, burns a real Anthropic call to
+  // "fix" what was only a transient read error.
+  if (loadFailed) {
+    return (
+      <div className="p-6 space-y-4">
+        {backLink}
+        <p className="text-sm text-red-400">Could not load this cover letter. Reload to try again.</p>
+      </div>
+    )
+  }
+
+  if (!letter) {
     return (
       <div className="p-6 space-y-4">
         {backLink}
@@ -129,7 +166,10 @@ export function DocumentsRoute() {
             value={current}
             onChange={(e) => setDraft(e.target.value)}
             maxLength={COVER_LETTER_MAX_CHARS}
-            className="w-full aspect-[210/297] bg-zinc-900 border border-zinc-800 rounded px-4 py-3 text-sm text-zinc-200 leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-zinc-600"
+            // Disabled while saving: the PDF render takes seconds, and keystrokes typed during that
+            // window would be dropped when the draft resets on success.
+            disabled={isPending}
+            className="w-full aspect-[210/297] bg-zinc-900 border border-zinc-800 rounded px-4 py-3 text-sm text-zinc-200 leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-zinc-600 disabled:opacity-60"
           />
         </div>
         <div className="space-y-2">
@@ -137,6 +177,11 @@ export function DocumentsRoute() {
           <iframe
             srcDoc={previewHtml}
             title="Cover letter preview"
+            // The letter is rendered from user-controlled text into a same-origin document that also
+            // carries an inline <script>. escHtml covers today's template, but sandboxing means a
+            // future escaping gap cannot become script execution in the app's origin. The preview
+            // needs no scripts — only the Playwright PDF path does.
+            sandbox=""
             className="w-full aspect-[210/297] border border-zinc-800 rounded bg-white"
           />
         </div>

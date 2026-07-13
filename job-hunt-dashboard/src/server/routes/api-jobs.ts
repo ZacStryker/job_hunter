@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { eq, desc, and, inArray, sql, isNotNull } from 'drizzle-orm'
-import { mkdirSync, renameSync } from 'node:fs'
+import { mkdirSync, renameSync, unlinkSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { db } from '../../db/client'
 import { jobs, statusEvents, coverLetters, messages, profile } from '../../db/schema'
@@ -589,7 +590,11 @@ async function writeCoverLetterVersion(
   const now = new Date().toISOString()
   const clDir = join(DATA_DIR, 'cover-letters')
   const finalPath = join(clDir, `${rawId}.pdf`)
-  const tmpPath = join(clDir, `${rawId}.pdf.tmp`)
+  // Per-WRITE tmp name, not per-job. Two writes for the same job can overlap (a double-clicked Save,
+  // an edit racing a restore, either racing a Regenerate), and a shared `${rawId}.pdf.tmp` lets them
+  // interleave: A writes tmp, B overwrites tmp, A renames B's bytes into place. The PDF on disk would
+  // then belong to no row in the version list.
+  const tmpPath = join(clDir, `${rawId}.${randomUUID()}.pdf.tmp`)
   try {
     mkdirSync(clDir, { recursive: true })
     await Bun.write(tmpPath, pdf)
@@ -597,26 +602,41 @@ async function writeCoverLetterVersion(
     return { ok: false, status: 500, error: 'Failed to render cover letter' }
   }
 
+  const discardTmp = () => { try { unlinkSync(tmpPath) } catch { /* already gone */ } }
+
+  let letter: typeof coverLetters.$inferSelect | undefined
   try {
     db.transaction((tx) => {
-      tx.insert(coverLetters).values({ jobId: rawId, userId, content, source, createdAt: now }).run()
+      // .returning() gives back the exact row just written. Re-selecting by createdAt would be
+      // ambiguous the moment two writes for one job land in the same millisecond.
+      letter = tx.insert(coverLetters)
+        .values({ jobId: rawId, userId, content, source, createdAt: now })
+        .returning()
+        .get()
       tx.update(jobs).set({ coverLetterSentAt: now })
         .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
     })
   } catch {
+    discardTmp()
+    return { ok: false, status: 500, error: 'Failed to store cover letter' }
+  }
+  if (!letter) {
+    discardTmp()
     return { ok: false, status: 500, error: 'Failed to store cover letter' }
   }
 
   try {
     renameSync(tmpPath, finalPath)
   } catch (err) {
+    // Do NOT report success. The row is committed and coverLetterSentAt is bumped, so the client
+    // would cache-bust to a PDF that is still the PREVIOUS render — the exact "my edit vanished"
+    // failure this feature exists to prevent. Surfacing a 500 lets the user retry, which re-renders.
     console.error('Failed to finalize cover letter PDF:', err)
+    discardTmp()
+    return { ok: false, status: 500, error: 'Failed to save cover letter PDF' }
   }
 
-  const letter = db.select().from(coverLetters)
-    .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.userId, userId), eq(coverLetters.createdAt, now)))
-    .get()
-  return { ok: true, letter: letter! }
+  return { ok: true, letter }
 }
 
 app.put('/:id/cover-letter', async (c) => {
@@ -645,6 +665,16 @@ app.put('/:id/cover-letter', async (c) => {
   const parsed = coverLetterEditSchema.safeParse(body)
   if (!parsed.success) {
     return c.json({ error: 'Invalid cover letter content' }, 400)
+  }
+
+  // This route EDITS; it does not create. Without an existing letter there is nothing to have
+  // edited, and letting the PUT through would mint a first letter tagged 'edited' that was never
+  // generated. The editor already refuses to open in that state — the API must agree.
+  const existing = db.select({ id: coverLetters.id }).from(coverLetters)
+    .where(and(eq(coverLetters.jobId, rawId), eq(coverLetters.userId, userId)))
+    .get()
+  if (!existing) {
+    return c.json({ error: 'No cover letter found' }, 404)
   }
 
   const result = await writeCoverLetterVersion(rawId, userId, parsed.data.content, 'edited')

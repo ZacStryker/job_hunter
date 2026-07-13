@@ -15,9 +15,20 @@ interface Props {
 // and this renders EXACTLY the plain date the column rendered before this feature existed.
 export function CoverLetterVersions({ jobId, sentAt }: Props) {
   const { data: versions = [] } = useCoverLetterVersionsQuery(jobId)
-  const { mutate: restore, isPending } = useCoverLetterRestoreMutation(jobId)
+  const { mutate: restore, isPending, isError, error } = useCoverLetterRestoreMutation(jobId)
 
   const currentDate = new Date(sentAt).toLocaleDateString()
+
+  // A failed restore must not look like a successful one. Without this the menu just closes and the
+  // user walks away believing the letter reverted — then sends the wrong document. Inline, per the
+  // UX spec's "all feedback is inline and contextual to the triggering element"; no toast.
+  if (isError) {
+    return (
+      <span className="text-xs text-red-400" title={error?.message}>
+        {error?.message || 'Restore failed'}
+      </span>
+    )
+  }
 
   if (versions.length <= 1) {
     return <p className="text-xs text-zinc-600">{currentDate}</p>

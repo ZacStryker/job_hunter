@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useJobsQuery } from '../hooks/useJobsQuery'
-import { useJobDrawerSearch } from '../hooks/useJobDrawerSearch'
+import { useJobDrawerSearch, drawerTabFor } from '../hooks/useJobDrawerSearch'
 import { TrackerTable } from '../components/tracker/TrackerTable'
 import { JobDrawer } from '../components/detail/JobDrawer'
 
@@ -29,7 +29,7 @@ export function TrackerRoute() {
         job={activeJobs.find((j) => j.id === selectedJobId) ?? null}
         open={selectedJobId !== null}
         onClose={() => setSelectedJobId(null)}
-        defaultTab={tabFromUrl}
+        defaultTab={drawerTabFor(selectedJobId, jobFromUrl, tabFromUrl)}
       />
     </>
   )

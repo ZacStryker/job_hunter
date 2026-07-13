@@ -17,6 +17,7 @@ mock.module('../services/resume-service', () => ({
 mock.module('node:fs', () => ({
   mkdirSync: () => {},
   renameSync: () => {},
+  unlinkSync: () => {},
 }))
 
 // Mock Bun.write to avoid writing real files in tests

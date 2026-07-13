@@ -29,6 +29,7 @@ mock.module('../services/generate-pdf', () => ({
 mock.module('node:fs', () => ({
   mkdirSync: () => {},
   renameSync: () => {},
+  unlinkSync: () => {},
 }))
 
 spyOn(Bun, 'write').mockResolvedValue(0)
@@ -223,6 +224,51 @@ describe('PUT /:id/cover-letter', () => {
     const rows = rowsFor(jobId)
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({ content: 'Original letter', user_id: 2 })
+  })
+
+  // PUT edits; it does not create. A first letter tagged 'edited' that was never generated is a
+  // contradiction, and the editor already refuses to open in that state.
+  test('on a job with no cover letter → 404, nothing created', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, user_id) VALUES ('Empty', 'Engineer', 1)`)
+    const jobId = (prodSqlite.query('SELECT last_insert_rowid() AS id').get() as { id: number }).id
+
+    const res = await jobsApp.request(`/${jobId}/cover-letter`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'Conjuring a letter from nothing' }),
+    })
+    expect(res.status).toBe(404)
+    expect(rowsFor(jobId)).toHaveLength(0)
+  })
+
+  test('returns the row it actually wrote', async () => {
+    const { jobId } = seedJobWithLetter()
+    const res = await jobsApp.request(`/${jobId}/cover-letter`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'Exactly this' }),
+    })
+    const { coverLetter } = await res.json() as { coverLetter: { id: number; content: string; source: string } }
+    const rows = rowsFor(jobId)
+    // The response must be the NEW row, not whichever row a createdAt lookup happened to return.
+    expect(coverLetter).toMatchObject({ id: rows[1].id, content: 'Exactly this', source: 'edited' })
+  })
+
+  test('a failed PDF render writes nothing and does not bump the cache-buster', async () => {
+    const { jobId } = seedJobWithLetter()
+    prodSqlite.run(`UPDATE jobs SET cover_letter_sent_at = '2026-04-01T10:00:00.000Z' WHERE id = ?`, [jobId])
+    mockRenderCoverLetterPdf = async () => { throw new Error('playwright exploded') }
+
+    const res = await jobsApp.request(`/${jobId}/cover-letter`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'Never lands' }),
+    })
+    expect(res.status).toBe(500)
+    expect(rowsFor(jobId)).toHaveLength(1)
+    const job = prodSqlite.query('SELECT cover_letter_sent_at AS t FROM jobs WHERE id = ?')
+      .get(jobId) as { t: string }
+    expect(job.t).toBe('2026-04-01T10:00:00.000Z')
   })
 })
 

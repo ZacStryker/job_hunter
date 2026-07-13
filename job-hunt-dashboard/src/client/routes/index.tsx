@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert'
 import { Button } from '../components/ui/button'
 import { Loader2, Search, Plus, Wand2 } from 'lucide-react'
 import { useJobsQuery } from '../hooks/useJobsQuery'
-import { useJobDrawerSearch } from '../hooks/useJobDrawerSearch'
+import { useJobDrawerSearch, drawerTabFor } from '../hooks/useJobDrawerSearch'
 import { useBulkArchiveMutation } from '../hooks/useBulkArchiveMutation'
 import { useWebhookStream } from '../hooks/useWebhookStream'
 import { PipelineTable } from '../components/pipeline/PipelineTable'
@@ -266,7 +266,7 @@ export function PipelineRoute() {
           job={activeJobs.find((j) => j.id === selectedJobId) ?? null}
           open={selectedJobId !== null}
           onClose={() => setSelectedJobId(null)}
-          defaultTab={tabFromUrl}
+          defaultTab={drawerTabFor(selectedJobId, jobFromUrl, tabFromUrl)}
         />
         {addJobDrawer}
       </>
