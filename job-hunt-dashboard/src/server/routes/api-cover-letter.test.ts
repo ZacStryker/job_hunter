@@ -75,13 +75,19 @@ const CREATE_JOBS_TABLE = `
     UNIQUE(company, job_title, user_id)
   )
 `
+// Identical, column for column, to `coverLetters` in schema.ts and to the DDL in every other test
+// file. One bun test process shares one in-memory DB, so the first CREATE TABLE IF NOT EXISTS to run
+// defines this table for the WHOLE suite — a divergent copy breaks other files, and only in the full
+// run. These five copies previously disagreed four ways (a DEFAULT here, no user_id at all there),
+// which is what made `returns 200 with most recent cover letter` red on a clean checkout.
 const CREATE_COVER_LETTERS_TABLE = `
   CREATE TABLE IF NOT EXISTS cover_letters (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
     content TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    user_id INTEGER NOT NULL DEFAULT 1
+    source TEXT NOT NULL DEFAULT 'generated'
   )
 `
 const CREATE_WEBHOOK_RUNS_TABLE = `
@@ -194,14 +200,20 @@ describe('GET /:id/cover-letter', () => {
     prodSqlite.run(
       `INSERT INTO jobs (company, job_title, job_description) VALUES ('Acme', 'Engineer', 'Build stuff')`
     )
-    const row = prodSqlite.query('SELECT id FROM jobs LIMIT 1').get() as { id: number }
+    // last_insert_rowid(), not `SELECT id FROM jobs LIMIT 1` — the shared in-memory DB means LIMIT 1
+    // can return a job another file seeded first.
+    const row = prodSqlite.query('SELECT last_insert_rowid() AS id').get() as { id: number }
+    // user_id is explicit. It used to be omitted, relying on a `DEFAULT 1` that existed ONLY in this
+    // file's copy of the cover_letters DDL — so in the full run, where another file's copy (no
+    // default) won the CREATE TABLE IF NOT EXISTS race, these inserts died on a NOT NULL constraint.
+    // That is why this test passed alone and failed together. The five DDLs are now identical.
     prodSqlite.run(
-      `INSERT INTO cover_letters (job_id, content, created_at) VALUES (?, ?, ?)`,
-      [row.id, 'First letter', '2026-04-01T10:00:00.000Z']
+      `INSERT INTO cover_letters (job_id, user_id, content, created_at) VALUES (?, ?, ?, ?)`,
+      [row.id, 1, 'First letter', '2026-04-01T10:00:00.000Z']
     )
     prodSqlite.run(
-      `INSERT INTO cover_letters (job_id, content, created_at) VALUES (?, ?, ?)`,
-      [row.id, 'Second letter', '2026-04-02T10:00:00.000Z']
+      `INSERT INTO cover_letters (job_id, user_id, content, created_at) VALUES (?, ?, ?, ?)`,
+      [row.id, 1, 'Second letter', '2026-04-02T10:00:00.000Z']
     )
     const res = await jobsApp.request(`/${row.id}/cover-letter`, { method: 'GET' })
     expect(res.status).toBe(200)
