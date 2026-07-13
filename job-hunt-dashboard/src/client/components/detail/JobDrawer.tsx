@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link, useLocation } from '@tanstack/react-router'
 import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, Pencil, Info, Ban, ChevronRight } from 'lucide-react'
 import { CoverLetterVersions } from './CoverLetterVersions'
+import { ResumeVersions } from './ResumeVersions'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
@@ -546,9 +547,26 @@ export function JobDrawer({ job, open, onClose, defaultTab }: JobDrawerProps) {
                     <p className="text-xs text-zinc-500 uppercase tracking-wide">Resume</p>
                     {job?.resumeGeneratedAt && (
                       <div className="flex items-center gap-2">
-                        <p className="text-xs text-zinc-600">{new Date(job.resumeGeneratedAt).toLocaleDateString()}</p>
+                        {/* The version control replaces the date; Edit is a ghost beside Download.
+                            Zero new rows, zero new buttons — Generate/Regenerate stays the column's
+                            only primary action. */}
+                        <ResumeVersions jobId={job.id} generatedAt={job.resumeGeneratedAt} />
+                        <Link
+                          to="/documents/$jobId/$docType"
+                          params={{ jobId: String(job.id), docType: 'resume' }}
+                          search={{ from: pathname }}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                        >
+                          <Pencil size={11} /> Edit
+                        </Link>
                         <a
-                          href={`/api/jobs/${job.id}/resume`}
+                          // ?t= is the cache-buster the resume has NEVER had. GET /:id/resume sends no
+                          // ETag, Last-Modified or Cache-Control, so with a bare URL the browser
+                          // happily serves the previously-downloaded PDF after a save or a regenerate
+                          // and the user concludes their edit vanished. resumeGeneratedAt is bumped in
+                          // the same transaction as every version INSERT, so this URL changes exactly
+                          // when the bytes do.
+                          href={`/api/jobs/${job.id}/resume?t=${job.resumeGeneratedAt}`}
                           download
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
                         >
@@ -586,7 +604,10 @@ export function JobDrawer({ job, open, onClose, defaultTab }: JobDrawerProps) {
                   )}
                   {job?.resumeGeneratedAt ? (
                     <iframe
-                      src={`/api/jobs/${job.id}/resume`}
+                      // Same cache-buster as the Download href above — this iframe is the other half
+                      // of "the edit is actually visible". Miss either one and a saved edit is served
+                      // as the stale render.
+                      src={`/api/jobs/${job.id}/resume?t=${job.resumeGeneratedAt}`}
                       className="w-full aspect-[210/297] border border-zinc-800 rounded"
                       title="Resume preview"
                     />

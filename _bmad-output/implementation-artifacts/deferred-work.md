@@ -1,5 +1,50 @@
 # Deferred Work
 
+## Deferred from: implementation of resume-editing-and-history / G3 (2026-07-13)
+
+- **`resumeDataSchema.email` is bounded but still allows `""`.** The spec's task list enumerated the
+  non-blank fields explicitly (`first_name`, `last_name`, `title_01`, `title_02`, `summary`,
+  `experience[].company`, `experience[].role`, each `bullets[]`) and named the fields left free
+  (`website`, `linkedin`, `location`, `projects[].url`). **`email` appears in neither list**, so it was
+  given a `.max()` bound but no `.trim().min(1)` — implemented literally rather than "fixed" silently,
+  because tightening beyond the spec binds the **generate** path and is an explicit Ask-First trigger.
+  A user can therefore still save a resume with a blank email, which the template renders as an empty
+  contact line. Decide whether email should join the non-blank set. [`src/shared/schemas.ts`]
+- **`GET /api/resume-template` could not live inside `api-jobs.ts`'s router as the Code Map implied.**
+  `api-jobs.ts` is mounted at `/api/jobs` (`index.ts:112`), so a route declared on its `app` would have
+  served `/api/jobs/resume-template`, not the `/api/resume-template` the frozen I/O matrix, Design Notes
+  and Resolved Decisions all specify. Resolved by keeping the handler in `api-jobs.ts` (per the Code
+  Map) but exporting it as a small `resumeTemplateApp` mounted at the frozen path in `index.ts`. Noted
+  because it is a deviation from the Code Map's literal file/router placement, resolved in favour of the
+  frozen URL. [`src/server/routes/api-jobs.ts`, `src/index.ts:113`]
+- **The editor's preview re-renders the whole iframe on every keystroke.** `srcDoc` is rebuilt from the
+  draft on each change, so the template re-parses, re-runs `paginate()` and re-awaits `document.fonts.ready`
+  per character, and the preview's scroll position resets. Matches the cover letter's live-preview
+  behaviour and is acceptable in practice (fonts are browser-cached after the first load), but a debounce
+  would be the obvious improvement if it feels laggy on a two-page resume. [`src/client/routes/documents.tsx`]
+- **Every render still makes a third-party network call for fonts.** The template pulls Rajdhani/Barlow
+  from `fonts.googleapis.com` and gates `paginate()` on `document.fonts.ready`, and `generatePdf` waits
+  for `networkidle` — so on an offline box or during a Google Fonts outage the preview and the PDF can
+  fall back to *different* metrics and paginate differently. Called out in the spec's Design Notes as
+  explicitly out of scope. Self-hosting the three fonts would retire the whole class.
+  [`resume_templates/resume_template(1).html`]
+- **A restored resume version is indistinguishable from the original it copied** — restore copies the
+  source row's `source` forward, so restoring a `'generated'` version writes a new row also labelled
+  `'generated'`. Identical to the cover letter's already-recorded entry below; the fix (a third
+  `'restored'` enum value) needs the same human call, and now needs it in two places.
+  [`src/server/routes/api-jobs.ts`, `src/shared/schemas.ts`]
+- **The Playwright concurrency cap is still absent, and this change adds two more entry points to it.**
+  `PUT /:id/resume` and the resume restore route each launch an unthrottled chromium, alongside the
+  existing generate/edit/restore paths for both documents. The `writeResumeVersion` bounds cap the *size*
+  of any single render, but nothing caps the *number* of concurrent ones. See the G2 entry below — this
+  widens it rather than changing it. [`src/server/services/generate-pdf.ts`]
+- **The `generate-cover-letter` tmp-path race is now fixed for resumes only.** Routing
+  `POST /:id/generate-resume` through `writeResumeVersion` gave it the per-write UUID tmp name, the
+  in-transaction bump, and a 500 on a failed rename. The **cover letter's** generate route
+  (`api-jobs.ts`) still writes its own `${rawId}.pdf.tmp` by hand and still swallows its rename failure —
+  the G2 entry below is therefore now half-closed. The two share a tmp directory, so give generate-cover-letter
+  the same treatment. [`src/server/routes/api-jobs.ts`]
+
 ## Deferred from: adversarial review of cover-letter-editing-and-history / G2+G6 (2026-07-13)
 
 - **The pre-existing `generate-cover-letter` route still has the tmp-path race and swallows its rename failure.** `api-jobs.ts:383-385` writes `${rawId}.pdf.tmp` — a per-JOB tmp name, not per-write — and its `renameSync` failure is logged, not surfaced, so it returns `200` with a `coverLetter` body while the PDF on disk is the previous render. The new edit/restore helper (`writeCoverLetterVersion`) was fixed during review (per-write UUID tmp name, tmp cleanup on failure, 500 on rename failure), but **the generate path was deliberately left alone** — it is outside this change and shares the tmp directory, so the two can still collide with each other. Fix: give generate the same treatment. [`job-hunt-dashboard/src/server/routes/api-jobs.ts:383`]

@@ -5,13 +5,13 @@ import { mkdirSync, renameSync, unlinkSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { db } from '../../db/client'
-import { jobs, statusEvents, coverLetters, messages, profile } from '../../db/schema'
+import { jobs, statusEvents, coverLetters, resumes, messages, profile } from '../../db/schema'
 import { generateCoverLetter, renderCoverLetterPdf } from '../services/cover-letter-service'
-import { generateResume } from '../services/resume-service'
+import { generateResume, renderResumePdf, readResumeTemplate } from '../services/resume-service'
 import { recordRun } from './api-webhook-runs'
 import { activityRegistry } from '../services/activity-registry'
-import { coverLetterEditSchema, profileDataSchema } from '../../shared/schemas'
-import type { Job, ProfileData } from '../../shared/schemas'
+import { coverLetterEditSchema, profileDataSchema, resumeEditSchema, resumeDataSchema, title02Violation } from '../../shared/schemas'
+import type { Job, ProfileData, ResumeData } from '../../shared/schemas'
 import type { AppEnv } from '../types'
 
 const EMPTY_PROFILE_DATA: ProfileData = {
@@ -449,7 +449,7 @@ app.post('/:id/generate-resume', async (c) => {
   let outcome: 'done' | 'failed' = 'failed'
   try {
     const resumeStartMs = Date.now()
-    let resumeResult: { pdf: Buffer; inputTokens: number; outputTokens: number }
+    let resumeResult: { data: ResumeData; pdf: Buffer; inputTokens: number; outputTokens: number }
     try {
       resumeResult = await generateResume(job as unknown as Job, userId)
     } catch (err) {
@@ -469,18 +469,18 @@ app.post('/:id/generate-resume', async (c) => {
     const fileName = `${candidateName} - Resume - ${job.company} - ${job.jobTitle}.pdf`
       .replace(/[–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/"/g, "'")
 
-    // Persist PDF to disk (atomic: write to temp then rename)
-    try {
-      const resumesDir = join(DATA_DIR, 'resumes')
-      mkdirSync(resumesDir, { recursive: true })
-      const finalPath = join(resumesDir, `${rawId}.pdf`)
-      const tmpPath = join(resumesDir, `${rawId}.pdf.tmp`)
-      await Bun.write(tmpPath, pdfBuffer)
-      renameSync(tmpPath, finalPath)
-      db.update(jobs).set({ resumeGeneratedAt: new Date().toISOString() }).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
-    } catch (err) {
-      console.error('Failed to persist resume PDF:', err)
-      // Non-fatal — user still gets their download
+    // Generate now goes through the SAME write helper as edit and restore. That is what makes the
+    // history real — the validated JSON is persisted instead of discarded — and it INSERTs rather
+    // than overwriting, so Regenerate is no longer a one-way door: the resume you just rerolled away
+    // from is still in the version list and still restorable.
+    //
+    // It also retires, for resumes, the tmp-path race deferred from the G2 review: the old block
+    // here used a per-JOB `${rawId}.pdf.tmp` and bumped resumeGeneratedAt outside a transaction, and
+    // it swallowed a failed rename — returning 200 while the PDF on disk was the previous render.
+    const written = await writeResumeVersion(rawId, userId, resumeResult.data, 'generated', pdfBuffer)
+    if (!written.ok) {
+      recordRun({ userId, name: `Resume - ${job.company} - ${job.jobTitle}`, success: false, itemCount: 0, errorMessage: written.error, durationMs: Date.now() - resumeStartMs })
+      return c.json({ error: written.error }, written.status)
     }
 
     recordRun({ userId, name: `Resume - ${job.company} - ${job.jobTitle}`, success: true, itemCount: 1,
@@ -533,6 +533,272 @@ app.get('/:id/resume', async (c) => {
       'Content-Disposition': `inline; filename="${fileName}"`,
     },
   })
+})
+
+// Writes a new version of a job's resume: renders the PDF, INSERTs an append-only row, and bumps
+// jobs.resumeGeneratedAt. Shared by generate, edit and restore — the only difference between them is
+// where `data` and `source` come from.
+//
+// The bump is NOT bookkeeping. Until this change the resume had NO cache-buster at all: the drawer's
+// Download href and preview iframe pointed at a bare /api/jobs/:id/resume and the route sends no
+// ETag, Last-Modified or Cache-Control. Both URLs now carry `?t=${job.resumeGeneratedAt}`, so a
+// re-render that leaves the column untouched serves the user the PREVIOUS pdf and looks exactly like
+// the save was lost. Bumping in the SAME transaction as the INSERT is what keeps the row and the
+// cache key from disagreeing.
+//
+// The PDF is one file per JOB, not per version: the row is the version, the file is merely the
+// current render. Restore overwrites it, which is the point.
+async function writeResumeVersion(
+  rawId: number,
+  userId: number,
+  data: ResumeData,
+  source: 'generated' | 'edited',
+  // Generate has ALREADY paid for a chromium launch inside generateResume, so it hands the bytes in
+  // rather than making us render the identical JSON a second time. Edit and restore omit it.
+  prerendered?: Buffer
+): Promise<{ ok: true; resume: typeof resumes.$inferSelect } | { ok: false; status: 500; error: string }> {
+  let pdf: Buffer
+  try {
+    pdf = prerendered ?? await renderResumePdf(data)
+  } catch {
+    return { ok: false, status: 500, error: 'Failed to render resume' }
+  }
+
+  const now = new Date().toISOString()
+  const resumesDir = join(DATA_DIR, 'resumes')
+  const finalPath = join(resumesDir, `${rawId}.pdf`)
+  // Per-WRITE tmp name, not per-job. Two writes for the same job can overlap (a double-clicked Save,
+  // an edit racing a restore, either racing a Regenerate), and a shared `${rawId}.pdf.tmp` lets them
+  // interleave: A writes tmp, B overwrites tmp, A renames B's bytes into place. The PDF on disk would
+  // then belong to no row in the version list.
+  const tmpPath = join(resumesDir, `${rawId}.${randomUUID()}.pdf.tmp`)
+  try {
+    mkdirSync(resumesDir, { recursive: true })
+    await Bun.write(tmpPath, pdf)
+  } catch {
+    return { ok: false, status: 500, error: 'Failed to render resume' }
+  }
+
+  const discardTmp = () => { try { unlinkSync(tmpPath) } catch { /* already gone */ } }
+
+  let row: typeof resumes.$inferSelect | undefined
+  try {
+    db.transaction((tx) => {
+      // .returning() gives back the exact row just written. Re-selecting by createdAt would be
+      // ambiguous the moment two writes for one job land in the same millisecond.
+      row = tx.insert(resumes)
+        .values({ jobId: rawId, userId, data: JSON.stringify(data), source, createdAt: now })
+        .returning()
+        .get()
+      tx.update(jobs).set({ resumeGeneratedAt: now })
+        .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
+    })
+  } catch {
+    discardTmp()
+    return { ok: false, status: 500, error: 'Failed to store resume' }
+  }
+  if (!row) {
+    discardTmp()
+    return { ok: false, status: 500, error: 'Failed to store resume' }
+  }
+
+  try {
+    renameSync(tmpPath, finalPath)
+  } catch (err) {
+    // Do NOT report success. The row is committed and resumeGeneratedAt is bumped, so the client
+    // would cache-bust to a PDF that is still the PREVIOUS render — the exact "my edit vanished"
+    // failure this feature exists to prevent. Surfacing a 500 lets the user retry, which re-renders.
+    console.error('Failed to finalize resume PDF:', err)
+    discardTmp()
+    return { ok: false, status: 500, error: 'Failed to save resume PDF' }
+  }
+
+  return { ok: true, resume: row }
+}
+
+// Parses a stored row's JSON back into ResumeData. Rows were validated against resumeDataSchema AS IT
+// EXISTED WHEN WRITTEN, and this change TIGHTENED that schema (bounds, non-blank), so a legacy row
+// may no longer conform. Parse on the way out and fail loudly rather than feeding non-conforming JSON
+// to the template.
+function parseStoredResume(raw: string): ResumeData | null {
+  try {
+    const parsed = resumeDataSchema.safeParse(JSON.parse(raw))
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
+}
+
+// The most recent version's JSON. Newest by createdAt DESC, id DESC — the id tiebreaker is not
+// decoration: two writes landing in the same millisecond would otherwise order arbitrarily.
+app.get('/:id/resume-data', async (c) => {
+  const userId = c.get('userId')
+  const idParam = c.req.param('id')
+  if (!/^\d+$/.test(idParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  if (rawId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const job = db.select({ id: jobs.id }).from(jobs)
+    .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
+  }
+
+  const row = db.select().from(resumes)
+    .where(and(eq(resumes.jobId, rawId), eq(resumes.userId, userId)))
+    .orderBy(desc(resumes.createdAt), desc(resumes.id))
+    .get()
+  if (!row) {
+    return c.json({ error: 'No resume found' }, 404)
+  }
+
+  const data = parseStoredResume(row.data)
+  if (!data) {
+    return c.json({ error: 'This resume version is no longer valid — regenerate it to make it editable' }, 422)
+  }
+
+  return c.json({ resume: { id: row.id, jobId: row.jobId, source: row.source, createdAt: row.createdAt, data } })
+})
+
+app.put('/:id/resume', async (c) => {
+  const userId = c.get('userId')
+  const idParam = c.req.param('id')
+  if (!/^\d+$/.test(idParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  if (rawId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const job = db.select({ id: jobs.id }).from(jobs)
+    .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
+  }
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
+
+  // Validated BEFORE any Playwright launch. The bounds in resumeDataSchema are what stand between a
+  // pasted 10 MB summary and a 15-second chromium hang, so this must reject first and render second.
+  // The form is not the security boundary: a drifted client or a hand-rolled PUT must not be able to
+  // write a blank, unbounded, or job-less resume.
+  const parsed = resumeEditSchema.safeParse(body)
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')
+    return c.json({ error: `Invalid resume: ${issues}` }, 400)
+  }
+
+  // A template RENDERING constraint, so it binds the user's typing exactly as it binds the model's.
+  if (title02Violation(parsed.data.data.title_02)) {
+    return c.json({ error: 'title_02 cannot contain "and" or "&" — it breaks template rendering' }, 400)
+  }
+
+  // This route EDITS; it does not create. Without an existing version there is nothing to have
+  // edited, and letting the PUT through would mint a first resume tagged 'edited' that was never
+  // generated. The editor already refuses to open in that state — the API must agree.
+  const existing = db.select({ id: resumes.id }).from(resumes)
+    .where(and(eq(resumes.jobId, rawId), eq(resumes.userId, userId)))
+    .get()
+  if (!existing) {
+    return c.json({ error: 'No resume found' }, 404)
+  }
+
+  const result = await writeResumeVersion(rawId, userId, parsed.data.data, 'edited')
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status)
+  }
+  return c.json({ resume: { id: result.resume.id, source: result.resume.source, createdAt: result.resume.createdAt } })
+})
+
+app.get('/:id/resume/versions', async (c) => {
+  const userId = c.get('userId')
+  const idParam = c.req.param('id')
+  if (!/^\d+$/.test(idParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  if (rawId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const job = db.select({ id: jobs.id }).from(jobs)
+    .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
+  }
+
+  // A job with no resume yet returns [], not a 404 — "no versions" is a valid answer to this
+  // question. Note this is also the LEGACY state: a resume generated before this feature existed has
+  // a PDF on disk and zero rows here.
+  const versions = db.select({
+    id: resumes.id,
+    source: resumes.source,
+    createdAt: resumes.createdAt,
+  }).from(resumes)
+    .where(and(eq(resumes.jobId, rawId), eq(resumes.userId, userId)))
+    .orderBy(desc(resumes.createdAt), desc(resumes.id))
+    .all()
+
+  return c.json({ versions })
+})
+
+app.post('/:id/resume/versions/:versionId/restore', async (c) => {
+  const userId = c.get('userId')
+  const idParam = c.req.param('id')
+  const versionParam = c.req.param('versionId')
+  if (!/^\d+$/.test(idParam) || !/^\d+$/.test(versionParam)) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+  const rawId = Number(idParam)
+  const versionId = Number(versionParam)
+  if (rawId <= 0 || versionId <= 0) {
+    return c.json({ error: 'Invalid job id' }, 400)
+  }
+
+  const job = db.select({ id: jobs.id }).from(jobs)
+    .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
+  if (!job) {
+    return c.json({ error: 'Job not found' }, 404)
+  }
+
+  // Scoped on BOTH userId and jobId. userId alone would let one of the caller's own jobs restore a
+  // version belonging to a different one of their jobs.
+  const version = db.select().from(resumes)
+    .where(and(
+      eq(resumes.id, versionId),
+      eq(resumes.jobId, rawId),
+      eq(resumes.userId, userId),
+    ))
+    .get()
+  if (!version) {
+    return c.json({ error: 'Version not found' }, 404)
+  }
+
+  // Re-validate on the way out: this row was written against the schema as it existed at the time,
+  // and this change tightened it. Rendering non-conforming JSON would produce a garbled PDF; a 422
+  // says plainly that this version cannot be brought back.
+  const data = parseStoredResume(version.data)
+  if (!data) {
+    return c.json({ error: 'This resume version is no longer valid and cannot be restored — regenerate instead' }, 422)
+  }
+
+  // Restore COPIES forward into a new row. The table stays append-only and nothing is destroyed —
+  // which is what makes editing safe enough to ship without a confirmation dialog.
+  const result = await writeResumeVersion(rawId, userId, data, version.source)
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status)
+  }
+  return c.json({ resume: { id: result.resume.id, source: result.resume.source, createdAt: result.resume.createdAt } })
 })
 
 app.get('/:id/cover-letter', async (c) => {
@@ -791,6 +1057,33 @@ app.get('/:id/cover-letter/pdf', async (c) => {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="${fileName}"`,
     },
+  })
+})
+
+// Mounted at /api/resume-template, NOT under /api/jobs — the template is not job-scoped, and `app`
+// here is mounted at /api/jobs. It lives in this file beside the routes that render from it.
+//
+// The client cannot reach resume_templates/ any other way: the directory sits outside public/,
+// vite.config.ts sets no publicDir, and only /api and /auth are proxied. Serving the SAME bytes the
+// renderer reads is what keeps the file on disk as the single source of truth — the server renders
+// from it, the client previews from it, and the two cannot drift. (A Vite `?raw` import would have
+// put a build-time copy in the bundle while the server kept reading disk at runtime: two sources,
+// and precisely the drift that extracting buildResumeHtml exists to make impossible.)
+export const resumeTemplateApp = new Hono<AppEnv>()
+
+resumeTemplateApp.get('/', async (c) => {
+  let html: string
+  try {
+    html = await readResumeTemplate()
+  } catch (err) {
+    console.error('Failed to read resume template:', err)
+    return c.json({ error: 'Resume template unavailable' }, 500)
+  }
+  return c.body(html, 200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    // The template does not change at runtime, so the client fetches it once and types for free.
+    // `private` because this sits behind auth like every other /api route.
+    'Cache-Control': 'private, max-age=3600',
   })
 })
 

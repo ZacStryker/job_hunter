@@ -57,6 +57,28 @@ export const coverLetters = sqliteTable('cover_letters', {
   index('cover_letters_user_id_idx').on(table.userId),
 ])
 
+// The resume's structured JSON — the ONLY editable representation of a resume that ever exists.
+// Before this table, generateResume validated it, rendered a PDF, and threw the JSON away, so a
+// resume could be rerolled but never fixed, diffed, or reverted. A PDF cannot be reversed into
+// structured data, so there is nothing to backfill: this table starts empty and every resume
+// generated before it existed has zero rows (see `jobs.resumeGeneratedAt`, which is what tells a
+// legacy resume apart from one that was never generated).
+//
+// Append-only, exactly like cover_letters: edit and restore both INSERT. The row IS the version;
+// DATA_DIR/resumes/{jobId}.pdf is merely the current render.
+export const resumes = sqliteTable('resumes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  jobId: integer('job_id').notNull().references(() => jobs.id),
+  userId: integer('user_id').notNull().references(() => users.id),
+  // The validated ResumeData, JSON-serialized. Re-parsed against resumeDataSchema on the way out —
+  // a row written under an older, looser schema may no longer conform.
+  data: text('data').notNull(),
+  createdAt: text('created_at').notNull(),
+  source: text('source', { enum: ['generated', 'edited'] }).notNull().default('generated'),
+}, (table) => [
+  index('resumes_user_id_idx').on(table.userId),
+])
+
 export const statusEvents = sqliteTable('status_events', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   jobId: integer('job_id').notNull().references(() => jobs.id),

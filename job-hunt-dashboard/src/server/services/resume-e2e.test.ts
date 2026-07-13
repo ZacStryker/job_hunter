@@ -163,6 +163,15 @@ beforeAll(() => {
     user_message TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`)
+  // generateResume's userId is now required, so a missing env key falls through to the per-user
+  // encrypted key lookup rather than short-circuiting. Matches schema.ts.
+  prodSqlite.run(`CREATE TABLE IF NOT EXISTS user_secrets (
+    user_id INTEGER NOT NULL,
+    key_name TEXT NOT NULL,
+    ciphertext TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, key_name)
+  )`)
   process.env.ANTHROPIC_API_KEY = 'test-key'
 })
 
@@ -176,7 +185,7 @@ describe('resume E2E — one-page layout', () => {
       JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(ONE_PAGE_FIXTURE) }], usage: { input_tokens: 100, output_tokens: 200 } }),
       { status: 200, headers: { 'content-type': 'application/json' } }
     ))) as unknown as typeof globalThis.fetch
-    const result = await generateResume(MOCK_JOB)
+    const result = await generateResume(MOCK_JOB, 1)
     expect(result.pdf).toBeInstanceOf(Buffer)
     expect(result.pdf.length).toBeGreaterThan(0)
   }, 60_000)
@@ -194,7 +203,7 @@ describe('resume E2E — two-page layout', () => {
       JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(TWO_PAGE_FIXTURE) }], usage: { input_tokens: 100, output_tokens: 200 } }),
       { status: 200, headers: { 'content-type': 'application/json' } }
     ))) as unknown as typeof globalThis.fetch
-    const result = await generateResume(MOCK_JOB)
+    const result = await generateResume(MOCK_JOB, 1)
     expect(result.pdf).toBeInstanceOf(Buffer)
     expect(result.pdf.length).toBeGreaterThan(0)
   }, 60_000)

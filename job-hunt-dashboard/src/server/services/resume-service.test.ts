@@ -34,6 +34,23 @@ const CREATE_PROMPTS_TABLE = `
   )
 `
 
+// generateResume now takes a REQUIRED userId, so the no-API-key path falls through to the
+// per-user encrypted key lookup instead of short-circuiting on `userId === undefined`. Without this
+// table that lookup would throw `no such table: user_secrets` rather than the expected error — and
+// relying on another test file to have created it first is exactly the cross-file DDL trap this
+// repo has been bitten by. Matches schema.ts.
+const CREATE_USER_SECRETS_TABLE = `
+  CREATE TABLE IF NOT EXISTS user_secrets (
+    user_id INTEGER NOT NULL,
+    key_name TEXT NOT NULL,
+    ciphertext TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, key_name)
+  )
+`
+
+const TEST_USER_ID = 1
+
 const MOCK_JOB = {
   id: 1, company: 'Acme Corp', jobTitle: 'Senior Engineer',
   jobDescription: 'Build great things at scale.', location: 'Amsterdam',
@@ -67,6 +84,7 @@ beforeAll(() => {
   originalFetch = globalThis.fetch
   prodSqlite.run(CREATE_PROFILE_TABLE)
   prodSqlite.run(CREATE_PROMPTS_TABLE)
+  prodSqlite.run(CREATE_USER_SECRETS_TABLE)
   process.env.ANTHROPIC_API_KEY = 'test-key'
 })
 
@@ -95,7 +113,7 @@ function mockAnthropicSuccess(text: string): void {
 describe('generateResume() — JSON pipeline', () => {
   test('parses valid JSON, injects into template, passes to generatePdf', async () => {
     mockAnthropicSuccess(JSON.stringify(VALID_RESUME_JSON))
-    const result = await generateResume(MOCK_JOB)
+    const result = await generateResume(MOCK_JOB, TEST_USER_ID)
     expect(result.pdf).toBeInstanceOf(Buffer)
     expect(result.pdf.length).toBeGreaterThan(0)
     expect(capturedHtml).toContain('<script id="resume-data" type="application/json">')
@@ -104,7 +122,7 @@ describe('generateResume() — JSON pipeline', () => {
 
   test('returns correct token counts', async () => {
     mockAnthropicSuccess(JSON.stringify(VALID_RESUME_JSON))
-    const result = await generateResume(MOCK_JOB)
+    const result = await generateResume(MOCK_JOB, TEST_USER_ID)
     expect(result.inputTokens).toBe(100)
     expect(result.outputTokens).toBe(200)
   })
@@ -115,13 +133,13 @@ describe('generateResume() — JSON pipeline', () => {
     await generateResume({
       ...MOCK_JOB,
       generationContext: 'Sarah Chen referred me. Lead with the payments migration.',
-    })
+    }, TEST_USER_ID)
     expect(capturedRequestBody).toContain('Additional context from the candidate: Sarah Chen referred me. Lead with the payments migration.')
   })
 
   test('no generationContext: no context label appears in the prompt', async () => {
     mockAnthropicSuccess(JSON.stringify(VALID_RESUME_JSON))
-    await generateResume({ ...MOCK_JOB, generationContext: null })
+    await generateResume({ ...MOCK_JOB, generationContext: null }, TEST_USER_ID)
     expect(capturedRequestBody).toContain('Acme Corp') // anchor: the prompt WAS built and sent
     expect(capturedRequestBody).not.toContain('Additional context from the candidate')
   })
@@ -131,7 +149,7 @@ describe('generateResume() — JSON pipeline', () => {
   test('generationContext containing $ substitution patterns is inserted literally', async () => {
     mockAnthropicSuccess(JSON.stringify(VALID_RESUME_JSON))
     const note = "Ask about the $5k bonus. Patterns: $& $` $' end."
-    await generateResume({ ...MOCK_JOB, generationContext: note })
+    await generateResume({ ...MOCK_JOB, generationContext: note }, TEST_USER_ID)
 
     const sent = JSON.parse(capturedRequestBody) as { messages: Array<{ content: string }> }
     const userMessage = sent.messages[0].content
@@ -141,7 +159,7 @@ describe('generateResume() — JSON pipeline', () => {
 
   test('strips code fences from JSON response if present', async () => {
     mockAnthropicSuccess('```json\n' + JSON.stringify(VALID_RESUME_JSON) + '\n```')
-    const result = await generateResume(MOCK_JOB)
+    const result = await generateResume(MOCK_JOB, TEST_USER_ID)
     expect(result.pdf).toBeInstanceOf(Buffer)
   })
 })
@@ -151,18 +169,18 @@ describe('generateResume() — validation', () => {
     const invalid = { ...VALID_RESUME_JSON }
     delete (invalid as unknown as { experience: unknown }).experience
     mockAnthropicSuccess(JSON.stringify(invalid))
-    await expect(generateResume(MOCK_JOB)).rejects.toThrow('Resume generation failed: LLM output did not conform to schema')
+    await expect(generateResume(MOCK_JOB, TEST_USER_ID)).rejects.toThrow('Resume generation failed: LLM output did not conform to schema')
   })
 
   test('throws when title_02 contains "and"', async () => {
     const bad = { ...VALID_RESUME_JSON, title_02: 'Systems Engineer and Architect' }
     mockAnthropicSuccess(JSON.stringify(bad))
-    await expect(generateResume(MOCK_JOB)).rejects.toThrow('title_02 contains')
+    await expect(generateResume(MOCK_JOB, TEST_USER_ID)).rejects.toThrow('title_02 contains')
   })
 
   test('throws when LLM output is not valid JSON', async () => {
     mockAnthropicSuccess('This is not JSON at all')
-    await expect(generateResume(MOCK_JOB)).rejects.toThrow('Resume generation failed: LLM output was not valid JSON')
+    await expect(generateResume(MOCK_JOB, TEST_USER_ID)).rejects.toThrow('Resume generation failed: LLM output was not valid JSON')
   })
 })
 
@@ -170,17 +188,17 @@ describe('generateResume() — error handling', () => {
   test('throws when ANTHROPIC_API_KEY is absent', async () => {
     const orig = process.env.ANTHROPIC_API_KEY
     delete process.env.ANTHROPIC_API_KEY
-    await expect(generateResume(MOCK_JOB)).rejects.toThrow('ANTHROPIC_API_KEY not configured')
+    await expect(generateResume(MOCK_JOB, TEST_USER_ID)).rejects.toThrow('ANTHROPIC_API_KEY not configured')
     process.env.ANTHROPIC_API_KEY = orig
   })
 
   test('throws when Anthropic returns HTTP error', async () => {
     globalThis.fetch = mock(() => Promise.resolve(new Response(null, { status: 500 }))) as unknown as typeof globalThis.fetch
-    await expect(generateResume(MOCK_JOB)).rejects.toThrow('Anthropic error 500')
+    await expect(generateResume(MOCK_JOB, TEST_USER_ID)).rejects.toThrow('Anthropic error 500')
   })
 
   test('throws when Anthropic returns empty text', async () => {
     mockAnthropicSuccess('   ')
-    await expect(generateResume(MOCK_JOB)).rejects.toThrow('Anthropic returned empty resume')
+    await expect(generateResume(MOCK_JOB, TEST_USER_ID)).rejects.toThrow('Anthropic returned empty resume')
   })
 })
