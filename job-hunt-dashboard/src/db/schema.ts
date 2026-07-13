@@ -32,6 +32,7 @@ export const jobs = sqliteTable('jobs', {
   status: text('status'),
   statusOverride: text('status_override'),
   coverLetterSentAt: text('cover_letter_sent_at'),
+  generationContext: text('generation_context'),
   dateApplied: text('date_applied'),
   appliedAt: text('applied_at'),
   dateArchived: text('date_archived'),

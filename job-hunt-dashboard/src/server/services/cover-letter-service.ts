@@ -103,17 +103,23 @@ export async function generateCoverLetter(job: Job, userId?: number): Promise<{ 
   const profileData = parseProfileData(profileRow?.profileData)
   const profileText = buildProfileText(profileData)
 
+  // Replacement must use the function form: the string form expands $$, $&, $` and $' in the
+  // REPLACEMENT, so user-typed text (a note mentioning "$5k", a profile with "$") would corrupt
+  // the prompt rather than be inserted literally.
   const systemPrompt = (promptConfig.systemPrompt ?? '')
-    .replaceAll('{{CANDIDATE_PROFILE}}', profileText)
+    .replaceAll('{{CANDIDATE_PROFILE}}', () => profileText)
 
   const jobDetails =
     'Role: Company: ' + job.company +
     ' Title: ' + job.jobTitle +
     ' Location: ' + (job.location ?? '') +
-    ' Description: ' + (job.jobDescription ?? '')
+    ' Description: ' + (job.jobDescription ?? '') +
+    (job.generationContext?.trim()
+      ? ' Additional context from the candidate: ' + job.generationContext.trim()
+      : '')
 
   const userMessage = promptConfig.userMessage
-    .replaceAll('{{JOB_DETAILS}}', jobDetails)
+    .replaceAll('{{JOB_DETAILS}}', () => jobDetails)
 
   const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',

@@ -68,6 +68,7 @@ const CREATE_JOBS_TABLE = `
     status TEXT,
     status_override TEXT,
     cover_letter_sent_at TEXT,
+    generation_context TEXT,
     date_applied TEXT,
     applied_at TEXT,
     date_archived TEXT,
@@ -188,7 +189,12 @@ describe('upsert business logic', () => {
 
     testDb
       .update(jobs)
-      .set({ applied: true, dateApplied: '2026-03-29T10:00:00.000Z', status: 'interviewing' })
+      .set({
+        applied: true,
+        dateApplied: '2026-03-29T10:00:00.000Z',
+        status: 'interviewing',
+        generationContext: 'Sarah Chen referred me.',
+      })
       .where(sql`company = 'Acme Corp' AND job_title = 'Senior Engineer'`)
       .run()
 
@@ -199,6 +205,7 @@ describe('upsert business logic', () => {
     expect(stored[0].applied).toBe(true)           // user-owned: preserved
     expect(stored[0].status).toBe('interviewing')  // user-owned: preserved
     expect(stored[0].dateApplied).toBe('2026-03-29T10:00:00.000Z') // user-owned: preserved
+    expect(stored[0].generationContext).toBe('Sarah Chen referred me.') // user-owned: survives re-scrape
   })
 
   test('multiple rows — correct mixed add/update counts', () => {

@@ -56,9 +56,12 @@ beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = 'test-key'
 })
 
+let capturedRequestBody = ''
+
 beforeEach(() => {
   prodSqlite.run('DELETE FROM profile')
   capturedHtml = ''
+  capturedRequestBody = ''
 })
 
 afterEach(() => {
@@ -66,14 +69,15 @@ afterEach(() => {
 })
 
 function mockAnthropicSuccess(text = 'Dear Hiring Manager,\n\nI am excited.\n\nSincerely,\nZac'): void {
-  globalThis.fetch = mock(() =>
-    Promise.resolve(
+  globalThis.fetch = mock((_url: unknown, init?: RequestInit) => {
+    capturedRequestBody = typeof init?.body === 'string' ? init.body : ''
+    return Promise.resolve(
       new Response(
         JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 100, output_tokens: 200 } }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       )
     )
-  ) as unknown as typeof globalThis.fetch
+  }) as unknown as typeof globalThis.fetch
 }
 
 describe('generateCoverLetter()', () => {
@@ -122,6 +126,58 @@ describe('generateCoverLetter()', () => {
     const result = await generateCoverLetter(MOCK_JOB)
     expect(result.pdf).toBeInstanceOf(Buffer)
     expect(result.pdf.length).toBeGreaterThan(0)
+  })
+
+  // generationContext rides the existing {{JOB_DETAILS}} placeholder — no new placeholder, so a
+  // user-overridden prompt in the `prompts` table cannot silently drop it.
+  test('generationContext is appended to JOB_DETAILS and reaches Anthropic', async () => {
+    mockAnthropicSuccess()
+    await generateCoverLetter({
+      ...MOCK_JOB,
+      generationContext: 'Sarah Chen referred me. Lead with the payments migration.',
+    })
+    expect(capturedRequestBody).toContain('Additional context from the candidate: Sarah Chen referred me. Lead with the payments migration.')
+    // still carries the original job details
+    expect(capturedRequestBody).toContain('Acme Corp')
+  })
+
+  test('no generationContext: no context label appears in the prompt', async () => {
+    mockAnthropicSuccess()
+    await generateCoverLetter({ ...MOCK_JOB, generationContext: null })
+    expect(capturedRequestBody).toContain('Acme Corp') // anchor: the prompt WAS built and sent
+    expect(capturedRequestBody).not.toContain('Additional context from the candidate')
+  })
+
+  test('whitespace-only generationContext: no context label appears in the prompt', async () => {
+    mockAnthropicSuccess()
+    await generateCoverLetter({ ...MOCK_JOB, generationContext: '   ' })
+    expect(capturedRequestBody).toContain('Acme Corp') // anchor: the prompt WAS built and sent
+    expect(capturedRequestBody).not.toContain('Additional context from the candidate')
+  })
+
+  // Regression: replaceAll(str, str) expands $$, $&, $` and $' in the REPLACEMENT. A note is
+  // hand-typed, so "$" is common ("the $5k bonus"). Without the function-form replacement these
+  // sequences splice surrounding prompt text into the job details instead of inserting literally.
+  test('generationContext containing $ substitution patterns is inserted literally', async () => {
+    mockAnthropicSuccess()
+    const note = "Ask about the $5k bonus. Budget is $$$. Patterns: $& $` $' end."
+    await generateCoverLetter({ ...MOCK_JOB, generationContext: note })
+
+    const sent = JSON.parse(capturedRequestBody) as { messages: Array<{ content: string }> }
+    const userMessage = sent.messages[0].content
+    expect(userMessage).toContain('Additional context from the candidate: ' + note)
+    expect(userMessage).not.toContain('{{JOB_DETAILS}}') // $& would re-emit the placeholder
+  })
+
+  // A <textarea> routinely produces quotes and newlines; assert via the parsed body, not a raw
+  // substring, so JSON escaping cannot mask a real failure (or fake a passing one).
+  test('generationContext with quotes and newlines survives into the prompt intact', async () => {
+    mockAnthropicSuccess()
+    const note = 'Referral: "Sarah Chen"\nAsk about the staff track.'
+    await generateCoverLetter({ ...MOCK_JOB, generationContext: note })
+
+    const sent = JSON.parse(capturedRequestBody) as { messages: Array<{ content: string }> }
+    expect(sent.messages[0].content).toContain('Additional context from the candidate: ' + note)
   })
 
   test('Anthropic returns empty text: throws', async () => {
