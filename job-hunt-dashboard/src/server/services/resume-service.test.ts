@@ -70,9 +70,12 @@ beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = 'test-key'
 })
 
+let capturedRequestBody = ''
+
 beforeEach(() => {
   prodSqlite.run('DELETE FROM profile')
   capturedHtml = ''
+  capturedRequestBody = ''
 })
 
 afterEach(() => {
@@ -80,12 +83,13 @@ afterEach(() => {
 })
 
 function mockAnthropicSuccess(text: string): void {
-  globalThis.fetch = mock(() =>
-    Promise.resolve(new Response(
+  globalThis.fetch = mock((_url: unknown, init?: RequestInit) => {
+    capturedRequestBody = typeof init?.body === 'string' ? init.body : ''
+    return Promise.resolve(new Response(
       JSON.stringify({ content: [{ type: 'text', text }], usage: { input_tokens: 100, output_tokens: 200 } }),
       { status: 200, headers: { 'content-type': 'application/json' } }
     ))
-  ) as unknown as typeof globalThis.fetch
+  }) as unknown as typeof globalThis.fetch
 }
 
 describe('generateResume() — JSON pipeline', () => {
@@ -103,6 +107,36 @@ describe('generateResume() — JSON pipeline', () => {
     const result = await generateResume(MOCK_JOB)
     expect(result.inputTokens).toBe(100)
     expect(result.outputTokens).toBe(200)
+  })
+
+  // One note per job, shared by both documents — the resume reads the same jobs.generationContext.
+  test('generationContext is appended to JOB_DETAILS and reaches Anthropic', async () => {
+    mockAnthropicSuccess(JSON.stringify(VALID_RESUME_JSON))
+    await generateResume({
+      ...MOCK_JOB,
+      generationContext: 'Sarah Chen referred me. Lead with the payments migration.',
+    })
+    expect(capturedRequestBody).toContain('Additional context from the candidate: Sarah Chen referred me. Lead with the payments migration.')
+  })
+
+  test('no generationContext: no context label appears in the prompt', async () => {
+    mockAnthropicSuccess(JSON.stringify(VALID_RESUME_JSON))
+    await generateResume({ ...MOCK_JOB, generationContext: null })
+    expect(capturedRequestBody).toContain('Acme Corp') // anchor: the prompt WAS built and sent
+    expect(capturedRequestBody).not.toContain('Additional context from the candidate')
+  })
+
+  // Regression: replace(regex, str) expands $$, $&, $` and $' in the REPLACEMENT — same hazard as
+  // the cover letter, and the note is the first hand-typed field routed through it.
+  test('generationContext containing $ substitution patterns is inserted literally', async () => {
+    mockAnthropicSuccess(JSON.stringify(VALID_RESUME_JSON))
+    const note = "Ask about the $5k bonus. Patterns: $& $` $' end."
+    await generateResume({ ...MOCK_JOB, generationContext: note })
+
+    const sent = JSON.parse(capturedRequestBody) as { messages: Array<{ content: string }> }
+    const userMessage = sent.messages[0].content
+    expect(userMessage).toContain('Additional context from the candidate: ' + note)
+    expect(userMessage).not.toContain('{{JOB_DETAILS}}')
   })
 
   test('strips code fences from JSON response if present', async () => {

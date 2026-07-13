@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
-import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, Pencil, Info, Ban } from 'lucide-react'
+import { ExternalLink, Archive, ArchiveRestore, Wand2, FileText, Download, Pencil, Info, Ban, ChevronRight } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
@@ -89,6 +89,9 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   const [editingDescription, setEditingDescription] = useState(false)
   const [descriptionDraft, setDescriptionDraft] = useState('')
   const [descriptionSaveError, setDescriptionSaveError] = useState<string | null>(null)
+  const [contextOpen, setContextOpen] = useState(false)
+  const [contextDraft, setContextDraft] = useState('')
+  const [contextSaveError, setContextSaveError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { data: events = [] } = useJobEvents(job?.id)
   const { mutate: generateCoverLetter, isPending, isError, error } = useGenerateCoverLetter(job?.id ?? 0)
@@ -105,6 +108,11 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
   useEffect(() => {
     setShowFullDescription(false)
     setEditingDescription(false)
+    setContextOpen(false)
+    setContextSaveError(null)
+    // Seed the draft per job, not per open: collapsing the disclosure then reopening it must not
+    // destroy text the user typed but has not saved. Cancel is the explicit discard.
+    setContextDraft(job?.generationContext ?? '')
   }, [job?.id])
 
   useEffect(() => {
@@ -135,6 +143,41 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
 
   function cancelEdit() {
     setEditingDescription(false)
+  }
+
+  const contextDirty = !!job && contextDraft.trim() !== (job.generationContext ?? '')
+
+  function toggleContext() {
+    setContextSaveError(null)
+    setContextOpen(!contextOpen)
+  }
+
+  function discardContext() {
+    setContextDraft(job?.generationContext ?? '')
+    setContextSaveError(null)
+    setContextOpen(false)
+  }
+
+  function saveContext() {
+    persistContext(() => setContextOpen(false))
+  }
+
+  // The note only has value if it reaches generation. Flush an unsaved note before generating,
+  // otherwise "brief the writer, then generate" silently generates without the brief.
+  function persistContext(onDone: () => void) {
+    if (!job) return
+    if (!contextDirty) {
+      onDone()
+      return
+    }
+    setContextSaveError(null)
+    patchJob(
+      { id: job.id, patch: { generationContext: contextDraft.trim() || null } },
+      {
+        onSuccess: () => onDone(),
+        onError: (err) => setContextSaveError(err.message || 'Failed to save'),
+      },
+    )
   }
 
   const isBlacklisted = job ? blacklist.some(e => e.companyName === job.company.toLowerCase()) : false
@@ -366,6 +409,58 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
               )}
             </TabsContent>
             <TabsContent value="documents" className="pt-4">
+              {/* Anything else I should know? — one note per job, shared by both documents.
+                  Sits above the grid: brief the writer, then generate. */}
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={toggleContext}
+                  className="flex w-full items-center gap-1.5 text-xs text-zinc-500 uppercase tracking-wide hover:text-zinc-300 transition-colors"
+                >
+                  <ChevronRight
+                    size={12}
+                    className={cn('shrink-0 transition-transform', contextOpen && 'rotate-90')}
+                  />
+                  {/* shrink-0: a bare text node is a shrinkable flex item, so a long note preview
+                      squeezes the label until it wraps to four lines. It must stay one row. */}
+                  <span className="shrink-0 whitespace-nowrap">Anything else I should know?</span>
+                  {!contextOpen && job?.generationContext && (
+                    <span className="ml-auto min-w-0 truncate normal-case tracking-normal text-zinc-600">
+                      {job.generationContext}
+                    </span>
+                  )}
+                </button>
+                {contextOpen && (
+                  <div className="mt-2 space-y-2">
+                    <textarea
+                      value={contextDraft}
+                      onChange={(e) => setContextDraft(e.target.value)}
+                      maxLength={5000}
+                      placeholder="Referrals, anecdotes, what to stress."
+                      className="w-full h-20 bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2 text-sm text-zinc-200 leading-relaxed resize-none placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={saveContext}
+                        disabled={isPatching}
+                        className="px-3 py-1.5 rounded-md bg-zinc-700 border border-zinc-600 text-sm text-zinc-100 hover:bg-zinc-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isPatching ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        onClick={discardContext}
+                        disabled={isPatching}
+                        className="px-3 py-1.5 rounded-md border border-zinc-700 text-sm text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Cancel
+                      </button>
+                      {contextSaveError && (
+                        <p className="text-xs text-red-400">{contextSaveError}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 {/* Cover Letter */}
                 <div className="space-y-2">
@@ -386,7 +481,7 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                   </div>
                   {job?.jobDescription ? (
                     <button
-                      onClick={() => generateCoverLetter()}
+                      onClick={() => persistContext(() => generateCoverLetter())}
                       disabled={isPending}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -443,7 +538,7 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                   </div>
                   {job?.jobDescription ? (
                     <button
-                      onClick={() => generateResume()}
+                      onClick={() => persistContext(() => generateResume())}
                       disabled={isResumePending}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >

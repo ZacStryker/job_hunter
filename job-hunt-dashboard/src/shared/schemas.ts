@@ -32,6 +32,7 @@ export const jobSchema = jobInputSchema.extend({
   status: z.string().nullable(),
   statusOverride: z.string().nullable(),
   coverLetterSentAt: z.string().nullable(),
+  generationContext: z.string().nullable(),
   dateApplied: z.string().nullable(),
   appliedAt: z.string().nullable(),
   dateArchived: z.string().nullable(),

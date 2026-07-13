@@ -41,6 +41,7 @@ const jobPatchSchema = z.object({
   statusOverride: z.enum(STATUS_OVERRIDE_VALUES).nullable().optional(),
   archived: z.boolean().optional(),
   jobDescription: z.string().max(100_000).nullable().optional(),
+  generationContext: z.string().max(5_000).nullable().optional(),
 })
 
 app.get('/', (c) => {
@@ -286,7 +287,7 @@ app.patch('/:id', async (c) => {
   }
 
   const patch = parsed.data
-  const hasFields = patch.applied !== undefined || patch.statusOverride !== undefined || patch.archived !== undefined || patch.jobDescription !== undefined
+  const hasFields = patch.applied !== undefined || patch.statusOverride !== undefined || patch.archived !== undefined || patch.jobDescription !== undefined || patch.generationContext !== undefined
   if (!hasFields) {
     return c.json({ error: 'No updatable fields provided' }, 400)
   }
@@ -318,6 +319,9 @@ app.patch('/:id', async (c) => {
     }
   }
   if (patch.jobDescription !== undefined) updateFields.jobDescription = patch.jobDescription
+  if (patch.generationContext !== undefined) {
+    updateFields.generationContext = patch.generationContext?.trim() || null
+  }
 
   db.update(jobs).set(updateFields).where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
 

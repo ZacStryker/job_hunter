@@ -72,16 +72,22 @@ export async function generateResume(job: Job, userId?: number): Promise<{ pdf: 
   const profileData = parseProfileData(profileRow?.profileData)
   const profileText = buildProfileText(profileData)
 
+  // Replacement must use the function form: the string form expands $$, $&, $` and $' in the
+  // REPLACEMENT, so user-typed text (a note mentioning "$5k", a profile with "$") would corrupt
+  // the prompt rather than be inserted literally.
   const systemPrompt = (promptConfig.systemPrompt ?? '')
-    .replace(/\{\{CANDIDATE_PROFILE\}\}/g, profileText)
+    .replace(/\{\{CANDIDATE_PROFILE\}\}/g, () => profileText)
 
   const jobDetails =
     'Target Role: ' + job.company + ' — ' + job.jobTitle + '\n' +
     'Location: ' + (job.location ?? '') + '\n' +
-    'Description: ' + (job.jobDescription ?? '')
+    'Description: ' + (job.jobDescription ?? '') +
+    (job.generationContext?.trim()
+      ? '\nAdditional context from the candidate: ' + job.generationContext.trim()
+      : '')
 
   const userMessage = promptConfig.userMessage
-    .replace(/\{\{JOB_DETAILS\}\}/g, jobDetails)
+    .replace(/\{\{JOB_DETAILS\}\}/g, () => jobDetails)
 
   const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',

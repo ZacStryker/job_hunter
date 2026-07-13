@@ -55,6 +55,7 @@ const CREATE_JOBS_TABLE = `
     status TEXT,
     status_override TEXT,
     cover_letter_sent_at TEXT,
+    generation_context TEXT,
     date_applied TEXT,
     applied_at TEXT,
     archived INTEGER NOT NULL DEFAULT 0,
@@ -318,6 +319,101 @@ describe('PATCH /api/jobs/:id', () => {
     const data = await res.json() as { job: Record<string, unknown> }
     expect(data.job.archived).toBe(false)
   })
+
+  // generationContext is user-owned: the note fed into {{JOB_DETAILS}} at generation time.
+  test('PATCH { generationContext } alone returns 200 and persists (clears the hasFields guard)', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, user_id) VALUES ('Ctx', 'Dev', 1)`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Ctx') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ generationContext: 'Sarah Chen referred me.' }),
+    })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { job: Record<string, unknown> }
+    expect(data.job.generationContext).toBe('Sarah Chen referred me.')
+    const stored = prodSqlite.query('SELECT generation_context FROM jobs WHERE id = ?').get(row.id) as { generation_context: string | null }
+    expect(stored.generation_context).toBe('Sarah Chen referred me.')
+  })
+
+  test('PATCH { generationContext: "" } stores null', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, user_id, generation_context) VALUES ('Ctx2', 'Dev', 1, 'old note')`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Ctx2') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ generationContext: '' }),
+    })
+    expect(res.status).toBe(200)
+    const stored = prodSqlite.query('SELECT generation_context FROM jobs WHERE id = ?').get(row.id) as { generation_context: string | null }
+    expect(stored.generation_context).toBeNull()
+  })
+
+  test('PATCH { generationContext } whitespace-only stores null', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, user_id, generation_context) VALUES ('Ctx3', 'Dev', 1, 'old note')`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Ctx3') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ generationContext: '   ' }),
+    })
+    expect(res.status).toBe(200)
+    const stored = prodSqlite.query('SELECT generation_context FROM jobs WHERE id = ?').get(row.id) as { generation_context: string | null }
+    expect(stored.generation_context).toBeNull()
+  })
+
+  test('PATCH { generationContext: null } stores null (the exact payload the drawer sends to clear)', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, user_id, generation_context) VALUES ('CtxNull', 'Dev', 1, 'old note')`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('CtxNull') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ generationContext: null }),
+    })
+    expect(res.status).toBe(200)
+    const stored = prodSqlite.query('SELECT generation_context FROM jobs WHERE id = ?').get(row.id) as { generation_context: string | null }
+    expect(stored.generation_context).toBeNull()
+  })
+
+  test('PATCH { generationContext } at exactly 5000 chars returns 200 (boundary)', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, user_id) VALUES ('CtxMax', 'Dev', 1)`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('CtxMax') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ generationContext: 'x'.repeat(5000) }),
+    })
+    expect(res.status).toBe(200)
+    const stored = prodSqlite.query('SELECT generation_context FROM jobs WHERE id = ?').get(row.id) as { generation_context: string | null }
+    expect(stored.generation_context?.length).toBe(5000)
+  })
+
+  test('PATCH { generationContext } over 5000 chars returns 400', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, user_id) VALUES ('Ctx4', 'Dev', 1)`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Ctx4') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ generationContext: 'x'.repeat(5001) }),
+    })
+    expect(res.status).toBe(400)
+    const data = await res.json() as Record<string, unknown>
+    expect(data).toHaveProperty('error')
+  })
+
+  // Tenant isolation, proven not assumed: the app fixes userId=1, so seed as user 2 and act as user 1.
+  test('PATCH { generationContext } on another user\'s job returns 404 and leaves their note unchanged', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, user_id, generation_context) VALUES ('Tenant', 'Dev', 2, 'user A note')`)
+    const row = prodSqlite.query('SELECT id FROM jobs WHERE company = ?').get('Tenant') as { id: number }
+    const res = await jobsApp.request(`/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ generationContext: 'user B overwrite' }),
+    })
+    expect(res.status).toBe(404)
+    const stored = prodSqlite.query('SELECT generation_context FROM jobs WHERE id = ?').get(row.id) as { generation_context: string | null }
+    expect(stored.generation_context).toBe('user A note')
+  })
 })
 
 describe('GET /api/jobs/:id/events', () => {
@@ -552,6 +648,17 @@ describe('GET /api/jobs/:id', () => {
 })
 
 describe('GET /api/jobs', () => {
+  // The drawer seeds its note textarea from the LIST query, so if the list stopped returning this
+  // column the note would silently render blank while every write-path test still passed.
+  test('returns generationContext on each job', async () => {
+    prodSqlite.run(`INSERT INTO jobs (company, job_title, user_id, generation_context) VALUES ('CtxList', 'Dev', 1, 'Sarah Chen referred me.')`)
+    const res = await jobsApp.request('/', { method: 'GET' })
+    expect(res.status).toBe(200)
+    const data = await res.json() as { jobs: Array<Record<string, unknown>> }
+    const job = data.jobs.find((j) => j.company === 'CtxList')
+    expect(job?.generationContext).toBe('Sarah Chen referred me.')
+  })
+
   test('returns 200 with empty jobs array when DB is empty', async () => {
     const res = await jobsApp.request('/', { method: 'GET' })
     expect(res.status).toBe(200)
