@@ -419,9 +419,11 @@ export function JobDrawer({ job, open, onClose }: JobDrawerProps) {
                 >
                   <ChevronRight
                     size={12}
-                    className={cn('transition-transform', contextOpen && 'rotate-90')}
+                    className={cn('shrink-0 transition-transform', contextOpen && 'rotate-90')}
                   />
-                  Anything else I should know?
+                  {/* shrink-0: a bare text node is a shrinkable flex item, so a long note preview
+                      squeezes the label until it wraps to four lines. It must stay one row. */}
+                  <span className="shrink-0 whitespace-nowrap">Anything else I should know?</span>
                   {!contextOpen && job?.generationContext && (
                     <span className="ml-auto min-w-0 truncate normal-case tracking-normal text-zinc-600">
                       {job.generationContext}
