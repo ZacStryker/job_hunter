@@ -2,7 +2,7 @@
 title: 'Cover letter editing + version history (G2 + G6)'
 type: 'feature'
 created: '2026-07-13'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: '4fcdb88'
 context:
   - '{project-root}/_bmad-output/project-context.md'
@@ -97,22 +97,22 @@ browsable. One spec, both goals.
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/server/routes/api-cover-letter.test.ts` -- **fix the already-red test first** (see Design Notes). It is red *only in the full run*, on the exact read path G6 extends. Do not build on a red test
-- [ ] `src/db/schema.ts` -- add `source` to `coverLetters` -- `notNull().default('generated')`, so every existing row reads back as `'generated'` with no backfill
-- [ ] `src/db/migrations/` -- `bun run db:generate` -- verify the emitted SQL touches **only** `cover_letters`
-- [ ] `src/db/migrate.ts` -- add `COVER_LETTERS_COLUMNS = [['source', "TEXT NOT NULL DEFAULT 'generated'"]]` and its repair loop, mirroring the two existing lists
-- [ ] **All 5 test files above** -- add `source TEXT NOT NULL DEFAULT 'generated'` to each hand-rolled `CREATE TABLE IF NOT EXISTS cover_letters` -- **lockstep, single commit.** One divergent DDL breaks *other* files
-- [ ] `src/shared/cover-letter-html.ts` -- extract `buildCoverLetterHtml` + `escHtml` verbatim; export both
-- [ ] `src/server/services/cover-letter-service.ts` -- import the extracted builder; add exported `renderCoverLetterPdf(content, userId)` -- generation path must be **behaviourally unchanged**
-- [ ] `src/shared/schemas.ts` -- `source: z.enum(['generated', 'edited'])` on `coverLetterSchema`; new `coverLetterVersionSchema` (`id`, `source`, `createdAt`)
-- [ ] `src/server/routes/api-jobs.ts` -- `PUT /:id/cover-letter` -- validate content (non-blank, ≤20000); INSERT `source: 'edited'`; re-render; bump `coverLetterSentAt`. Reuse the tmp-write → transaction → rename pattern at :383-413
-- [ ] `src/server/routes/api-jobs.ts` -- `GET /:id/cover-letter/versions` -- newest first, `createdAt DESC, id DESC`; `[]` when none
-- [ ] `src/server/routes/api-jobs.ts` -- `POST /:id/cover-letter/versions/:versionId/restore` -- scope the version lookup on **both** `userId` and `jobId`; INSERT a copy; re-render; bump. Never destructive
-- [ ] `src/client/lib/router.ts` -- declare `/documents/$jobId/$docType` under `protectedRoute`
-- [ ] `src/client/routes/documents.tsx` -- two-pane shell; `<textarea>` left, `<iframe srcdoc>` live preview right; two-step inline Discard; Back reopens the drawer on the Documents tab
-- [ ] `src/client/hooks/` -- `useCoverLetterMutation`, `useCoverLetterVersionsQuery`, `useCoverLetterRestoreMutation`, all via `apiFetch`; invalidate `['jobs']` so `coverLetterSentAt` (the cache-buster) refreshes
-- [ ] `src/client/components/detail/JobDrawer.tsx` -- `[Edit]` ghost in the existing header row; the date becomes `v3 · Jul 13 ▾`. **With one version: no chevron, no menu, plain date**
-- [ ] Tests -- tenant isolation on all three routes (proven, not assumed); PUT inserts rather than mutates and leaves the prior version restorable; restore of a foreign/other-job `versionId` 404s; blank content 400s; versions returns `[]` not 404
+- [x] `src/server/routes/api-cover-letter.test.ts` -- **fix the already-red test first** (see Design Notes). It is red *only in the full run*, on the exact read path G6 extends. Do not build on a red test
+- [x] `src/db/schema.ts` -- add `source` to `coverLetters` -- `notNull().default('generated')`, so every existing row reads back as `'generated'` with no backfill
+- [x] `src/db/migrations/` -- `bun run db:generate` -- verify the emitted SQL touches **only** `cover_letters`
+- [x] `src/db/migrate.ts` -- add `COVER_LETTERS_COLUMNS = [['source', "TEXT NOT NULL DEFAULT 'generated'"]]` and its repair loop, mirroring the two existing lists
+- [x] **All 5 test files above** -- add `source TEXT NOT NULL DEFAULT 'generated'` to each hand-rolled `CREATE TABLE IF NOT EXISTS cover_letters` -- **lockstep, single commit.** One divergent DDL breaks *other* files
+- [x] `src/shared/cover-letter-html.ts` -- extract `buildCoverLetterHtml` + `escHtml` verbatim; export both
+- [x] `src/server/services/cover-letter-service.ts` -- import the extracted builder; add exported `renderCoverLetterPdf(content, userId)` -- generation path must be **behaviourally unchanged**
+- [x] `src/shared/schemas.ts` -- `source: z.enum(['generated', 'edited'])` on `coverLetterSchema`; new `coverLetterVersionSchema` (`id`, `source`, `createdAt`)
+- [x] `src/server/routes/api-jobs.ts` -- `PUT /:id/cover-letter` -- validate content (non-blank, ≤20000); INSERT `source: 'edited'`; re-render; bump `coverLetterSentAt`. Reuse the tmp-write → transaction → rename pattern at :383-413
+- [x] `src/server/routes/api-jobs.ts` -- `GET /:id/cover-letter/versions` -- newest first, `createdAt DESC, id DESC`; `[]` when none
+- [x] `src/server/routes/api-jobs.ts` -- `POST /:id/cover-letter/versions/:versionId/restore` -- scope the version lookup on **both** `userId` and `jobId`; INSERT a copy; re-render; bump. Never destructive
+- [x] `src/client/lib/router.ts` -- declare `/documents/$jobId/$docType` under `protectedRoute`
+- [x] `src/client/routes/documents.tsx` -- two-pane shell; `<textarea>` left, `<iframe srcdoc>` live preview right; two-step inline Discard; Back reopens the drawer on the Documents tab
+- [x] `src/client/hooks/` -- `useCoverLetterMutation`, `useCoverLetterVersionsQuery`, `useCoverLetterRestoreMutation`, all via `apiFetch`; invalidate `['jobs']` so `coverLetterSentAt` (the cache-buster) refreshes
+- [x] `src/client/components/detail/JobDrawer.tsx` -- `[Edit]` ghost in the existing header row; the date becomes `v3 · Jul 13 ▾`. **With one version: no chevron, no menu, plain date**
+- [x] Tests -- tenant isolation on all three routes (proven, not assumed); PUT inserts rather than mutates and leaves the prior version restorable; restore of a foreign/other-job `versionId` 404s; blank content 400s; versions returns `[]` not 404
 
 **Acceptance Criteria:**
 - Given a generated cover letter, when the user edits the prose and saves, then a **new** `cover_letters` row exists with `source: 'edited'`, the prior row is **still present**, and the downloaded PDF reflects the edit.
