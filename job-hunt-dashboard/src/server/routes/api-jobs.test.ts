@@ -7,6 +7,22 @@ import type { ResumeData } from '../../shared/schemas'
 import { Database } from 'bun:sqlite'
 import { activityRegistry } from '../services/activity-registry'
 
+// This file reads NOTHING from disk, so it must write nothing to disk either.
+//
+// bun's mock.module is process-global: api-resume.test.ts replaces `node:fs` for the whole run, so in
+// a full `bun test` this file inherits a no-op renameSync/unlinkSync while Bun.write stays REAL. The
+// generate/edit write path therefore dropped real tmp PDFs into the repo's data/resumes/ and never
+// renamed or unlinked them. That leak predates this change (the old per-JOB `${id}.pdf.tmp` name
+// overwrote itself, so it capped out at one file per job id — the repo has ~56 of them), but the
+// per-write UUID tmp name makes it unbounded: every test run would leave a fresh pile behind.
+//
+// Re-installed in beforeEach, NOT once at module load: bun restores spies at file boundaries, so a
+// single top-level spyOn can be torn down before this file's tests actually run.
+function silenceDiskWrites(): void {
+  spyOn(Bun, 'write').mockResolvedValue(0)
+}
+silenceDiskWrites()
+
 // Mock both doc-generation services BEFORE dynamic import — bun:test hoisting requirement.
 // The real services require an Anthropic key + network; these stubs are driven per-test.
 let coverLetterImpl: () => Promise<{ content: string; pdf: Buffer; inputTokens: number; outputTokens: number }> =
@@ -178,6 +194,7 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
+  silenceDiskWrites()
   prodSqlite.run('DELETE FROM status_events')
   prodSqlite.run('DELETE FROM messages')
   prodSqlite.run('DELETE FROM resumes')

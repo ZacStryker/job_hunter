@@ -40,14 +40,21 @@ mock.module('../services/resume-service', () => ({
 
 // Mock node:fs — production code uses mkdirSync + renameSync; make them no-ops in tests.
 // Tests that need real filesystem access use node:fs/promises or Bun.write directly.
+//
+// renameSync is drivable so the atomicity contract can actually be exercised: the spec requires that
+// a failed rename commit NO row and bump NO clock. With a no-op rename that path was unreachable.
+let renameShouldThrow = false
+const unlinkedPaths: string[] = []
 mock.module('node:fs', () => ({
   mkdirSync: () => {},
-  renameSync: () => {},
-  unlinkSync: () => {},
+  renameSync: () => { if (renameShouldThrow) throw new Error('EXDEV: cross-device link') },
+  unlinkSync: (p: string) => { unlinkedPaths.push(p) },
 }))
 
-// Mock Bun.write to avoid writing real files in tests
-const mockBunWrite = spyOn(Bun, 'write').mockResolvedValue(0)
+// Mock Bun.write to avoid writing real files in tests. Re-installed per test, not once at module
+// load: bun restores spies at file boundaries, so a single top-level spyOn can be torn down before
+// this file's tests run — and the write path then drops real tmp PDFs into the repo's data/resumes/.
+let mockBunWrite = spyOn(Bun, 'write').mockResolvedValue(0)
 
 const { default: jobsRoute } = await import('./api-jobs')
 const { db: prodDb } = await import('../../db/client')
@@ -154,8 +161,10 @@ beforeEach(() => {
   mockGenerateResume = async () => ({ data: RESUME_DATA, pdf: Buffer.from('%PDF-mock'), inputTokens: 100, outputTokens: 200 })
   mockRenderResumePdf = async () => Buffer.from('%PDF-rendered')
   renderCalls = 0
+  renameShouldThrow = false
+  unlinkedPaths.length = 0
+  mockBunWrite = spyOn(Bun, 'write').mockResolvedValue(0)
   mockBunWrite.mockClear()
-  mockBunWrite.mockResolvedValue(0)
 })
 
 describe('POST /:id/generate-resume', () => {
@@ -661,5 +670,93 @@ describe('resume routes — tenant isolation', () => {
     expect(res.status).toBe(404)
     expect(resumeRows(ownJob)).toHaveLength(1)
     expect(resumeRows(foreignJob)).toHaveLength(1)
+  })
+})
+
+// The spec's I/O matrix: "PDF render fails on save | Playwright throws, or the rename fails | 500,
+// and no row is committed and no bump happens — the user retries against unchanged state."
+//
+// This was the review's one real acceptance violation. Committing the row and bumping the clock
+// BEFORE the rename means a failed rename returns 500 while the version list shows an edit whose PDF
+// was never written, and ?t= cache-busts to the previous render — the exact failure the feature
+// exists to prevent. The rename now happens inside the transaction, so it rolls both back.
+describe('writeResumeVersion — atomicity when the rename fails', () => {
+  test('PUT: a failed rename commits NO row and bumps NO clock', async () => {
+    const id = seedJob('Rename Co', 'Engineer', 1, '2026-01-01T00:00:00.000Z')
+    seedResume(id, 1, RESUME_DATA)
+
+    renameShouldThrow = true
+    const res = await jobsApp.request(`/${id}/resume`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: editedData({ summary: 'this must not survive' }) }),
+    })
+
+    expect(res.status).toBe(500)
+    // No row committed — the transaction rolled back.
+    expect(resumeRows(id)).toHaveLength(1)
+    expect(JSON.parse(resumeRows(id)[0].data).summary).toBe(RESUME_DATA.summary)
+    // No bump — the cache-buster must not move to a render that does not exist on disk.
+    const job = prodSqlite.query('SELECT resume_generated_at AS t FROM jobs WHERE id = ?').get(id) as { t: string }
+    expect(job.t).toBe('2026-01-01T00:00:00.000Z')
+    // And the tmp file is cleaned up rather than leaked.
+    expect(unlinkedPaths.length).toBeGreaterThan(0)
+  })
+
+  test('generate: a failed rename commits NO row and bumps NO clock', async () => {
+    const id = seedJob('Rename Gen Co', 'Engineer')
+    renameShouldThrow = true
+
+    const res = await jobsApp.request(`/${id}/generate-resume`, { method: 'POST' })
+
+    expect(res.status).toBe(500)
+    expect(resumeRows(id)).toHaveLength(0)
+    const job = prodSqlite.query('SELECT resume_generated_at AS t FROM jobs WHERE id = ?').get(id) as { t: string | null }
+    expect(job.t).toBeNull()
+  })
+
+  test('restore: a failed rename commits NO row and bumps NO clock', async () => {
+    const id = seedJob('Rename Restore Co', 'Engineer', 1, '2026-01-01T00:00:00.000Z')
+    const v1 = seedResume(id, 1, RESUME_DATA)
+
+    renameShouldThrow = true
+    const res = await jobsApp.request(`/${id}/resume/versions/${v1}/restore`, { method: 'POST' })
+
+    expect(res.status).toBe(500)
+    expect(resumeRows(id)).toHaveLength(1)
+    const job = prodSqlite.query('SELECT resume_generated_at AS t FROM jobs WHERE id = ?').get(id) as { t: string }
+    expect(job.t).toBe('2026-01-01T00:00:00.000Z')
+  })
+
+  // The tmp name is a fresh UUID nothing else will ever reuse, so a leak here is permanent.
+  test('a failed Bun.write cleans up its tmp file rather than leaking it', async () => {
+    const id = seedJob('Disk Full Co', 'Engineer')
+    seedResume(id, 1, RESUME_DATA)
+    mockBunWrite.mockRejectedValueOnce(new Error('ENOSPC: no space left on device') as never)
+
+    const res = await jobsApp.request(`/${id}/resume`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: editedData({ summary: 'never written' }) }),
+    })
+
+    expect(res.status).toBe(500)
+    expect(resumeRows(id)).toHaveLength(1)
+    expect(unlinkedPaths.some(p => p.endsWith('.pdf.tmp'))).toBe(true)
+  })
+})
+
+// "resumeGeneratedAt actually moves on EVERY PDF-changing write" — generate and PUT are asserted
+// above; restore is the third, and was the one the spec's test list left unproven.
+describe('restore — the cache-buster moves', () => {
+  test('restore bumps resumeGeneratedAt', async () => {
+    const id = seedJob('Restore Bump Co', 'Engineer', 1, '2026-01-01T00:00:00.000Z')
+    const v1 = seedResume(id, 1, RESUME_DATA)
+
+    const res = await jobsApp.request(`/${id}/resume/versions/${v1}/restore`, { method: 'POST' })
+    expect(res.status).toBe(200)
+
+    const job = prodSqlite.query('SELECT resume_generated_at AS t FROM jobs WHERE id = ?').get(id) as { t: string }
+    expect(job.t).not.toBe('2026-01-01T00:00:00.000Z')
   })
 })

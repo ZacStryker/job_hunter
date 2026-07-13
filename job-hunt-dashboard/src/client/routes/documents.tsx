@@ -58,7 +58,7 @@ export function DocumentsRoute() {
   }
 
   if (docType === 'resume') {
-    return <ResumeEditor id={id} job={job} backLink={backLink} />
+    return <ResumeEditor id={id} job={job} jobsLoading={jobsLoading} backLink={backLink} />
   }
 
   return (
@@ -175,7 +175,7 @@ function CoverLetterEditor({ id, backLink }: { id: number; backLink: React.React
 
 // ── Resume ──────────────────────────────────────────────────────────────────────────────────────
 
-function ResumeEditor({ id, job, backLink }: { id: number; job: Job | undefined; backLink: React.ReactNode }) {
+function ResumeEditor({ id, job, jobsLoading, backLink }: { id: number; job: Job | undefined; jobsLoading: boolean; backLink: React.ReactNode }) {
   const { data: stored, isLoading, isError: loadFailed, error: loadError } = useResumeDataQuery(id)
   const { data: template, isLoading: templateLoading, isError: templateFailed } = useResumeTemplateQuery()
   const { mutate: save, isPending, isError, error, reset } = useResumeMutation(id)
@@ -216,7 +216,11 @@ function ResumeEditor({ id, job, backLink }: { id: number; job: Job | undefined;
     reset()
   }
 
-  if (isLoading || templateLoading) {
+  // jobsLoading is part of the gate, not decoration: `job.resumeGeneratedAt` is the ONLY thing that
+  // tells a legacy resume apart from one that was never generated. If resume-data 404s before the
+  // jobs query resolves, `job` is undefined and a legacy user is told "Generate a resume first"
+  // while looking at a preview of the resume they already have.
+  if (isLoading || templateLoading || jobsLoading) {
     return <Shell backLink={backLink}><p className="text-sm text-zinc-500">Loading…</p></Shell>
   }
 

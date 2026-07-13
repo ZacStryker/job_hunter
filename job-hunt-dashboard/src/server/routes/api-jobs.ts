@@ -572,18 +572,32 @@ async function writeResumeVersion(
   // interleave: A writes tmp, B overwrites tmp, A renames B's bytes into place. The PDF on disk would
   // then belong to no row in the version list.
   const tmpPath = join(resumesDir, `${rawId}.${randomUUID()}.pdf.tmp`)
+  const discardTmp = () => { try { unlinkSync(tmpPath) } catch { /* already gone */ } }
+
   try {
     mkdirSync(resumesDir, { recursive: true })
     await Bun.write(tmpPath, pdf)
   } catch {
+    // Bun.write can fail PART-WAY (ENOSPC), so the tmp may exist. The name is a fresh UUID that
+    // nothing else will ever reuse or overwrite, so without this it leaks forever — and the 500 we
+    // return invites a retry that leaks another.
+    discardTmp()
     return { ok: false, status: 500, error: 'Failed to render resume' }
   }
 
-  const discardTmp = () => { try { unlinkSync(tmpPath) } catch { /* already gone */ } }
-
   let row: typeof resumes.$inferSelect | undefined
+  let renamed = false
   try {
     db.transaction((tx) => {
+      // Ownership is enforced HERE, not just in the callers. This is the shared write path for
+      // generate, edit and restore; every caller checks first today, but the bump below is a scoped
+      // UPDATE that silently affects zero rows if the job is not the caller's, so a future caller
+      // that forgets would write a resumes row cross-linking one tenant's user_id to another
+      // tenant's job_id and nothing would look wrong. The write helper is the right place for it.
+      const owned = tx.select({ id: jobs.id }).from(jobs)
+        .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).get()
+      if (!owned) throw new Error('job not owned by user')
+
       // .returning() gives back the exact row just written. Re-selecting by createdAt would be
       // ambiguous the moment two writes for one job land in the same millisecond.
       row = tx.insert(resumes)
@@ -592,25 +606,33 @@ async function writeResumeVersion(
         .get()
       tx.update(jobs).set({ resumeGeneratedAt: now })
         .where(and(eq(jobs.id, rawId), eq(jobs.userId, userId))).run()
+
+      // The rename is the transaction's LAST act, and it is INSIDE it deliberately.
+      //
+      // Committing first and renaming after (the cover letter's shape) means a failed rename returns
+      // 500 while the row stays committed and the clock stays bumped: the version list then shows an
+      // edit whose PDF was never written, and `?t=` cache-busts to the PREVIOUS render — the exact
+      // "my edit vanished" failure this feature exists to prevent. The spec is explicit that a failed
+      // rename must leave NO row committed and NO bump, so a throw here must roll both back.
+      //
+      // It also orders concurrent writes. The tmp name stops two writes clobbering each other's tmp
+      // file, but it does not stop their COMMITS and their RENAMES from interleaving: A could commit,
+      // B could commit, B could rename, then A's rename could overwrite B's bytes — leaving the
+      // newest row pointing at an older render. This block is synchronous (bun:sqlite is sync, and
+      // SQLite is single-writer), so commit order and rename order cannot diverge.
+      renameSync(tmpPath, finalPath)
+      renamed = true
     })
-  } catch {
+  } catch (err) {
+    console.error('Failed to write resume version:', err)
     discardTmp()
-    return { ok: false, status: 500, error: 'Failed to store resume' }
+    // If the rename threw, the transaction rolled back: no row, no bump, and the PDF on disk is
+    // untouched. The user retries against genuinely unchanged state.
+    return { ok: false, status: 500, error: renamed ? 'Failed to store resume' : 'Failed to save resume PDF' }
   }
   if (!row) {
     discardTmp()
     return { ok: false, status: 500, error: 'Failed to store resume' }
-  }
-
-  try {
-    renameSync(tmpPath, finalPath)
-  } catch (err) {
-    // Do NOT report success. The row is committed and resumeGeneratedAt is bumped, so the client
-    // would cache-bust to a PDF that is still the PREVIOUS render — the exact "my edit vanished"
-    // failure this feature exists to prevent. Surfacing a 500 lets the user retry, which re-renders.
-    console.error('Failed to finalize resume PDF:', err)
-    discardTmp()
-    return { ok: false, status: 500, error: 'Failed to save resume PDF' }
   }
 
   return { ok: true, resume: row }

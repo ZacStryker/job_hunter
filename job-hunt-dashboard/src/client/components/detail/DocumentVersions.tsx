@@ -30,25 +30,12 @@ interface Props {
 export function DocumentVersions({ versions, stampedAt, isPending, isError, error, onRestore }: Props) {
   const currentDate = new Date(stampedAt).toLocaleDateString()
 
-  // A failed restore must not look like a successful one. Without this the menu just closes and the
-  // user walks away believing the document reverted — then sends the wrong one. Inline, per the UX
-  // spec's "all feedback is inline and contextual to the triggering element"; no toast.
-  if (isError) {
-    return (
-      <span className="text-xs text-red-400" title={error?.message}>
-        {error?.message || 'Restore failed'}
-      </span>
-    )
-  }
-
-  if (versions.length <= 1) {
-    return <p className="text-xs text-zinc-600">{currentDate}</p>
-  }
-
   // Newest first from the server, so the newest carries the highest version number.
   const total = versions.length
 
-  return (
+  const control = total <= 1 ? (
+    <p className="text-xs text-zinc-600">{currentDate}</p>
+  ) : (
     <DropdownMenu>
       <DropdownMenuTrigger
         disabled={isPending}
@@ -80,4 +67,23 @@ export function DocumentVersions({ versions, stampedAt, isPending, isError, erro
       </DropdownMenuContent>
     </DropdownMenu>
   )
+
+  // A failed restore must not look like a successful one — otherwise the menu just closes and the
+  // user walks away believing the document reverted, then sends the wrong one. Inline, per the UX
+  // spec's "all feedback is inline and contextual to the triggering element"; no toast.
+  //
+  // The error renders BESIDE the control, never instead of it. Replacing it stranded the user: the
+  // only thing that can clear the error is another restore, and the only way to fire one is the
+  // dropdown that had just been unmounted. Kept terse (full message on hover) so it stays inside the
+  // ~340px column.
+  if (isError) {
+    return (
+      <span className="inline-flex items-center gap-2">
+        <span className="text-xs text-red-400" title={error?.message}>Restore failed</span>
+        {control}
+      </span>
+    )
+  }
+
+  return control
 }

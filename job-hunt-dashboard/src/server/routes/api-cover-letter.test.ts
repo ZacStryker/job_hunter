@@ -32,7 +32,13 @@ mock.module('node:fs', () => ({
   unlinkSync: () => {},
 }))
 
-spyOn(Bun, 'write').mockResolvedValue(0)
+// Re-installed in beforeEach, not once at module load: bun restores spies at file boundaries, so a
+// single top-level spyOn can be torn down before this file's tests run — and the generate path then
+// writes real tmp PDFs into the repo's data/cover-letters/.
+function silenceDiskWrites(): void {
+  spyOn(Bun, 'write').mockResolvedValue(0)
+}
+silenceDiskWrites()
 
 // --- Import AFTER mock ---
 const { default: jobsRoute } = await import('./api-jobs')
@@ -124,6 +130,7 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
+  silenceDiskWrites()
   prodSqlite.run('DELETE FROM cover_letters')
   prodSqlite.run('DELETE FROM jobs')
   mockGenerateCoverLetter = async () => ({ content: 'Mock cover letter text', pdf: Buffer.from('%PDF-mock'), inputTokens: 100, outputTokens: 200 })
