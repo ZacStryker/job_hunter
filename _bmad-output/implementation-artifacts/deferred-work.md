@@ -81,8 +81,16 @@ only in the full run).
 
 **Also still deferred, from the same intent (Stage 2, and explicitly declined items):** G3 — resume
 structured editing (needs a new append-only `resumes` table first, because the validated JSON is
-currently discarded after render at `resume-service.ts:119-123`; this is the stage that makes the
-resume editable *and* gives it history on the same code path). G4 — provenance highlighting (declined
+currently discarded after render at `resume-service.ts:145-149`; this is the stage that makes the
+resume editable *and* gives it history on the same code path). **Now specced and adversarially
+reviewed:** `spec-resume-editing-and-history.md` (status `draft`; 14 review findings applied).
+Decisions: editing is text + add/remove, **no reorder**; Regenerate becomes **non-destructive**;
+the client gets the template from a new `GET /api/resume-template`. The review surfaced two live
+bugs that G3 must fix and that exist **today**: (a) the resume PDF has **no cache-buster** —
+`JobDrawer.tsx:551,589` are bare URLs and `GET /:id/resume` sends no cache validators, so Regenerate
+can serve a stale PDF; (b) `resume-service.ts:139` injects `JSON.stringify` into a `<script>` tag
+without escaping `<`, which becomes a real injection vector the moment users can type into resume
+fields. G4 — provenance highlighting (declined
 for now; noted for the record that overclaiming was named the *most dangerous* defect and an editor
 only fixes what you **notice**). G5 — regenerate-with-instruction (overlaps heavily with G1; revisit
 after G1 lands).
