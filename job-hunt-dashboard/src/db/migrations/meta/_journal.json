@@ -295,6 +295,13 @@
       "when": 1783947848296,
       "tag": "0041_silky_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "6",
+      "when": 1783969045616,
+      "tag": "0042_milky_winter_soldier",
+      "breakpoints": true
     }
   ]
 }

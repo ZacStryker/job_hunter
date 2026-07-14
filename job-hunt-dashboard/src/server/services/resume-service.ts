@@ -6,8 +6,9 @@ import { profile, userSecrets } from '../../db/schema'
 import { decrypt } from '../lib/crypto'
 import { generatePdf } from './generate-pdf'
 import { loadEffectivePrompt } from './prompt-defaults'
-import { resumeDataSchema, profileDataSchema } from '../../shared/schemas'
-import type { Job, ProfileData } from '../../shared/schemas'
+import { buildResumeHtml } from '../../shared/resume-html'
+import { resumeDataSchema, profileDataSchema, title02Violation } from '../../shared/schemas'
+import type { Job, ProfileData, ResumeData } from '../../shared/schemas'
 
 const EMPTY_PROFILE_DATA: ProfileData = {
   personal: { fullName: '', email: '', phone: null, location: null, summary: null, skills: null, websites: [] },
@@ -56,9 +57,26 @@ interface AnthropicResponse {
   usage: { input_tokens: number; output_tokens: number }
 }
 
-export async function generateResume(job: Job, userId?: number): Promise<{ pdf: Buffer; inputTokens: number; outputTokens: number }> {
+const TEMPLATE_PATH = join(import.meta.dir, '../../../resume_templates/resume_template(1).html')
+
+// The single source of truth for the template bytes. The server renders from this file and the
+// client previews from these same bytes (served by GET /api/resume-template), so the two cannot
+// drift — which is the entire reason buildResumeHtml takes the template as a parameter.
+export function readResumeTemplate(): Promise<string> {
+  return readFile(TEMPLATE_PATH, 'utf-8')
+}
+
+// The render half, shared by edit and restore. No Anthropic call: these are renders, not
+// generations. Kept next to generateResume so both paths render through exactly one code path.
+export async function renderResumePdf(data: ResumeData): Promise<Buffer> {
+  return generatePdf(buildResumeHtml(data, await readResumeTemplate()))
+}
+
+// `userId` is REQUIRED, not optional: a resumes row cannot be written without it, and making it
+// required means typecheck enforces that forever rather than a null slipping through at runtime.
+export async function generateResume(job: Job, userId: number): Promise<{ data: ResumeData; pdf: Buffer; inputTokens: number; outputTokens: number }> {
   let apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey && userId !== undefined) {
+  if (!apiKey) {
     const row = db.select({ ciphertext: userSecrets.ciphertext })
       .from(userSecrets)
       .where(and(eq(userSecrets.userId, userId), eq(userSecrets.keyName, 'anthropic_api_key')))
@@ -67,7 +85,7 @@ export async function generateResume(job: Job, userId?: number): Promise<{ pdf: 
   }
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
-  const profileRow = (userId !== undefined ? db.select().from(profile).where(eq(profile.userId, userId)).get() : null) ?? null
+  const profileRow = db.select().from(profile).where(eq(profile.userId, userId)).get() ?? null
   const promptConfig = loadEffectivePrompt('resume')
   const profileData = parseProfileData(profileRow?.profileData)
   const profileText = buildProfileText(profileData)
@@ -128,22 +146,15 @@ export async function generateResume(job: Job, userId?: number): Promise<{ pdf: 
     throw new Error(`Resume generation failed: LLM output did not conform to schema — ${issues}`)
   }
 
-  if (/\band\b/i.test(parsed.data.title_02) || parsed.data.title_02.includes('&')) {
+  if (title02Violation(parsed.data.title_02)) {
     throw new Error('Resume generation failed: title_02 contains "and" or "&" — violates template rendering rule')
   }
 
-  const templatePath = join(import.meta.dir, '../../../resume_templates/resume_template(1).html')
-  const templateHtml = await readFile(templatePath, 'utf-8')
-  const injectedHtml = templateHtml.replace(
-    /<script id="resume-data" type="application\/json">[\s\S]*?<\/script>/,
-    `<script id="resume-data" type="application/json">\n${JSON.stringify(parsed.data, null, 2)}\n</script>`
-  )
-  if (injectedHtml === templateHtml) {
-    throw new Error('Resume generation failed: template injection point not found — template may be corrupted')
-  }
-
+  // The validated JSON is RETURNED, not discarded. It used to die here — which is why a resume could
+  // be rerolled but never edited, diffed, or reverted. The caller persists it as a resumes row.
   return {
-    pdf: await generatePdf(injectedHtml),
+    data: parsed.data,
+    pdf: await renderResumePdf(parsed.data),
     inputTokens: data.usage?.input_tokens ?? 0,
     outputTokens: data.usage?.output_tokens ?? 0,
   }

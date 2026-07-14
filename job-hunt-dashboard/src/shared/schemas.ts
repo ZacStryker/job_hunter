@@ -398,28 +398,84 @@ export const blacklistEntryInputSchema = z.object({
 export type BlacklistEntry = z.infer<typeof blacklistEntrySchema>
 export type BlacklistEntryInput = z.infer<typeof blacklistEntryInputSchema>
 
+// Bounds exist because this schema now guards a USER-writable path (PUT /api/jobs/:id/resume), not
+// just LLM output. Save hands the parsed data straight to a Playwright chromium launch whose
+// pagination engine measures overflow in a loop under a 15s timeout — an unbounded `summary` or a
+// 5,000-entry `experience` turns Save into a self-inflicted DoS. Every limit here is several times
+// the resume prompt's own CONTENT LIMITS (3–6 skill groups, 3–5 bullets of ~140–170 chars, 1–4
+// projects), so a real generation cannot trip them. They bind the generate path too, deliberately:
+// an LLM emitting a monster is equally unwelcome.
+//
+// `.trim().min(1)` marks the fields a resume is meaningless without. z.string() accepts '', so
+// without this a user could empty every identity field and Save a blank-but-valid resume — and
+// `.min(1)` on an array bounds its LENGTH, not the content of its strings, so each bullet needs its
+// own non-blank rule. website / linkedin / location / projects[].url are legitimately empty and are
+// left free.
+const RESUME_MAX = {
+  name: 100, title: 120, email: 200, url: 300, location: 200, summary: 2000,
+  groupLabel: 100, skill: 100, groups: 30, skillsPerGroup: 50,
+  school: 200, degree: 200, year: 50, education: 30,
+  projectName: 200, projectDesc: 1000, stack: 300, projectUrl: 500, projects: 30,
+  company: 200, dates: 100, role: 200, experience: 40, bullet: 600, bullets: 20,
+} as const
+
 export const resumeDataSchema = z.object({
-  first_name:   z.string(),
-  last_name:    z.string(),
-  title_01:     z.string(),
-  title_02:     z.string(),
-  email:        z.string(),
-  website:      z.string(),
-  linkedin:     z.string(),
-  location:     z.string(),
-  summary:      z.string(),
-  skill_groups: z.array(z.object({ label: z.string(), skills: z.array(z.string()) })),
-  education:    z.array(z.object({ school: z.string(), degree: z.string(), year: z.string() })),
-  projects:     z.array(z.object({ name: z.string(), desc: z.string(), stack: z.string(), url: z.string().default('') })),
+  first_name:   z.string().trim().min(1).max(RESUME_MAX.name),
+  last_name:    z.string().trim().min(1).max(RESUME_MAX.name),
+  title_01:     z.string().trim().min(1).max(RESUME_MAX.title),
+  title_02:     z.string().trim().min(1).max(RESUME_MAX.title),
+  email:        z.string().max(RESUME_MAX.email),
+  website:      z.string().max(RESUME_MAX.url),
+  linkedin:     z.string().max(RESUME_MAX.url),
+  location:     z.string().max(RESUME_MAX.location),
+  summary:      z.string().trim().min(1).max(RESUME_MAX.summary),
+  skill_groups: z.array(z.object({
+    label:  z.string().max(RESUME_MAX.groupLabel),
+    skills: z.array(z.string().max(RESUME_MAX.skill)).max(RESUME_MAX.skillsPerGroup),
+  })).max(RESUME_MAX.groups),
+  education:    z.array(z.object({
+    school: z.string().max(RESUME_MAX.school),
+    degree: z.string().max(RESUME_MAX.degree),
+    year:   z.string().max(RESUME_MAX.year),
+  })).max(RESUME_MAX.education),
+  projects:     z.array(z.object({
+    name:  z.string().max(RESUME_MAX.projectName),
+    desc:  z.string().max(RESUME_MAX.projectDesc),
+    stack: z.string().max(RESUME_MAX.stack),
+    url:   z.string().max(RESUME_MAX.projectUrl).default(''),
+  })).max(RESUME_MAX.projects),
   experience:   z.array(z.object({
-    company:  z.string(),
-    location: z.string(),
-    dates:    z.string(),
-    role:     z.string(),
-    bullets:  z.array(z.string()).min(1),
-  })).min(1),
+    company:  z.string().trim().min(1).max(RESUME_MAX.company),
+    location: z.string().max(RESUME_MAX.location),
+    dates:    z.string().max(RESUME_MAX.dates),
+    role:     z.string().trim().min(1).max(RESUME_MAX.role),
+    bullets:  z.array(z.string().trim().min(1).max(RESUME_MAX.bullet)).min(1).max(RESUME_MAX.bullets),
+  })).min(1).max(RESUME_MAX.experience),
 })
 export type ResumeData = z.infer<typeof resumeDataSchema>
+
+// title_02 must not contain "and" or "&" — a TEMPLATE RENDERING constraint, not an LLM-output one,
+// so it binds a user's typing exactly as it binds the model's. Shared by the generate path and the
+// edit route so the two cannot disagree about what a valid title is.
+export function title02Violation(title02: string): boolean {
+  return /\band\b/i.test(title02) || title02.includes('&')
+}
+
+export const RESUME_SOURCES = ['generated', 'edited'] as const
+
+// PUT /api/jobs/:id/resume body.
+export const resumeEditSchema = z.object({
+  data: resumeDataSchema,
+})
+
+// A row in the version list. `data` is deliberately absent — the dropdown renders id/source/date
+// only, and shipping every version's full JSON to populate it would be wasteful.
+export const resumeVersionSchema = z.object({
+  id: z.number().int(),
+  source: z.enum(RESUME_SOURCES),
+  createdAt: z.string(),
+})
+export type ResumeVersion = z.infer<typeof resumeVersionSchema>
 
 export const SETUP_TASK_ORDER = ['linkedin', 'apiKey', 'profile', 'inboxConnect', 'inboxMapping'] as const
 

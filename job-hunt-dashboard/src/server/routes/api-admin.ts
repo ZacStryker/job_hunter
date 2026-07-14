@@ -5,7 +5,7 @@ import { getCookie } from 'hono/cookie'
 import { randomBytes } from 'node:crypto'
 import argon2 from 'argon2'
 import { db } from '../../db/client'
-import { users, sessions, inviteKeys, jobs, coverLetters, statusEvents, messages, searchConfigs, userSecrets, sourceSettings, featureSettings } from '../../db/schema'
+import { users, sessions, inviteKeys, jobs, coverLetters, resumes, statusEvents, messages, searchConfigs, userSecrets, sourceSettings, featureSettings } from '../../db/schema'
 import { encrypt } from '../lib/crypto'
 import { scraperSourceSchema } from '../../shared/schemas'
 import type { AppEnv } from '../types'
@@ -119,6 +119,9 @@ app.delete('/users/:id', (c) => {
     tx.delete(messages).where(eq(messages.userId, id)).run()
     tx.delete(searchConfigs).where(eq(searchConfigs.userId, id)).run()
     tx.delete(coverLetters).where(eq(coverLetters.userId, id)).run()
+    // Before the jobs delete: resumes.job_id points at jobs.id, so purging it after would leave rows
+    // referencing a dead job as well as a dead user.
+    tx.delete(resumes).where(eq(resumes.userId, id)).run()
     const jobIds = tx.select({ id: jobs.id }).from(jobs).where(eq(jobs.userId, id)).all().map(r => r.id)
     if (jobIds.length > 0) {
       tx.delete(statusEvents).where(inArray(statusEvents.jobId, jobIds)).run()
@@ -151,6 +154,7 @@ app.post('/users/test-user', async (c) => {
       tx.delete(messages).where(eq(messages.userId, id)).run()
       tx.delete(searchConfigs).where(eq(searchConfigs.userId, id)).run()
       tx.delete(coverLetters).where(eq(coverLetters.userId, id)).run()
+      tx.delete(resumes).where(eq(resumes.userId, id)).run()
       const jobIds = tx.select({ id: jobs.id }).from(jobs).where(eq(jobs.userId, id)).all().map(r => r.id)
       if (jobIds.length > 0) {
         tx.delete(statusEvents).where(inArray(statusEvents.jobId, jobIds)).run()

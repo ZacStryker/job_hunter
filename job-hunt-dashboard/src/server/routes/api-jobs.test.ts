@@ -3,17 +3,55 @@ process.env.DB_PATH = ':memory:'
 import { describe, test, expect, beforeAll, beforeEach, afterEach, mock, spyOn } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
+import type { ResumeData } from '../../shared/schemas'
 import { Database } from 'bun:sqlite'
 import { activityRegistry } from '../services/activity-registry'
+
+// This file reads NOTHING from disk, so it must write nothing to disk either.
+//
+// bun's mock.module is process-global: api-resume.test.ts replaces `node:fs` for the whole run, so in
+// a full `bun test` this file inherits a no-op renameSync/unlinkSync while Bun.write stays REAL. The
+// generate/edit write path therefore dropped real tmp PDFs into the repo's data/resumes/ and never
+// renamed or unlinked them. That leak predates this change (the old per-JOB `${id}.pdf.tmp` name
+// overwrote itself, so it capped out at one file per job id — the repo has ~56 of them), but the
+// per-write UUID tmp name makes it unbounded: every test run would leave a fresh pile behind.
+//
+// Re-installed in beforeEach, NOT once at module load: bun restores spies at file boundaries, so a
+// single top-level spyOn can be torn down before this file's tests actually run.
+function silenceDiskWrites(): void {
+  spyOn(Bun, 'write').mockResolvedValue(0)
+}
+silenceDiskWrites()
 
 // Mock both doc-generation services BEFORE dynamic import — bun:test hoisting requirement.
 // The real services require an Anthropic key + network; these stubs are driven per-test.
 let coverLetterImpl: () => Promise<{ content: string; pdf: Buffer; inputTokens: number; outputTokens: number }> =
   async () => ({ content: 'cover', pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 0, outputTokens: 0 })
-let resumeImpl: () => Promise<{ pdf: Buffer; inputTokens: number; outputTokens: number }> =
-  async () => ({ pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 0, outputTokens: 0 })
+
+// generateResume now RETURNS the validated JSON as well as the PDF — that is the whole point of G3,
+// and the generate route persists it as a resumes row. A stub that omits `data` writes NULL into a
+// NOT NULL column and 500s.
+const RESUME_DATA: ResumeData = {
+  first_name: 'Jane', last_name: 'Doe',
+  title_01: 'Software Engineer', title_02: 'Platform Specialist',
+  email: 'jane@example.com', website: '', linkedin: '', location: 'Amsterdam',
+  summary: 'Experienced engineer building distributed systems.',
+  skill_groups: [], education: [], projects: [],
+  experience: [{
+    company: 'Acme Corp', location: 'Amsterdam', dates: '2021-2024', role: 'Senior Engineer',
+    bullets: ['Built an event pipeline processing 5M events/day.'],
+  }],
+}
+let resumeImpl: () => Promise<{ data: ResumeData; pdf: Buffer; inputTokens: number; outputTokens: number }> =
+  async () => ({ data: RESUME_DATA, pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 0, outputTokens: 0 })
 mock.module('../services/cover-letter-service', () => ({ generateCoverLetter: () => coverLetterImpl() }))
-mock.module('../services/resume-service', () => ({ generateResume: () => resumeImpl() }))
+// mock.module replaces the WHOLE module, so the edit/restore routes' renderResumePdf and the
+// template route's readResumeTemplate must be stubbed too or they arrive as undefined.
+mock.module('../services/resume-service', () => ({
+  generateResume: () => resumeImpl(),
+  renderResumePdf: async () => Buffer.from('%PDF-1.4 rendered'),
+  readResumeTemplate: async () => '<script id="resume-data" type="application/json">{}</script>',
+}))
 
 const { default: jobsRoute } = await import('./api-jobs')
 const { db: prodDb } = await import('../../db/client')
@@ -101,6 +139,21 @@ const CREATE_COVER_LETTERS_TABLE = `
   )
 `
 
+// Must stay IDENTICAL, column for column, to schema.ts and to the copies in api-resume.test.ts and
+// api-admin.test.ts. One bun test process shares one in-memory DB, so whichever file's
+// CREATE TABLE IF NOT EXISTS runs first defines `resumes` for the WHOLE suite — a divergent copy
+// breaks OTHER files, and only in the full run.
+const CREATE_RESUMES_TABLE = `
+  CREATE TABLE IF NOT EXISTS resumes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'generated'
+  )
+`
+
 const CREATE_PROFILE_TABLE = `
   CREATE TABLE IF NOT EXISTS profile (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,13 +188,16 @@ beforeAll(() => {
   prodSqlite.run(`CREATE UNIQUE INDEX IF NOT EXISTS messages_uid_user_id_idx ON messages (uid, user_id)`)
   prodSqlite.run(`CREATE UNIQUE INDEX IF NOT EXISTS messages_message_id_user_id_idx ON messages (message_id, user_id)`)
   prodSqlite.run(CREATE_COVER_LETTERS_TABLE)
+  prodSqlite.run(CREATE_RESUMES_TABLE)
   prodSqlite.run(CREATE_PROFILE_TABLE)
   prodSqlite.run(CREATE_WEBHOOK_RUNS_TABLE)
 })
 
 beforeEach(() => {
+  silenceDiskWrites()
   prodSqlite.run('DELETE FROM status_events')
   prodSqlite.run('DELETE FROM messages')
+  prodSqlite.run('DELETE FROM resumes')
   prodSqlite.run('DELETE FROM jobs')
   prodSqlite.run('DELETE FROM cover_letters')
   prodSqlite.run('DELETE FROM profile')
@@ -1168,7 +1224,7 @@ describe('POST /api/jobs/:id/generate-cover-letter', () => {
 describe('POST /api/jobs/:id/generate-resume', () => {
   test('registers a resume run with {company, role} and userId before generating (AC2)', async () => {
     const id = seedJob('Acme', 'Engineer')
-    resumeImpl = async () => ({ pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 })
+    resumeImpl = async () => ({ data: RESUME_DATA, pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 })
     const registerSpy = spyOn(activityRegistry, 'register')
 
     await jobsApp.request(`/${id}/generate-resume`, { method: 'POST' })
@@ -1183,7 +1239,7 @@ describe('POST /api/jobs/:id/generate-resume', () => {
 
   test('success finalizes done and returns 200 application/pdf (AC3)', async () => {
     const id = seedJob('Acme', 'Engineer')
-    resumeImpl = async () => ({ pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 })
+    resumeImpl = async () => ({ data: RESUME_DATA, pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 })
     const registerSpy = spyOn(activityRegistry, 'register')
     const finalizeSpy = spyOn(activityRegistry, 'finalize')
 
@@ -1240,7 +1296,7 @@ describe('POST /api/jobs/:id/generate-resume', () => {
     resumeImpl = async () => {
       callCount++
       if (callCount === 2) throw new Error('LLM exploded')
-      return { pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 }
+      return { data: RESUME_DATA, pdf: Buffer.from('%PDF-1.4 test'), inputTokens: 1, outputTokens: 2 }
     }
     const registerSpy = spyOn(activityRegistry, 'register')
     const finalizeSpy = spyOn(activityRegistry, 'finalize')

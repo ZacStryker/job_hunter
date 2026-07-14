@@ -9,7 +9,7 @@ import { db } from './db/client'
 import { users, sessions } from './db/schema'
 import { startScraperProcess, stopScraperProcess } from './server/services/scraper-process'
 import ingestRoute from './server/routes/api-ingest'
-import jobsRoute from './server/routes/api-jobs'
+import jobsRoute, { resumeTemplateApp } from './server/routes/api-jobs'
 import messagesRoute from './server/routes/api-messages'
 import webhookRunsRoute from './server/routes/api-webhook-runs'
 import webhooksRoute from './server/routes/api-webhooks'
@@ -110,6 +110,8 @@ app.use('/api/onboarding/gmail/*', emailFeaturesMiddleware)
 
 app.route('/api/ingest', ingestRoute)
 app.route('/api/jobs', jobsRoute)
+// The resume editor's preview renders from the same template bytes the server renders the PDF from.
+app.route('/api/resume-template', resumeTemplateApp)
 app.route('/api/messages', messagesRoute)
 app.route('/api/webhook-runs', webhookRunsRoute)
 app.route('/api/webhooks', webhooksRoute)

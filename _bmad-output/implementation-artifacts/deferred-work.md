@@ -1,5 +1,117 @@
 # Deferred Work
 
+## Deferred from: implementation of resume-editing-and-history / G3 (2026-07-13)
+
+- **A whole tier of fields can still be saved blank: `email`, `skill_groups[].label`, `skill_groups[].skills[]`,
+  `education[].school|degree|year`, `projects[].name|desc|stack`.** The spec's task list enumerated the
+  non-blank fields explicitly (`first_name`, `last_name`, `title_01`, `title_02`, `summary`,
+  `experience[].company`, `experience[].role`, each `bullets[]`) and separately named the fields left
+  free (`website`, `linkedin`, `location`, `projects[].url`). **Everything above appears in neither
+  list**, so each was given a `.max()` bound but no `.trim().min(1)` — implemented literally rather than
+  "fixed" silently, because tightening beyond the spec binds the **generate** path and is an explicit
+  Ask-First trigger. The user-visible consequence: clicking "Add group" / "Add skill" / "Add education"
+  / "Add project" in the editor seeds empty strings that the server happily accepts, and the template
+  renders an unlabelled group or an empty education row into the PDF. Two fixes are possible and they
+  are not equivalent — decide which: (a) extend the non-blank set in `resumeDataSchema` (binds generate
+  too), or (b) strip blank entries client-side before submit (leaves the API permissive). Flagged
+  independently by two of the three reviewers. [`src/shared/schemas.ts`, `src/client/routes/documents.tsx`]
+- **Tightening `resumeDataSchema` means the generate path can now 502 where it previously produced a
+  resume.** `.trim().min(1)` on `last_name`, `title_02` and `summary` is spec-mandated ("this binds the
+  generate path too — intentionally"), but it converts an LLM that emits `""` for one of those into a
+  hard `502 … did not conform to schema`, where before it rendered a resume with a blank field. A real
+  generation was run during verification and passed, so the limits are not wrong today — but per the
+  spec's own Ask-First rule, if a real generation starts failing on these the fix is to WIDEN the limit,
+  not drop the rule. Worth a prompt-side guarantee that those three fields are always non-empty.
+  [`src/shared/schemas.ts`, `src/server/services/prompt-defaults.ts`]
+- **A `javascript:` URL in `projects[].url` becomes a live href now that users can type it.**
+  `resume_template(1).html:421` renders the project name as `<a href="${esc(p.url)…}">`; `esc()` escapes
+  `&`/`<`/`>` and the quote is escaped separately, so there is **no injection** — but nothing validates
+  the SCHEME, so `javascript:alert(1)` survives into the anchor. It does not fire in the PDF (Playwright
+  never clicks) and the preview iframe is sandboxed without `allow-same-origin`, so this is not currently
+  exploitable; it becomes one the moment that HTML is rendered anywhere trusted, and a user could ship a
+  resume PDF whose project link is a javascript: URL. Fix: constrain `projects[].url` to http/https (or
+  drop the anchor when the scheme is not). Pre-existing in the template; this change makes the field
+  user-writable for the first time. [`src/shared/schemas.ts`, `resume_templates/resume_template(1).html:421`]
+- **The `versions` / `resume-data` responses are enveloped (`{ versions: [...] }`, `{ resume: {...} }`)
+  while the spec's frozen I/O matrix specifies a bare array / bare JSON.** Kept as an envelope
+  deliberately, for exactly the reason recorded for the cover letter below: every existing route in the
+  repo envelopes (`{ jobs }`, `{ coverLetter }`), including the sibling routes these sit beside, and
+  `project-context.md` says "if a rule contradicts the code, the code is right." Re-recorded here so the
+  deviation from frozen text is on the record for G3 too, rather than silently inherited.
+  [`src/server/routes/api-jobs.ts`]
+- **`ResumeForm` keys its array items by index.** `key={gi}` / `key={si}` / `key={ei}` / `key={bi}` /
+  `key={pi}` on lists that support removal. The values are fully controlled so the CONTENT stays correct,
+  but removing a middle item makes React reuse the removed row's DOM node for its successor, so focus /
+  caret position and any user-dragged `resize-y` textarea height migrate to the wrong entry. `ResumeData`
+  carries no per-item id, so a stable key needs either a synthesized client-side id or a schema change.
+  [`src/client/routes/documents.tsx`]
+- **`GET /api/resume-template` could not live inside `api-jobs.ts`'s router as the Code Map implied.**
+  `api-jobs.ts` is mounted at `/api/jobs` (`index.ts:112`), so a route declared on its `app` would have
+  served `/api/jobs/resume-template`, not the `/api/resume-template` the frozen I/O matrix, Design Notes
+  and Resolved Decisions all specify. Resolved by keeping the handler in `api-jobs.ts` (per the Code
+  Map) but exporting it as a small `resumeTemplateApp` mounted at the frozen path in `index.ts`. Noted
+  because it is a deviation from the Code Map's literal file/router placement, resolved in favour of the
+  frozen URL. [`src/server/routes/api-jobs.ts`, `src/index.ts:113`]
+- **The editor's preview re-renders the whole iframe on every keystroke.** `srcDoc` is rebuilt from the
+  draft on each change, so the template re-parses, re-runs `paginate()` and re-awaits `document.fonts.ready`
+  per character, and the preview's scroll position resets. Matches the cover letter's live-preview
+  behaviour and is acceptable in practice (fonts are browser-cached after the first load), but a debounce
+  would be the obvious improvement if it feels laggy on a two-page resume. [`src/client/routes/documents.tsx`]
+- **Every render still makes a third-party network call for fonts.** The template pulls Rajdhani/Barlow
+  from `fonts.googleapis.com` and gates `paginate()` on `document.fonts.ready`, and `generatePdf` waits
+  for `networkidle` — so on an offline box or during a Google Fonts outage the preview and the PDF can
+  fall back to *different* metrics and paginate differently. Called out in the spec's Design Notes as
+  explicitly out of scope. Self-hosting the three fonts would retire the whole class.
+  [`resume_templates/resume_template(1).html`]
+- **A restored resume version is indistinguishable from the original it copied** — restore copies the
+  source row's `source` forward, so restoring a `'generated'` version writes a new row also labelled
+  `'generated'`. Identical to the cover letter's already-recorded entry below; the fix (a third
+  `'restored'` enum value) needs the same human call, and now needs it in two places.
+  [`src/server/routes/api-jobs.ts`, `src/shared/schemas.ts`]
+- **The Playwright concurrency cap is still absent, and this change adds two more entry points to it.**
+  `PUT /:id/resume` and the resume restore route each launch an unthrottled chromium, alongside the
+  existing generate/edit/restore paths for both documents. The `writeResumeVersion` bounds cap the *size*
+  of any single render, but nothing caps the *number* of concurrent ones. See the G2 entry below — this
+  widens it rather than changing it. [`src/server/services/generate-pdf.ts`]
+- **`bun test` writes real PDFs into the repo's `data/` directory, and `data/resumes/` already holds ~56
+  orphaned `.pdf.tmp` files as a result.** `DATA_DIR` is hardcoded to `job-hunt-dashboard/data`, and bun's
+  `mock.module` is process-global — `api-resume.test.ts` replaces `node:fs` for the WHOLE run, so other
+  files inherit a no-op `renameSync`/`unlinkSync` while `Bun.write` stays real. The document write paths
+  therefore created tmp PDFs in the developer's actual data directory and never renamed or removed them.
+  This is **pre-existing** (the ~56 stale `NNN.pdf.tmp` files predate this change and are the fossil
+  record of it), but the new per-write UUID tmp name would have made it unbounded — one fresh file per
+  write per run instead of one per job id. Patched here by re-installing the `Bun.write` spy in
+  `beforeEach` in the three test files that drive those routes (bun restores spies at file boundaries, so
+  a single module-level `spyOn` gets torn down before the tests run). Verified: a full suite now leaves
+  `data/` byte-for-byte unchanged. **The underlying design flaw remains** — production code resolves
+  `DATA_DIR` from `import.meta.dirname` with no env override, so any test that forgets to mock `Bun.write`
+  will write to the real data directory again. Fix: make `DATA_DIR` honour `process.env.DATA_DIR` and point
+  the suite at a temp dir. The ~56 existing orphans are safe to delete but were left alone (they are the
+  user's data directory, not ours). [`src/server/routes/api-jobs.ts` `DATA_DIR`, all PDF-route test files]
+- **`api-jobs.test.ts` cannot be run on its own.** Standalone it dies with `SyntaxError: Export named
+  'renderCoverLetterPdf' not found in module '.../cover-letter-service.ts'` — its `mock.module` for
+  cover-letter-service omits that export, and it only survives the full run because another file's mock of
+  the same module wins first. Confirmed **pre-existing** (reproduced on the clean baseline with this change
+  stashed). It means the suite's "run one file to debug it" workflow is broken for the largest route test
+  file, and it hides exactly the cross-file mock coupling that this repo keeps getting bitten by. Fix: add
+  `renderCoverLetterPdf` to that file's mock. [`src/server/routes/api-jobs.test.ts`]
+- **`writeCoverLetterVersion` still commits the row and bumps the clock BEFORE renaming the PDF.**
+  The G3 review found this in `writeResumeVersion` (all three reviewers, independently) and it was fixed
+  there by moving `renameSync` INSIDE the transaction, so a failed rename rolls back the INSERT and the
+  bump — the spec's frozen I/O matrix requires "no row is committed and no bump happens". The **cover
+  letter's** helper still has the original shape: on a failed rename it returns 500 with the row
+  committed and `coverLetterSentAt` bumped, so the version list shows an edit whose PDF was never
+  written and `?t=` cache-busts to the previous render. Same one-line fix (move the rename into the
+  transaction); left alone here because it is G2 code and outside this change. Note this also means the
+  two helpers now differ in shape — do not "restore consistency" by reverting the resume one.
+  [`src/server/routes/api-jobs.ts` `writeCoverLetterVersion`]
+- **The `generate-cover-letter` tmp-path race is now fixed for resumes only.** Routing
+  `POST /:id/generate-resume` through `writeResumeVersion` gave it the per-write UUID tmp name, the
+  in-transaction bump, and a 500 on a failed rename. The **cover letter's** generate route
+  (`api-jobs.ts`) still writes its own `${rawId}.pdf.tmp` by hand and still swallows its rename failure —
+  the G2 entry below is therefore now half-closed. The two share a tmp directory, so give generate-cover-letter
+  the same treatment. [`src/server/routes/api-jobs.ts`]
+
 ## Deferred from: adversarial review of cover-letter-editing-and-history / G2+G6 (2026-07-13)
 
 - **The pre-existing `generate-cover-letter` route still has the tmp-path race and swallows its rename failure.** `api-jobs.ts:383-385` writes `${rawId}.pdf.tmp` — a per-JOB tmp name, not per-write — and its `renameSync` failure is logged, not surfaced, so it returns `200` with a `coverLetter` body while the PDF on disk is the previous render. The new edit/restore helper (`writeCoverLetterVersion`) was fixed during review (per-write UUID tmp name, tmp cleanup on failure, 500 on rename failure), but **the generate path was deliberately left alone** — it is outside this change and shares the tmp directory, so the two can still collide with each other. Fix: give generate the same treatment. [`job-hunt-dashboard/src/server/routes/api-jobs.ts:383`]
@@ -81,8 +193,16 @@ only in the full run).
 
 **Also still deferred, from the same intent (Stage 2, and explicitly declined items):** G3 — resume
 structured editing (needs a new append-only `resumes` table first, because the validated JSON is
-currently discarded after render at `resume-service.ts:119-123`; this is the stage that makes the
-resume editable *and* gives it history on the same code path). G4 — provenance highlighting (declined
+currently discarded after render at `resume-service.ts:145-149`; this is the stage that makes the
+resume editable *and* gives it history on the same code path). **Now specced and adversarially
+reviewed:** `spec-resume-editing-and-history.md` (status `ready`; 14 review findings applied).
+Decisions: editing is text + add/remove, **no reorder**; Regenerate becomes **non-destructive**;
+the client gets the template from a new `GET /api/resume-template`. The review surfaced two live
+bugs that G3 must fix and that exist **today**: (a) the resume PDF has **no cache-buster** —
+`JobDrawer.tsx:551,589` are bare URLs and `GET /:id/resume` sends no cache validators, so Regenerate
+can serve a stale PDF; (b) `resume-service.ts:139` injects `JSON.stringify` into a `<script>` tag
+without escaping `<`, which becomes a real injection vector the moment users can type into resume
+fields. G4 — provenance highlighting (declined
 for now; noted for the record that overclaiming was named the *most dangerous* defect and an editor
 only fixes what you **notice**). G5 — regenerate-with-instruction (overlaps heavily with G1; revisit
 after G1 lands).

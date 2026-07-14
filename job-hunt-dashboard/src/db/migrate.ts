@@ -78,6 +78,27 @@ function repairCoverLettersSchema(): void {
   }
 }
 
+// `resumes` is a NEW table (migration 0042), so on a clean run the migrator creates it and this is a
+// no-op. It exists because this project has a documented history of migration drift — the guarded
+// loop in repairCoverLettersSchema is here precisely because a repair once fired ALTER TABLE at a
+// table that did not exist. A drifted DB that never applied 0042 would otherwise 500 every resume
+// route with `no such table: resumes`. Kept identical to schema.ts / 0042_milky_winter_soldier.sql.
+function ensureResumesTable(): void {
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS resumes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      job_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      data TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      source TEXT DEFAULT 'generated' NOT NULL,
+      FOREIGN KEY (job_id) REFERENCES jobs(id) ON UPDATE no action ON DELETE no action,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE no action
+    )
+  `)
+  sqlite.run(`CREATE INDEX IF NOT EXISTS resumes_user_id_idx ON resumes (user_id)`)
+}
+
 function backfillDateArchived(): void {
   const result = sqlite
     .prepare(
@@ -107,6 +128,7 @@ export function runMigrations(): void {
   repairSchema()
   repairWebhookRunsSchema()
   repairCoverLettersSchema()
+  ensureResumesTable()
   backfillDateArchived()
   reclaimStrandedAnalyzing()
   console.log('[db] Migrations complete')

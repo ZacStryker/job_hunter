@@ -127,6 +127,20 @@ beforeAll(() => {
       source TEXT NOT NULL DEFAULT 'generated'
     )
   `)
+  // Must stay IDENTICAL, column for column, to schema.ts and to the copies in api-resume.test.ts
+  // and api-jobs.test.ts. One bun test process shares one in-memory DB, so whichever file's
+  // CREATE TABLE IF NOT EXISTS runs first defines `resumes` for the WHOLE suite — a divergent copy
+  // breaks OTHER files, and only in the full run.
+  prodSqlite.run(`
+    CREATE TABLE IF NOT EXISTS resumes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      data TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'generated'
+    )
+  `)
   prodSqlite.run(`
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -166,6 +180,7 @@ beforeAll(() => {
 beforeEach(() => {
   prodSqlite.run('DELETE FROM status_events')
   prodSqlite.run('DELETE FROM cover_letters')
+  prodSqlite.run('DELETE FROM resumes')
   prodSqlite.run('DELETE FROM messages')
   prodSqlite.run('DELETE FROM search_configs')
   prodSqlite.run('DELETE FROM user_secrets')
@@ -615,6 +630,8 @@ describe('DELETE /api/admin/users/:id', () => {
     prodSqlite.run(`INSERT INTO messages (uid, received_at, from_address, subject, user_id) VALUES ('uid1', ?, 'a@b.com', 'Hi', 2)`, [new Date().toISOString()])
     prodSqlite.run(`INSERT INTO search_configs (source, query, user_id) VALUES ('linkedin', 'engineer', 2)`)
     prodSqlite.run(`INSERT INTO user_secrets (user_id, key_name, ciphertext, updated_at) VALUES (2, 'imap_password', 'enc', ?)`, [new Date().toISOString()])
+    prodSqlite.run(`INSERT INTO cover_letters (job_id, user_id, content, created_at) VALUES (10, 2, 'letter', ?)`, [new Date().toISOString()])
+    prodSqlite.run(`INSERT INTO resumes (job_id, user_id, data, created_at) VALUES (10, 2, '{}', ?)`, [new Date().toISOString()])
     const app = makeAdminApp(1, 1)
     const res = await request(app, '/users/2', { method: 'DELETE' })
     expect(res.status).toBe(204)
@@ -625,6 +642,9 @@ describe('DELETE /api/admin/users/:id', () => {
     expect(prodSqlite.query('SELECT * FROM messages WHERE user_id = 2').all()).toHaveLength(0)
     expect(prodSqlite.query('SELECT * FROM search_configs WHERE user_id = 2').all()).toHaveLength(0)
     expect(prodSqlite.query('SELECT * FROM user_secrets WHERE user_id = 2').all()).toHaveLength(0)
+    expect(prodSqlite.query('SELECT * FROM cover_letters WHERE user_id = 2').all()).toHaveLength(0)
+    // Miss this and deleting a user leaves resume rows pointing at a dead user_id AND a dead job_id.
+    expect(prodSqlite.query('SELECT * FROM resumes WHERE user_id = 2').all()).toHaveLength(0)
   })
 
   test('self-delete → 403', async () => {
