@@ -172,10 +172,18 @@ describe('generateResume() — validation', () => {
     await expect(generateResume(MOCK_JOB, TEST_USER_ID)).rejects.toThrow('Resume generation failed: LLM output did not conform to schema')
   })
 
-  test('throws when title_02 contains "and"', async () => {
+  test('sanitizes title_02 instead of failing when it contains "and"', async () => {
     const bad = { ...VALID_RESUME_JSON, title_02: 'Systems Engineer and Architect' }
     mockAnthropicSuccess(JSON.stringify(bad))
-    await expect(generateResume(MOCK_JOB, TEST_USER_ID)).rejects.toThrow('title_02 contains')
+    const result = await generateResume(MOCK_JOB, TEST_USER_ID)
+    expect(result.data.title_02).toBe('Systems Engineer')
+  })
+
+  test('sanitizes title_02 instead of failing when it contains "&"', async () => {
+    const bad = { ...VALID_RESUME_JSON, title_02: 'Platform & Infrastructure' }
+    mockAnthropicSuccess(JSON.stringify(bad))
+    const result = await generateResume(MOCK_JOB, TEST_USER_ID)
+    expect(result.data.title_02).toBe('Platform')
   })
 
   test('throws when LLM output is not valid JSON', async () => {

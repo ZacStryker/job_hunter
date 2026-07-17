@@ -461,6 +461,17 @@ export function title02Violation(title02: string): boolean {
   return /\band\b/i.test(title02) || title02.includes('&')
 }
 
+// The generate path SANITIZES rather than rejects: the model occasionally slips an "and"/"&" into
+// title_02 despite the prompt rule, and throwing away an entire paid generation over a two-word
+// cosmetic field is the wrong trade. The template renders "title_01 and title_02", so a connective
+// inside title_02 doubles it ("Engineer and X and Y"). Keeping only the first clause — everything
+// before the first "and"/"&" — restores the intended grammar. The word boundary spares titles like
+// "Brand Strategist" (the "and" must stand alone); a literal "&" is always a connective here, so
+// "no ampersands" holds even at the cost of clipping a rare "R&D"-style title to its first token.
+export function sanitizeTitle02(title02: string): string {
+  return title02.replace(/\s*(?:\band\b|&).*$/is, '').trim()
+}
+
 export const RESUME_SOURCES = ['generated', 'edited'] as const
 
 // PUT /api/jobs/:id/resume body.
