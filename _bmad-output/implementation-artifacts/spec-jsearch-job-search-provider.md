@@ -70,6 +70,10 @@ context:
 - Given `JSEARCH_API_KEY` is unset, when `search()` is called, then `JobSearchNotConfiguredError` is thrown and no network call is made.
 - Given the client bundle, when built, then `JSEARCH_API_KEY` and the provider modules never appear in it (server-only).
 
+## Spec Change Log
+
+- **2026-07-17 — JSearch API v2 migration (post-merge, found running the spike).** Live calls showed the JSearch API no longer serves `/search` (`404 "Endpoint '/search' does not exist"`); the current endpoint is `/search-v2`, whose response nests results under `data.jobs` (cursor pagination) rather than a top-level `data[]` array. Job-item field names are unchanged, so `normalize()` was untouched. Also corrected the geo model: v2 returns **nothing** for a location baked into the free-text query — it requires structured `country` (ISO alpha-2) + `city` params, and remote uses `work_from_home` (not `remote_jobs_only`). `JobSearchQuery.location` was replaced with `country`/`city`. Known-bad state avoided: a provider that returns 0 results for every location-scoped search (the primary NL use case) while appearing to "work" for US-default queries. KEEP: the pure `normalize()` seam and the not-configured/error-handling contract survived unchanged.
+
 ## Design Notes
 
 JSearch response is `{ status, data: [...] }`. Per-item mapping into `jobInputSchema`:

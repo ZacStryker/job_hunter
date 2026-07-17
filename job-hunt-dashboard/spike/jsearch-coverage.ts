@@ -8,22 +8,23 @@
 
 import { getJobSearchProvider, JobSearchNotConfiguredError } from '../src/server/services/job-search'
 
-const QUERIES: { query: string; location?: string; remoteOnly?: boolean }[] = [
-  { query: 'senior frontend engineer', location: 'Amsterdam, Netherlands' },
-  { query: 'react developer', location: 'Berlin, Germany' },
-  { query: 'full stack engineer', location: 'London, United Kingdom' },
-  { query: 'typescript developer', remoteOnly: true },
-  { query: 'platform engineer', location: 'Remote' },
-  { query: 'staff software engineer', location: 'San Francisco, CA' },
-  { query: 'backend engineer golang', location: 'Austin, TX' },
-  { query: 'devops engineer kubernetes', location: 'Toronto, Canada' },
-  { query: 'data engineer', location: 'New York, NY' },
-  { query: 'machine learning engineer', remoteOnly: true },
-  { query: 'product designer', location: 'Amsterdam, Netherlands' },
-  { query: 'engineering manager', location: 'Dublin, Ireland' },
-  { query: 'python developer', location: 'Utrecht, Netherlands' },
-  { query: 'site reliability engineer', location: 'Remote' },
-  { query: 'security engineer', location: 'Seattle, WA' },
+// v2 geo model: structured country (ISO alpha-2) + city, NOT location in the query.
+const QUERIES: { query: string; country?: string; city?: string; remoteOnly?: boolean }[] = [
+  { query: 'senior frontend engineer', country: 'nl', city: 'Amsterdam' },
+  { query: 'react developer', country: 'de', city: 'Berlin' },
+  { query: 'full stack engineer', country: 'gb', city: 'London' },
+  { query: 'typescript developer', country: 'us', remoteOnly: true },
+  { query: 'platform engineer', country: 'nl', city: 'Utrecht' },
+  { query: 'staff software engineer', country: 'us', city: 'San Francisco' },
+  { query: 'backend engineer golang', country: 'us', city: 'Austin' },
+  { query: 'devops engineer kubernetes', country: 'ca', city: 'Toronto' },
+  { query: 'data engineer', country: 'us', city: 'New York' },
+  { query: 'machine learning engineer', country: 'us', remoteOnly: true },
+  { query: 'product designer', country: 'nl', city: 'Amsterdam' },
+  { query: 'engineering manager', country: 'ie', city: 'Dublin' },
+  { query: 'python developer', country: 'nl', city: 'Rotterdam' },
+  { query: 'site reliability engineer', country: 'gb', city: 'London' },
+  { query: 'security engineer', country: 'us', city: 'Seattle' },
 ]
 
 function pct(n: number, total: number): string {
@@ -45,7 +46,8 @@ async function main() {
       const withApply = jobs.filter((j) => j.sourceUrl).length
       const withSalary = jobs.filter((j) => j.salary).length
       const distinctLocations = new Set(jobs.map((j) => j.location).filter(Boolean)).size
-      const label = q.location ? `${q.query} @ ${q.location}` : `${q.query} (remote)`
+      const geo = q.city ? `${q.city}, ${q.country}` : q.remoteOnly ? 'remote' : q.country ?? '—'
+      const label = `${q.query} @ ${geo}`
       console.log(
         label.slice(0, 34).padEnd(34),
         String(jobs.length).padStart(4),

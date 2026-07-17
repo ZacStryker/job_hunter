@@ -7,15 +7,18 @@ import type { JobInput } from '../../../shared/schemas'
 export type JobSearchDatePosted = 'all' | 'today' | '3days' | 'week' | 'month'
 
 export interface JobSearchQuery {
-  // Free-text query, e.g. "react developer in Amsterdam".
+  // Free-text role/skills query, e.g. "react developer". Location does NOT go
+  // here — JSearch v2 returns nothing for location baked into the query string;
+  // use country/city instead.
   query: string
+  // ISO 3166-1 alpha-2 country code, e.g. 'nl', 'us', 'gb'. Provider default 'us'.
+  country?: string
+  // City to scope within the country, e.g. 'Amsterdam'.
+  city?: string
   // 1-based page index (provider default: 1).
   page?: number
   // Number of pages to fetch in one call (provider default: 1).
   numPages?: number
-  // Optional location filter, appended to the query when the provider has no
-  // dedicated location parameter.
-  location?: string
   remoteOnly?: boolean
   datePosted?: JobSearchDatePosted
 }

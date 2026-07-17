@@ -71,8 +71,13 @@ describe('normalize', () => {
 
 describe('jsearchProvider.search', () => {
   test('sends key + host headers and returns normalized results', async () => {
-    const calls = mockFetch({ status: 'OK', data: [SAMPLE_JOB] })
-    const results = await jsearchProvider.search({ query: 'react developer', location: 'Amsterdam' })
+    const calls = mockFetch({ status: 'OK', data: { jobs: [SAMPLE_JOB] } })
+    const results = await jsearchProvider.search({
+      query: 'react developer',
+      country: 'nl',
+      city: 'Amsterdam',
+      remoteOnly: true,
+    })
 
     expect(results).toHaveLength(1)
     expect(jobInputSchema.safeParse(results[0]).success).toBe(true)
@@ -80,14 +85,18 @@ describe('jsearchProvider.search', () => {
     const headers = calls[0].init?.headers as Record<string, string>
     expect(headers['X-RapidAPI-Key']).toBe('test-key')
     expect(headers['X-RapidAPI-Host']).toBe('jsearch.p.rapidapi.com')
-    expect(calls[0].url).toContain('jsearch.p.rapidapi.com/search')
-    // location is folded into the query when set (URLSearchParams encodes spaces as +)
-    expect(calls[0].url).toContain('query=react+developer+in+Amsterdam')
+    expect(calls[0].url).toContain('jsearch.p.rapidapi.com/search-v2')
+    // v2 geo params are structured, not folded into the query
+    expect(calls[0].url).toContain('query=react+developer')
+    expect(calls[0].url).toContain('country=nl')
+    expect(calls[0].url).toContain('city=Amsterdam')
+    expect(calls[0].url).toContain('work_from_home=true')
+    expect(calls[0].url).not.toContain('in+Amsterdam')
   })
 
   test('throws JobSearchNotConfiguredError and makes no request when the key is unset', async () => {
     delete process.env.JSEARCH_API_KEY
-    const calls = mockFetch({ status: 'OK', data: [] })
+    const calls = mockFetch({ status: 'OK', data: { jobs: [] } })
     await expect(jsearchProvider.search({ query: 'x' })).rejects.toBeInstanceOf(
       JobSearchNotConfiguredError,
     )
@@ -99,10 +108,10 @@ describe('jsearchProvider.search', () => {
     await expect(jsearchProvider.search({ query: 'x' })).rejects.toThrow('429')
   })
 
-  test('returns an empty array when the feed has no data', async () => {
-    mockFetch({ status: 'OK', data: [] })
+  test('returns an empty array when the feed has no jobs', async () => {
+    mockFetch({ status: 'OK', data: { jobs: [] } })
     expect(await jsearchProvider.search({ query: 'x' })).toEqual([])
-    mockFetch({ status: 'OK' }) // data field absent entirely
+    mockFetch({ status: 'OK', data: null }) // data absent entirely
     expect(await jsearchProvider.search({ query: 'x' })).toEqual([])
   })
 })
