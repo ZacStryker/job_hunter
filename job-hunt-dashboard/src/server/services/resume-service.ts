@@ -7,7 +7,7 @@ import { decrypt } from '../lib/crypto'
 import { generatePdf } from './generate-pdf'
 import { loadEffectivePrompt } from './prompt-defaults'
 import { buildResumeHtml } from '../../shared/resume-html'
-import { resumeDataSchema, profileDataSchema, title02Violation } from '../../shared/schemas'
+import { resumeDataSchema, profileDataSchema, sanitizeTitle02 } from '../../shared/schemas'
 import type { Job, ProfileData, ResumeData } from '../../shared/schemas'
 
 const EMPTY_PROFILE_DATA: ProfileData = {
@@ -146,15 +146,17 @@ export async function generateResume(job: Job, userId: number): Promise<{ data: 
     throw new Error(`Resume generation failed: LLM output did not conform to schema — ${issues}`)
   }
 
-  if (title02Violation(parsed.data.title_02)) {
-    throw new Error('Resume generation failed: title_02 contains "and" or "&" — violates template rendering rule')
-  }
+  // title_02 is SANITIZED, never rejected: a connective the model slipped past the prompt rule is a
+  // cosmetic flaw in a two-word field, not a reason to discard an entire paid generation. The user
+  // can further adjust it in the editor. (The manual edit route still rejects, because there the
+  // typing is direct and the 400 is immediate, actionable feedback rather than a lost generation.)
+  const resume = { ...parsed.data, title_02: sanitizeTitle02(parsed.data.title_02) }
 
   // The validated JSON is RETURNED, not discarded. It used to die here — which is why a resume could
   // be rerolled but never edited, diffed, or reverted. The caller persists it as a resumes row.
   return {
-    data: parsed.data,
-    pdf: await renderResumePdf(parsed.data),
+    data: resume,
+    pdf: await renderResumePdf(resume),
     inputTokens: data.usage?.input_tokens ?? 0,
     outputTokens: data.usage?.output_tokens ?? 0,
   }
