@@ -137,6 +137,10 @@ export const searchConfigs = sqliteTable('search_configs', {
   source: text('source').notNull(),
   query: text('query').notNull(),
   location: text('location'),
+  // Structured geo for the 'jsearch' source (JSearch v2 needs ISO alpha-2 country
+  // + optional city). Scraper sources use `location` and leave these null.
+  country: text('country'),
+  city: text('city'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
   userId: integer('user_id').notNull().references(() => users.id),
 }, (table) => [

@@ -84,13 +84,34 @@ afterEach(() => {
 })
 
 describe('POST /api/webhooks/discovery', () => {
-  test('returns 503 when SCRAPER_URL is not set', async () => {
+  test('returns 503 when neither SCRAPER_URL nor JSEARCH_API_KEY is set', async () => {
+    const origKey = process.env.JSEARCH_API_KEY
     delete process.env.SCRAPER_URL
-    const res = await asUser(1).request('/discovery', { method: 'POST' })
-    expect(res.status).toBe(503)
-    const body = await res.json() as { error: string }
-    expect(body).toHaveProperty('error')
-    expect(body).not.toHaveProperty('message')
+    delete process.env.JSEARCH_API_KEY
+    try {
+      const res = await asUser(1).request('/discovery', { method: 'POST' })
+      expect(res.status).toBe(503)
+      const body = await res.json() as { error: string }
+      expect(body).toHaveProperty('error')
+      expect(body).not.toHaveProperty('message')
+    } finally {
+      if (origKey === undefined) delete process.env.JSEARCH_API_KEY
+      else process.env.JSEARCH_API_KEY = origKey
+    }
+  })
+
+  test('proceeds (no 503) with JSEARCH_API_KEY set even when SCRAPER_URL is absent', async () => {
+    const origKey = process.env.JSEARCH_API_KEY
+    delete process.env.SCRAPER_URL
+    process.env.JSEARCH_API_KEY = 'test-key'
+    mockRunDiscovery = async () => ({ inserted: 1, bySource: { jsearch: 1 }, errors: [] })
+    try {
+      const res = await asUser(1).request('/discovery', { method: 'POST' })
+      expect(res.status).toBe(200)
+    } finally {
+      if (origKey === undefined) delete process.env.JSEARCH_API_KEY
+      else process.env.JSEARCH_API_KEY = origKey
+    }
   })
 
   test('streams done event with inserted count on success', async () => {

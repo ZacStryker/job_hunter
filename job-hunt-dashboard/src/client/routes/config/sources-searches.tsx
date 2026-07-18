@@ -32,11 +32,18 @@ export function SourcesSearchesRoute() {
   const [source, setSource] = useState<ScraperSource>('linkedin')
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
+  const [country, setCountry] = useState('')
+  const [city, setCity] = useState('')
+  // The select falls back to the first addable source when `source` isn't enabled; use the
+  // effective value so the jsearch geo fields and validation track what's actually shown.
+  const effectiveSource: ScraperSource = addableSources.includes(source) ? source : (addableSources[0] ?? source)
 
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editSource, setEditSource] = useState<ScraperSource>('linkedin')
   const [editQuery, setEditQuery] = useState('')
   const [editLocation, setEditLocation] = useState('')
+  const [editCountry, setEditCountry] = useState('')
+  const [editCity, setEditCity] = useState('')
 
   const [sortCol, setSortCol] = useState<SortCol>('source')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
@@ -50,12 +57,14 @@ export function SourcesSearchesRoute() {
     }
   }
 
-  function startEdit(row: { id: number; source: ScraperSource; query: string; location: string | null }) {
+  function startEdit(row: { id: number; source: ScraperSource; query: string; location: string | null; country: string | null; city: string | null }) {
     updateMutation.reset()
     setEditingId(row.id)
     setEditSource(row.source)
     setEditQuery(row.query)
     setEditLocation(row.location ?? '')
+    setEditCountry(row.country ?? '')
+    setEditCity(row.city ?? '')
   }
 
   function cancelEdit() {
@@ -64,20 +73,37 @@ export function SourcesSearchesRoute() {
   }
 
   function handleSaveEdit(id: number) {
+    const isJsearch = editSource === 'jsearch'
     updateMutation.mutate(
-      { id, source: editSource, query: editQuery, location: editLocation.trim() || null },
+      {
+        id,
+        source: editSource,
+        query: editQuery,
+        location: isJsearch ? null : (editLocation.trim() || null),
+        country: isJsearch ? (editCountry.trim() || null) : null,
+        city: isJsearch ? (editCity.trim() || null) : null,
+      },
       { onSuccess: () => setEditingId(null) }
     )
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const isJsearch = effectiveSource === 'jsearch'
     addMutation.mutate(
-      { source, query, location: location.trim() || null },
+      {
+        source: effectiveSource,
+        query,
+        location: isJsearch ? null : (location.trim() || null),
+        country: isJsearch ? (country.trim() || null) : null,
+        city: isJsearch ? (city.trim() || null) : null,
+      },
       {
         onSuccess: () => {
           setQuery('')
           setLocation('')
+          setCountry('')
+          setCity('')
         },
       }
     )
@@ -100,7 +126,7 @@ export function SourcesSearchesRoute() {
           <select
             id="sc-source"
             className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100"
-            value={addableSources.includes(source) ? source : (addableSources[0] ?? source)}
+            value={effectiveSource}
             onChange={(e) => setSource(e.target.value as ScraperSource)}
             disabled={addableSources.length === 0 || sourceSettingsLoading}
           >
@@ -123,21 +149,48 @@ export function SourcesSearchesRoute() {
             placeholder="e.g. genai ml python"
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="sc-location" className="text-xs text-zinc-400">Location (optional)</label>
-          <input
-            id="sc-location"
-            className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100"
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. remote"
-          />
-        </div>
+        {effectiveSource === 'jsearch' ? (
+          <>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="sc-country" className="text-xs text-zinc-400">Country (ISO, e.g. nl)</label>
+              <input
+                id="sc-country"
+                className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100 w-24"
+                type="text"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                placeholder="nl"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="sc-city" className="text-xs text-zinc-400">City (optional)</label>
+              <input
+                id="sc-city"
+                className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100"
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="Amsterdam"
+              />
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="sc-location" className="text-xs text-zinc-400">Location (optional)</label>
+            <input
+              id="sc-location"
+              className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100"
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. remote"
+            />
+          </div>
+        )}
         <button
           type="submit"
           className="px-3 py-1 rounded bg-zinc-700 text-zinc-100 text-sm hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!query.trim() || addMutation.isPending || addableSources.length === 0 || sourceSettingsLoading}
+          disabled={!query.trim() || addMutation.isPending || addableSources.length === 0 || sourceSettingsLoading || (effectiveSource === 'jsearch' && !country.trim())}
         >
           Add
         </button>
@@ -191,19 +244,40 @@ export function SourcesSearchesRoute() {
                     />
                   </TableCell>
                   <TableCell className="px-3 py-1">
-                    <input
-                      className={inputCls}
-                      type="text"
-                      value={editLocation}
-                      onChange={(e) => setEditLocation(e.target.value)}
-                      placeholder="optional"
-                    />
+                    {editSource === 'jsearch' ? (
+                      <div className="flex gap-1">
+                        <input
+                          className={`${inputCls} w-20`}
+                          type="text"
+                          value={editCountry}
+                          onChange={(e) => setEditCountry(e.target.value)}
+                          placeholder="country"
+                          aria-label="Country"
+                        />
+                        <input
+                          className={inputCls}
+                          type="text"
+                          value={editCity}
+                          onChange={(e) => setEditCity(e.target.value)}
+                          placeholder="city (optional)"
+                          aria-label="City"
+                        />
+                      </div>
+                    ) : (
+                      <input
+                        className={inputCls}
+                        type="text"
+                        value={editLocation}
+                        onChange={(e) => setEditLocation(e.target.value)}
+                        placeholder="optional"
+                      />
+                    )}
                   </TableCell>
                   <TableCell className="px-3 py-1 whitespace-nowrap">
                     <button
                       aria-label="Save"
                       className="text-zinc-300 hover:text-green-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed mr-2"
-                      disabled={!editQuery.trim() || updateMutation.isPending}
+                      disabled={!editQuery.trim() || updateMutation.isPending || (editSource === 'jsearch' && !editCountry.trim())}
                       onClick={() => handleSaveEdit(row.id)}
                     >
                       ✓
@@ -240,7 +314,9 @@ export function SourcesSearchesRoute() {
                   </TableCell>
                   <TableCell className="px-3 py-2 text-zinc-300">{row.query}</TableCell>
                   <TableCell className="px-3 py-2 text-zinc-300">
-                    {row.location ?? <span className="text-zinc-600">—</span>}
+                    {row.source === 'jsearch'
+                      ? ([row.city, row.country].filter(Boolean).join(', ') || <span className="text-zinc-600">—</span>)
+                      : (row.location ?? <span className="text-zinc-600">—</span>)}
                   </TableCell>
                   <TableCell className="px-3 py-2 whitespace-nowrap">
                     <button
