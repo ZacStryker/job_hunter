@@ -3,10 +3,11 @@ import { db } from '../../db/client'
 import { jobs, searchConfigs, userSecrets, sourceSettings, profile, companyBlacklist } from '../../db/schema'
 import { decrypt, encrypt } from '../lib/crypto'
 import { profileDataSchema } from '../../shared/schemas'
-import type { ScraperSource, ProfileData } from '../../shared/schemas'
+import type { ScraperSource, ProfileData, JobInput } from '../../shared/schemas'
 import { getOrComputeResumeEmbedding } from './resume-embedding-cache'
 import { embed, cosineSimilarity } from './embedding-service'
 import { setupHealth } from './setup-health'
+import { getJobSearchProvider, JobSearchNotConfiguredError } from './job-search'
 
 const EMPTY_PROFILE_DATA: ProfileData = {
   personal: { fullName: '', email: '', phone: null, location: null, summary: null, skills: null, websites: [] },
@@ -27,10 +28,11 @@ interface ScraperResult {
   company: string
   location: string | null
   url: string | null
+  salary?: string | null // only the jsearch path populates this; scrapers leave it undefined
 }
 
 const DB_SOURCE: Record<ScraperSource, string> = {
-  linkedin: 'linkedin', indeed: 'indeed', indeed_nl: 'indeed_nl', arc: 'arc',
+  linkedin: 'linkedin', indeed: 'indeed', indeed_nl: 'indeed_nl', arc: 'arc', jsearch: 'jsearch',
 }
 
 async function hashText(text: string): Promise<string> {
@@ -45,7 +47,8 @@ export async function runDiscovery(
 ): Promise<{ inserted: number; bySource: Record<string, number>; errors: Array<{ source: string; error: string }> }> {
   const scraperUrl = process.env.SCRAPER_URL
   const scraperToken = process.env.SCRAPER_TOKEN
-  if (!scraperUrl) throw new Error('SCRAPER_URL not configured')
+  // No hard requirement on SCRAPER_URL: the 'jsearch' source needs no scraper. Scraper
+  // sources soft-fail per-source below when SCRAPER_URL is absent, so a jsearch-only run works.
 
   const _debugStart = Date.now()
   console.log(`[DISCOVERY] start — userId=${userId ?? 'none'} scraperUrl=${scraperUrl}`)
@@ -173,8 +176,87 @@ export async function runDiscovery(
 
   const dateScraped = new Date().toISOString()
 
+  // Shared new-record filter (dedup + junk-row + blacklist guard) and insert, used by
+  // both the scraper path and the jsearch path so their dedup/insert cannot drift.
+  const filterNew = (results: ScraperResult[]): ScraperResult[] =>
+    results.filter((r) => {
+      if (!r.id || !r.company || !r.title || existingIds.has(r.id) || seen.has(r.id)) return false
+      if (blacklistedNames.size > 0 && blacklistedNames.has(r.company.toLowerCase())) return false
+      seen.add(r.id)
+      return true
+    })
+
+  const insertNewJobs = (dbSource: string, newForSource: ScraperResult[]) => {
+    if (newForSource.length === 0) return
+    bySource[dbSource] = (bySource[dbSource] ?? 0) + newForSource.length
+    if (userId === undefined) return
+    onProgress?.(`Inserting ${newForSource.length} jobs from ${dbSource}…`)
+    db.transaction((tx) => {
+      for (const job of newForSource) {
+        tx
+          .insert(jobs)
+          .values({
+            company: job.company,
+            jobTitle: job.title,
+            location: job.location ?? null,
+            sourceUrl: job.url ?? null,
+            salary: job.salary ?? null,
+            source: dbSource,
+            externalJobId: job.id,
+            dateScraped,
+            analysisStatus: 'pending',
+            userId,
+          })
+          .onConflictDoNothing()
+          .run()
+      }
+    })
+    totalInserted += newForSource.length
+    for (const job of newForSource) {
+      allInsertedJobs.push({ id: job.id, title: job.title })
+    }
+    onJobsInserted?.(newForSource.length, dbSource)
+  }
+
   const processSearch = async (s: typeof activeSearches[number]) => {
     const dbSource = DB_SOURCE[s.source as ScraperSource] ?? s.source
+
+    // JSearch source: call the managed provider directly (no scraper round-trip), then
+    // run results through the SAME dedup/insert path as the scrapers.
+    if (s.source === 'jsearch') {
+      onProgress?.(`Searching JSearch: ${s.query}…`)
+      let found: JobInput[]
+      try {
+        found = await getJobSearchProvider('jsearch').search({
+          query: s.query,
+          country: s.country ?? undefined,
+          city: s.city ?? undefined,
+        })
+      } catch (err: unknown) {
+        const msg = err instanceof JobSearchNotConfiguredError
+          ? 'JSearch not configured — set JSEARCH_API_KEY'
+          : err instanceof Error ? err.message : String(err)
+        console.error(`[DISCOVERY] ← jsearch failed: ${msg}`)
+        errors.push({ source: 'jsearch', error: msg })
+        return
+      }
+      const mapped: ScraperResult[] = found.map((j) => ({
+        id: j.externalJobId ?? '',
+        title: j.jobTitle,
+        company: j.company,
+        location: j.location,
+        url: j.sourceUrl,
+        salary: j.salary,
+      }))
+      insertNewJobs(dbSource, filterNew(mapped))
+      return
+    }
+
+    // Scraper sources require the scraper service; soft-fail per-source if it's absent.
+    if (!scraperUrl) {
+      errors.push({ source: s.source, error: 'SCRAPER_URL not configured' })
+      return
+    }
     onProgress?.(`Searching ${s.source}: ${s.query}…`)
 
     const requestBody: Record<string, unknown> = {
@@ -247,44 +329,7 @@ export async function runDiscovery(
       }
     }
 
-    const newForSource = (data.results ?? []).filter((r) => {
-      if (!r.id || !r.company || !r.title || existingIds.has(r.id) || seen.has(r.id)) return false
-      if (blacklistedNames.size > 0 && blacklistedNames.has(r.company.toLowerCase())) return false
-      seen.add(r.id)
-      return true
-    })
-
-    if (newForSource.length > 0) {
-      bySource[dbSource] = (bySource[dbSource] ?? 0) + newForSource.length
-    }
-
-    if (newForSource.length > 0 && userId !== undefined) {
-      onProgress?.(`Inserting ${newForSource.length} jobs from ${dbSource}…`)
-      db.transaction((tx) => {
-        for (const job of newForSource) {
-          tx
-            .insert(jobs)
-            .values({
-              company: job.company,
-              jobTitle: job.title,
-              location: job.location ?? null,
-              sourceUrl: job.url ?? null,
-              source: dbSource,
-              externalJobId: job.id,
-              dateScraped,
-              analysisStatus: 'pending',
-              userId,
-            })
-            .onConflictDoNothing()
-            .run()
-        }
-      })
-      totalInserted += newForSource.length
-      for (const job of newForSource) {
-        allInsertedJobs.push({ id: job.id, title: job.title })
-      }
-      onJobsInserted?.(newForSource.length, dbSource)
-    }
+    insertNewJobs(dbSource, filterNew(data.results ?? []))
   }
 
   await Promise.allSettled(activeSearches.map(processSearch))

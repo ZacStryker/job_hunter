@@ -162,6 +162,9 @@ beforeAll(() => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       source TEXT NOT NULL,
       query TEXT NOT NULL,
+      location TEXT,
+      country TEXT,
+      city TEXT,
       enabled INTEGER NOT NULL DEFAULT 1,
       user_id INTEGER NOT NULL REFERENCES users(id)
     )

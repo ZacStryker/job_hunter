@@ -305,19 +305,38 @@ export type AnalysisRequest = z.infer<typeof analysisRequestSchema>
 export type StatusEvent = z.infer<typeof statusEventSchema>
 export type Message = z.infer<typeof messageSchema>
 
-export const SCRAPER_SOURCES = ['linkedin', 'indeed', 'indeed_nl', 'arc'] as const
+// Note: 'jsearch' is not scraped — it's the managed JSearch/Google-for-Jobs feed
+// (see job-search/ provider). The enum name is now a slight misnomer; kept as-is
+// because renaming ripples across the schema, admin toggles, DB_SOURCE, and the UI.
+export const SCRAPER_SOURCES = ['linkedin', 'indeed', 'indeed_nl', 'arc', 'jsearch'] as const
 export const scraperSourceSchema = z.enum(SCRAPER_SOURCES)
 export const searchConfigSchema = z.object({
   id: z.number().int(),
   source: scraperSourceSchema,
   query: z.string(),
   location: z.string().nullable(),
+  // country (ISO alpha-2) + city are used only by the 'jsearch' source; scraper
+  // sources read `location`. See spec-jsearch-discovery-wiring.
+  country: z.string().nullable(),
+  city: z.string().nullable(),
   enabled: z.boolean(),
 })
 export const searchConfigInputSchema = z.object({
   source: scraperSourceSchema,
   query: z.string().min(1),
   location: z.string().nullable(),
+  country: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+}).superRefine((val, ctx) => {
+  // JSearch v2 requires a structured country; a location baked into the query returns
+  // zero. The refine only *requires* country for jsearch — it does not forbid it elsewhere.
+  if (val.source === 'jsearch' && (val.country == null || val.country.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['country'],
+      message: 'country is required for the jsearch source (ISO alpha-2, e.g. "nl")',
+    })
+  }
 })
 export type SearchConfig = z.infer<typeof searchConfigSchema>
 export type SearchConfigInput = z.infer<typeof searchConfigInputSchema>
