@@ -20,7 +20,11 @@ const CACHE_READ_MULT = 0.1
 const app = new Hono<AppEnv>()
 
 app.post('/discovery', (c) => {
-  if (!process.env.SCRAPER_URL) return c.json({ error: 'SCRAPER_URL not configured' }, 503)
+  // Discovery needs at least one usable source: the scraper (SCRAPER_URL) or the managed
+  // JSearch feed (JSEARCH_API_KEY). runDiscovery soft-fails per-source for whichever is absent.
+  if (!process.env.SCRAPER_URL && !process.env.JSEARCH_API_KEY) {
+    return c.json({ error: 'No job source configured (need SCRAPER_URL or JSEARCH_API_KEY)' }, 503)
+  }
   const userId = c.get('userId')
   if (activityRegistry.hasRunning(userId, 'discovery')) {
     return c.json({ error: 'A discovery run is already in progress' }, 409)

@@ -22,6 +22,8 @@ const CREATE_SEARCH_CONFIGS_TABLE = `
     source TEXT NOT NULL,
     query TEXT NOT NULL,
     location TEXT,
+    country TEXT,
+    city TEXT,
     enabled INTEGER NOT NULL DEFAULT 1,
     user_id INTEGER NOT NULL DEFAULT 1
   )
@@ -82,6 +84,42 @@ describe('POST /api/search-configs', () => {
     expect(res.status).toBe(201)
     const body = await res.json() as { location: null }
     expect(body.location).toBeNull()
+  })
+
+  test('persists country and city for the jsearch source', async () => {
+    const res = await searchConfigsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'jsearch', query: 'software engineer', location: null, country: 'nl', city: 'Amsterdam' }),
+    })
+    expect(res.status).toBe(201)
+    const body = await res.json() as { source: string; country: string | null; city: string | null }
+    expect(body.source).toBe('jsearch')
+    expect(body.country).toBe('nl')
+    expect(body.city).toBe('Amsterdam')
+  })
+
+  test('returns 400 when the jsearch source is missing country', async () => {
+    const res = await searchConfigsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'jsearch', query: 'software engineer', location: null }),
+    })
+    expect(res.status).toBe(400)
+    const body = await res.json() as { error: string }
+    expect(body).toHaveProperty('error')
+  })
+
+  test('scraper source without country/city stores them null (refine does not forbid absence)', async () => {
+    const res = await searchConfigsApp.request('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'linkedin', query: 'genai', location: 'Amsterdam' }),
+    })
+    expect(res.status).toBe(201)
+    const body = await res.json() as { country: string | null; city: string | null }
+    expect(body.country).toBeNull()
+    expect(body.city).toBeNull()
   })
 
   test('returns 400 for invalid source enum', async () => {

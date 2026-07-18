@@ -26,7 +26,9 @@ app.post('/', async (c) => {
     return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body' }, 400)
   }
   const { source, query, location } = parsed.data
-  const result = db.insert(searchConfigs).values({ source, query, location, userId }).returning().get()
+  const country = parsed.data.country ?? null
+  const city = parsed.data.city ?? null
+  const result = db.insert(searchConfigs).values({ source, query, location, country, city, userId }).returning().get()
   return c.json(result, 201)
 })
 
@@ -47,9 +49,11 @@ app.put('/:id', async (c) => {
     return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body' }, 400)
   }
   const { source, query, location } = parsed.data
+  const country = parsed.data.country ?? null
+  const city = parsed.data.city ?? null
   const result = db
     .update(searchConfigs)
-    .set({ source, query, location })
+    .set({ source, query, location, country, city })
     .where(and(eq(searchConfigs.id, rawId), eq(searchConfigs.userId, userId)))
     .returning()
     .get()

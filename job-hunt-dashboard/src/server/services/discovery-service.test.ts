@@ -88,6 +88,8 @@ const CREATE_SEARCH_CONFIGS_TABLE = `
     source TEXT NOT NULL,
     query TEXT NOT NULL,
     location TEXT,
+    country TEXT,
+    city TEXT,
     enabled INTEGER NOT NULL DEFAULT 1,
     user_id INTEGER NOT NULL DEFAULT 1
   )
@@ -144,11 +146,13 @@ beforeAll(() => {
   prodSqlite.run(CREATE_PROFILE_TABLE)
   prodSqlite.run(CREATE_USER_EMBEDDINGS_TABLE)
   prodSqlite.run(CREATE_COMPANY_BLACKLIST_TABLE)
-  prodSqlite.run(`INSERT OR IGNORE INTO source_settings (source, enabled) VALUES ('linkedin',1),('indeed',1),('indeed_nl',1),('arc',1)`)
+  prodSqlite.run(`INSERT OR IGNORE INTO source_settings (source, enabled) VALUES ('linkedin',1),('indeed',1),('indeed_nl',1),('arc',1),('jsearch',1)`)
   prodSqlite.run(`INSERT INTO search_configs (source, query, enabled) VALUES ('linkedin', 'genai python', 1)`)
   process.env.SCRAPER_URL = 'http://test-scraper.invalid'
   process.env.SCRAPER_TOKEN = 'test-token'
 })
+
+const originalJsearchKey = process.env.JSEARCH_API_KEY
 
 afterAll(() => {
   prodSqlite.run('DELETE FROM search_configs')
@@ -252,11 +256,19 @@ describe('runDiscovery()', () => {
     expect(calls[0].source).toBe('linkedin')
   })
 
-  test('missing SCRAPER_URL: throws', async () => {
+  test('missing SCRAPER_URL: scraper sources soft-fail per-source, no throw', async () => {
     const original = process.env.SCRAPER_URL
     delete process.env.SCRAPER_URL
-    await expect(runDiscovery(undefined, 1)).rejects.toThrow('SCRAPER_URL not configured')
-    process.env.SCRAPER_URL = original
+    // arc is a scraper source that needs no session secret, so it reaches the scraper guard.
+    prodSqlite.run(`INSERT INTO search_configs (source, query, enabled, user_id) VALUES ('arc', 'backend dev', 1, 1)`)
+    try {
+      const { inserted, errors } = await runDiscovery(undefined, 1)
+      expect(inserted).toBe(0)
+      expect(errors.some((e) => e.source === 'arc' && e.error === 'SCRAPER_URL not configured')).toBe(true)
+    } finally {
+      prodSqlite.run(`DELETE FROM search_configs WHERE source = 'arc'`)
+      process.env.SCRAPER_URL = original
+    }
   })
 
   test('onProgress: emits search messages before fetches and insert message before transaction', async () => {
@@ -886,6 +898,100 @@ describe('runDiscovery()', () => {
         brokenSpy.mockRestore()
         healthySpy.mockRestore()
       }
+    })
+  })
+
+  describe('jsearch source', () => {
+    const addJsearchConfig = () =>
+      prodSqlite.run(
+        `INSERT INTO search_configs (source, query, country, city, enabled, user_id) VALUES ('jsearch', 'software engineer', 'nl', 'Amsterdam', 1, 1)`
+      )
+
+    const jsearchResponse = (jobs: unknown[]) =>
+      Promise.resolve(new Response(
+        JSON.stringify({ status: 'OK', data: { jobs } }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      ))
+
+    afterEach(() => {
+      prodSqlite.run(`DELETE FROM search_configs WHERE source = 'jsearch'`)
+      if (originalJsearchKey === undefined) delete process.env.JSEARCH_API_KEY
+      else process.env.JSEARCH_API_KEY = originalJsearchKey
+    })
+
+    test('inserts JSearch jobs with no SCRAPER_URL (jsearch-only run, no throw)', async () => {
+      const originalScraper = process.env.SCRAPER_URL
+      delete process.env.SCRAPER_URL
+      process.env.JSEARCH_API_KEY = 'test-key'
+      addJsearchConfig()
+      globalThis.fetch = mock(() => jsearchResponse([
+        { job_id: 'js-1', job_title: 'SWE', employer_name: 'JCorp', job_city: 'Amsterdam', job_country: 'NL', job_min_salary: 70000, job_max_salary: 90000, job_salary_period: 'YEAR' },
+      ])) as unknown as typeof fetch
+      try {
+        const { inserted } = await runDiscovery(undefined, 1)
+        expect(inserted).toBe(1)
+        const row = prodSqlite.prepare(`SELECT * FROM jobs WHERE external_job_id = 'js-1'`).get() as Record<string, unknown>
+        expect(row.source).toBe('jsearch')
+        expect(row.company).toBe('JCorp')
+        expect(row.analysis_status).toBe('pending')
+        expect(row.salary).toBe('70000–90000 / year')
+      } finally {
+        process.env.SCRAPER_URL = originalScraper
+      }
+    })
+
+    test('missing JSEARCH_API_KEY becomes a per-source error, not a throw', async () => {
+      delete process.env.JSEARCH_API_KEY
+      addJsearchConfig()
+      globalThis.fetch = mock(() => jsearchResponse([])) as unknown as typeof fetch
+      const { errors } = await runDiscovery(undefined, 1)
+      expect(errors.some((e) => e.source === 'jsearch')).toBe(true)
+    })
+
+    test('mixed run: jsearch inserts while a scraper source soft-fails without SCRAPER_URL', async () => {
+      const originalScraper = process.env.SCRAPER_URL
+      delete process.env.SCRAPER_URL
+      process.env.JSEARCH_API_KEY = 'test-key'
+      addJsearchConfig()
+      prodSqlite.run(`INSERT INTO search_configs (source, query, enabled, user_id) VALUES ('arc', 'backend dev', 1, 1)`)
+      globalThis.fetch = mock(() => jsearchResponse([
+        { job_id: 'js-mix', job_title: 'Dev', employer_name: 'MixCo' },
+      ])) as unknown as typeof fetch
+      try {
+        const { inserted, errors } = await runDiscovery(undefined, 1)
+        expect(inserted).toBe(1)
+        expect(prodSqlite.prepare(`SELECT source FROM jobs WHERE external_job_id = 'js-mix'`).get()).toEqual({ source: 'jsearch' })
+        expect(errors.some((e) => e.source === 'arc' && e.error === 'SCRAPER_URL not configured')).toBe(true)
+      } finally {
+        prodSqlite.run(`DELETE FROM search_configs WHERE source = 'arc'`)
+        process.env.SCRAPER_URL = originalScraper
+      }
+    })
+
+    test('dedup: a JSearch job whose externalJobId already exists is skipped', async () => {
+      process.env.JSEARCH_API_KEY = 'test-key'
+      addJsearchConfig()
+      prodSqlite.run(`INSERT INTO jobs (company, job_title, external_job_id, analysis_status, source, user_id) VALUES ('JCorp', 'SWE', 'js-dup', 'done', 'jsearch', 1)`)
+      globalThis.fetch = mock(() => jsearchResponse([
+        { job_id: 'js-dup', job_title: 'SWE', employer_name: 'JCorp' },
+      ])) as unknown as typeof fetch
+      const { inserted } = await runDiscovery(undefined, 1)
+      expect(inserted).toBe(0)
+    })
+
+    test('tenant isolation: discovery for user B never runs user A configs or writes A rows', async () => {
+      process.env.JSEARCH_API_KEY = 'test-key'
+      addJsearchConfig() // owned by user 1
+      let fetched = false
+      globalThis.fetch = mock(() => {
+        fetched = true
+        return jsearchResponse([{ job_id: 'js-a', job_title: 'SWE', employer_name: 'ACorp' }])
+      }) as unknown as typeof fetch
+      // Run as user 2 — they have no configs, so nothing is fetched or written.
+      const { inserted } = await runDiscovery(undefined, 2)
+      expect(inserted).toBe(0)
+      expect(fetched).toBe(false)
+      expect(prodSqlite.prepare(`SELECT COUNT(*) AS n FROM jobs WHERE external_job_id = 'js-a'`).get()).toEqual({ n: 0 })
     })
   })
 })
