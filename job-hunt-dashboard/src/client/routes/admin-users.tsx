@@ -26,6 +26,7 @@ import { useToggleEmailFeaturesMutation } from '@/hooks/useToggleEmailFeaturesMu
 import { UserEditDrawer } from '@/components/admin/UserEditDrawer'
 import { apiFetch } from '@/lib/api'
 import { toast } from 'sonner'
+import { SCRAPER_SOURCES } from '@shared/schemas'
 import type { AdminUser, InviteKey, ScraperSource } from '@shared/schemas'
 
 type DialogState =
@@ -363,26 +364,25 @@ export function AdminUsersRoute() {
               </tr>
             </thead>
             <tbody>
-              {sourceSettingsList.map((setting) => (
-                <tr key={setting.source} className="border-b border-zinc-800/50">
-                  <td className="px-4 py-3 text-zinc-100 font-mono text-xs">{setting.source}</td>
-                  <td className="px-4 py-3">
-                    <Switch
-                      checked={setting.enabled}
-                      onCheckedChange={(checked) => handleToggleSource(setting.source as ScraperSource, checked)}
-                      disabled={toggleSourceMutation.isPending}
-                      aria-label={`${setting.enabled ? 'Disable' : 'Enable'} ${setting.source}`}
-                    />
-                  </td>
-                </tr>
-              ))}
-              {sourceSettingsList.length === 0 && (
-                <tr>
-                  <td colSpan={2} className="px-4 py-6 text-center text-zinc-500 text-sm">
-                    No source settings found.
-                  </td>
-                </tr>
-              )}
+              {/* Render every known source, not just those with a DB row: a source lacking a row
+                  (e.g. jsearch on a drifted DB) still needs a toggle. Missing rows default to
+                  enabled; toggling upserts via the PATCH endpoint in handleToggleSource. */}
+              {SCRAPER_SOURCES.map((source) => {
+                const enabled = sourceSettingsList.find((s) => s.source === source)?.enabled ?? true
+                return (
+                  <tr key={source} className="border-b border-zinc-800/50">
+                    <td className="px-4 py-3 text-zinc-100 font-mono text-xs">{source}</td>
+                    <td className="px-4 py-3">
+                      <Switch
+                        checked={enabled}
+                        onCheckedChange={(checked) => handleToggleSource(source, checked)}
+                        disabled={toggleSourceMutation.isPending}
+                        aria-label={`${enabled ? 'Disable' : 'Enable'} ${source}`}
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
