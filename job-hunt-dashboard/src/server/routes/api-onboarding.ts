@@ -117,6 +117,9 @@ app.put('/imap', async (c) => {
     auth: { user: parsed.data.user, pass: parsed.data.pass },
     logger: false,
   })
+  // ImapFlow is an EventEmitter: an 'error' event with no listener is rethrown
+  // by Node/Bun as an uncaught exception, crashing the whole process.
+  client.on('error', () => { /* handled via connect()/logout() rejections below */ })
 
   let connected = false
   const timeoutPromise = new Promise<never>((_, reject) =>

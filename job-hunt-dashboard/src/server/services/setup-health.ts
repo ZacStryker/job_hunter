@@ -56,6 +56,12 @@ export async function probeImap(creds: ImapCreds): Promise<ProbeResult> {
     auth: { user: creds.user, pass: creds.pass },
     logger: false,
   })
+  // ImapFlow is an EventEmitter: an 'error' event with no listener is rethrown
+  // by Node/Bun as an uncaught exception, which crashes the whole process.
+  // Socket-level errors (reset, timeout) surface via this event independently
+  // of the connect()/logout() promises, so this listener must exist even
+  // though we handle failures through those promises' rejections.
+  client.on('error', () => { /* handled via probeImap's own try/catch below */ })
 
   let connected = false
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -81,7 +87,9 @@ export async function probeImap(creds: ImapCreds): Promise<ProbeResult> {
     if (timer) clearTimeout(timer)
     // Tear down the socket even when the timeout won the race: the pending
     // connect() may still resolve later and would otherwise leak its connection.
-    client.close()
+    // close() throws NoConnection when auth failed before the socket opened —
+    // swallow it so it doesn't escape the caller's try/catch as an unhandled rejection.
+    try { client.close() } catch { /* swallow NoConnection */ }
   }
 }
 
@@ -138,6 +146,9 @@ export async function probeInboxMapping(
       auth: { user: creds.imapCreds.user, pass: creds.imapCreds.pass },
       logger: false,
     })
+    // See probeImap: without an 'error' listener, ImapFlow rethrows socket-level
+    // errors as uncaught exceptions that crash the process.
+    client.on('error', () => { /* handled via this function's own try/catch below */ })
     let timer: ReturnType<typeof setTimeout> | undefined
     const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(Object.assign(new Error('IMAP timeout'), { name: 'TimeoutError' })), 10000)

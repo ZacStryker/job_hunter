@@ -40,6 +40,9 @@ export async function fetchAndStoreEmails(credentials: ImapCredentials, userId: 
     auth: { user: credentials.user, pass: credentials.pass },
     logger: false,
   })
+  // ImapFlow is an EventEmitter: an 'error' event with no listener is rethrown
+  // by Node/Bun as an uncaught exception, crashing the whole process.
+  client.on('error', () => { /* handled via connect()/logout() rejections above */ })
 
   let added = 0
   try {
