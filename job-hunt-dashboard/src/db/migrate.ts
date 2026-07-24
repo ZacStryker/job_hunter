@@ -99,6 +99,24 @@ function ensureResumesTable(): void {
   sqlite.run(`CREATE INDEX IF NOT EXISTS resumes_user_id_idx ON resumes (user_id)`)
 }
 
+// `source_settings` (migration 0027) is skipped by the migrator on incrementally-migrated DBs:
+// its journal `when` timestamp (1747440000000) was backdated far below its neighbors, and drizzle's
+// bun-sqlite migrator applies by a single high-water `created_at`, so any DB already past that value
+// never runs it. Same class of drift as ensureResumesTable. CREATE IF NOT EXISTS + INSERT OR IGNORE
+// keeps this a no-op on healthy DBs. Seeds jsearch too, which no migration ever seeded — without it
+// the admin UI has no jsearch row to toggle, blocking every jsearch search config.
+// Kept identical to schema.ts / 0027_source_settings.sql (plus the jsearch row).
+function ensureSourceSettingsTable(): void {
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS source_settings (
+      source TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 1
+    )
+  `)
+  sqlite.run(`INSERT OR IGNORE INTO source_settings (source, enabled) VALUES
+    ('linkedin',1),('indeed',1),('indeed_nl',1),('arc',1),('jsearch',1)`)
+}
+
 function backfillDateArchived(): void {
   const result = sqlite
     .prepare(
@@ -129,6 +147,7 @@ export function runMigrations(): void {
   repairWebhookRunsSchema()
   repairCoverLettersSchema()
   ensureResumesTable()
+  ensureSourceSettingsTable()
   backfillDateArchived()
   reclaimStrandedAnalyzing()
   console.log('[db] Migrations complete')
